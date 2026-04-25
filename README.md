@@ -37,7 +37,7 @@ in [`CLAUDE.md`](CLAUDE.md).
 
 ### One-time setup
 ```bash
-git clone https://github.com/botargento/dashboard.git botargento-dashboard
+git clone https://github.com/jperez1804/botargento-dashboard.git botargento-dashboard
 cd botargento-dashboard
 pnpm install
 

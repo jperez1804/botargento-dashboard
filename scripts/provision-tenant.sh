@@ -28,6 +28,8 @@ TENANT_ROOT="/opt/n8n/$TENANT"
 TENANT_ENV="$TENANT_ROOT/.env"
 N8N_POSTGRES_CONTAINER="n8n-$TENANT-postgres"
 DASHBOARD_CONTAINER="n8n-$TENANT-dashboard"
+DASHBOARD_IMAGE_REPO="${DASHBOARD_IMAGE_REPO:-ghcr.io/jperez1804/dashboard}"
+RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/jperez1804/botargento-dashboard/main}"
 
 if [[ ! -d "$TENANT_ROOT" ]]; then
   echo "✗ $TENANT_ROOT does not exist."
@@ -128,9 +130,9 @@ MIGRATIONS_DIR="$REPO_ROOT/migrations"
 if [[ ! -f "$MIGRATIONS_DIR/0000_init.sql" ]]; then
   echo "→ Local migrations not found — fetching from GitHub raw…"
   MIGRATIONS_DIR="$(mktemp -d)"
-  curl -fsSL https://raw.githubusercontent.com/botargento/dashboard/main/migrations/0000_init.sql \
+  curl -fsSL "$RAW_BASE_URL/migrations/0000_init.sql" \
     -o "$MIGRATIONS_DIR/0000_init.sql"
-  curl -fsSL https://raw.githubusercontent.com/botargento/dashboard/main/migrations/0001_escalation_type.sql \
+  curl -fsSL "$RAW_BASE_URL/migrations/0001_escalation_type.sql" \
     -o "$MIGRATIONS_DIR/0001_escalation_type.sql"
 fi
 
@@ -191,7 +193,7 @@ mkdir -p "$TENANT_ROOT/assets"
 cat > "$COMPOSE_FILE" <<YAML
 services:
   dashboard:
-    image: ghcr.io/botargento/dashboard:\${DASHBOARD_TAG:-latest}
+    image: ${DASHBOARD_IMAGE_REPO}:\${DASHBOARD_TAG:-latest}
     container_name: ${DASHBOARD_CONTAINER}
     restart: unless-stopped
     expose:

@@ -909,7 +909,7 @@ See Section 12 for full workflow YAML. Push to `main` triggers image build + pus
 ### Local dev setup
 
 ```bash
-git clone https://github.com/botargento/dashboard.git botargento-dashboard
+git clone https://github.com/jperez1804/botargento-dashboard.git botargento-dashboard
 cd botargento-dashboard
 pnpm install
 
@@ -993,7 +993,7 @@ sudo mkdir -p /opt/scripts
 sudo chown deploy:deploy /opt/scripts
 
 # Install the shared deploy script (see Section 12.5)
-curl -fsSL https://raw.githubusercontent.com/botargento/dashboard/main/scripts/update-dashboards.sh \
+curl -fsSL https://raw.githubusercontent.com/jperez1804/botargento-dashboard/main/scripts/update-dashboards.sh \
   -o /opt/scripts/update-dashboards.sh
 chmod +x /opt/scripts/update-dashboards.sh
 
@@ -1065,9 +1065,9 @@ On the VPS, as the `deploy` user, with a psql shell into the client's Postgres. 
 ```bash
 mkdir -p /opt/n8n/<clientN>/migrations
 # Copy the migration SQL files from the dashboard repo or fetch them from GitHub raw:
-curl -fsSL https://raw.githubusercontent.com/botargento/dashboard/main/migrations/0000_init.sql \
+curl -fsSL https://raw.githubusercontent.com/jperez1804/botargento-dashboard/main/migrations/0000_init.sql \
   -o /opt/n8n/<clientN>/migrations/0000_init.sql
-curl -fsSL https://raw.githubusercontent.com/botargento/dashboard/main/migrations/0001_escalation_type.sql \
+curl -fsSL https://raw.githubusercontent.com/jperez1804/botargento-dashboard/main/migrations/0001_escalation_type.sql \
   -o /opt/n8n/<clientN>/migrations/0001_escalation_type.sql
 
 # Generate a strong password for the dashboard's DB user
@@ -1139,7 +1139,7 @@ Create `/opt/n8n/<clientN>/dashboard.compose.yml` (shown with `<clientN>` = `cli
 ```yaml
 services:
   dashboard:
-    image: ghcr.io/botargento/dashboard:${DASHBOARD_TAG:-latest}
+    image: ghcr.io/jperez1804/dashboard:${DASHBOARD_TAG:-latest}
     container_name: n8n-client1-dashboard
     restart: unless-stopped
     expose:
