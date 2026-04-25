@@ -117,4 +117,4 @@ Server Components await Drizzle queries from `src/lib/queries/*.ts` and render H
 7. **Migrations are additive only.** No `DROP COLUMN` or destructive changes without a multi-deploy migration plan.
 8. **Max 300 lines per component file.** Extract when larger.
 9. **All env vars validated with Zod at boot.** The container fails fast on misconfiguration, not at request time.
-10. **No secrets in Git, ever.** `.env*` is in `.gitignore`. Secrets live in `/opt/tenants/<clientN>/dashboard.env` on the VPS.
+10. **No secrets in Git, ever.** `.env*` is in `.gitignore`. Secrets live in `/opt/n8n/<clientN>/dashboard.env` on the VPS.

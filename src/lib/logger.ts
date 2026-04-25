@@ -2,7 +2,6 @@ import pino, { type Logger } from "pino";
 import { env } from "@/lib/env";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __logger: Logger | undefined;
 }
 
@@ -17,9 +16,24 @@ function build(): Logger {
             target: "pino-pretty",
             options: { colorize: true, translateTime: "HH:MM:ss.l" },
           },
-        }),
+      }),
   });
 }
 
-export const logger: Logger = global.__logger ?? build();
-if (env().NODE_ENV !== "production") global.__logger = logger;
+function getLogger(): Logger {
+  if (global.__logger) return global.__logger;
+
+  const instance = build();
+  if (env().NODE_ENV !== "production") {
+    global.__logger = instance;
+  }
+
+  return instance;
+}
+
+// Keep call sites unchanged while deferring env reads until runtime.
+export const logger = new Proxy({} as Logger, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getLogger(), prop, receiver);
+  },
+}) as Logger;
