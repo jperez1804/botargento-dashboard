@@ -1,0 +1,8 @@
+services:
+  postgres-dev:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: dashboard_dev
+    ports: ["5433:5432"]
+    volumes: ["./dev-seed.sql:/docker-entrypoint-initdb.d/01-seed.sql"]
