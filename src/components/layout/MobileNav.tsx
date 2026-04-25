@@ -34,7 +34,11 @@ export function MobileNav({ items }: Props) {
   const pathname = usePathname();
 
   // Close the sheet when the route changes
-  useEffect(() => setOpen(false), [pathname]);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setOpen(false);
+  }
 
   // Lock body scroll while open
   useEffect(() => {

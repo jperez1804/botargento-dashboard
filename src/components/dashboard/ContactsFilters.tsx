@@ -14,16 +14,26 @@ export function ContactsFilters() {
   const sp = useSearchParams();
   const [pending, startTransition] = useTransition();
 
-  const [search, setSearch] = useState(sp.get("q") ?? "");
-  const [from, setFrom] = useState(sp.get("from") ?? "");
-  const [to, setTo] = useState(sp.get("to") ?? "");
+  const urlQ = sp.get("q") ?? "";
+  const urlFrom = sp.get("from") ?? "";
+  const urlTo = sp.get("to") ?? "";
+
+  const [search, setSearch] = useState(urlQ);
+  const [from, setFrom] = useState(urlFrom);
+  const [to, setTo] = useState(urlTo);
 
   // Sync local state when the URL changes from outside (e.g. browser back).
-  useEffect(() => {
-    setSearch(sp.get("q") ?? "");
-    setFrom(sp.get("from") ?? "");
-    setTo(sp.get("to") ?? "");
-  }, [sp]);
+  const [prevUrl, setPrevUrl] = useState({ q: urlQ, from: urlFrom, to: urlTo });
+  if (
+    prevUrl.q !== urlQ ||
+    prevUrl.from !== urlFrom ||
+    prevUrl.to !== urlTo
+  ) {
+    setPrevUrl({ q: urlQ, from: urlFrom, to: urlTo });
+    setSearch(urlQ);
+    setFrom(urlFrom);
+    setTo(urlTo);
+  }
 
   // Debounced URL sync. Filters live in the URL so state survives reload + share.
   useEffect(() => {

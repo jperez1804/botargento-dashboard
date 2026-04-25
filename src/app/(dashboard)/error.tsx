@@ -12,8 +12,6 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Surface to dev console; container logs catch it server-side.
-    // eslint-disable-next-line no-console
     console.error(error);
   }, [error]);
 
