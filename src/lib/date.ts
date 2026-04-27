@@ -36,7 +36,9 @@ export function formatDateTime(iso: string, locale: string, timezone: string): s
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    // Pin h23 (00–23) so midnight renders as "00:00" on every ICU build.
+    // Some Linux ICU bundles default es-AR + hour12:false to h24 ("24:00").
+    hourCycle: "h23",
     timeZone: timezone,
   }).format(new Date(iso));
 }
