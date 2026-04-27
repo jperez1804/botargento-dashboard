@@ -5,7 +5,7 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
+const handler = auth((req) => {
   if (req.auth) return NextResponse.next();
   const loginUrl = new URL("/login", req.nextUrl);
   const { pathname, search } = req.nextUrl;
@@ -14,6 +14,12 @@ export default auth((req) => {
   }
   return NextResponse.redirect(loginUrl);
 });
+
+// Next 16's proxy convention requires a named `proxy` export (or a default
+// function). `auth(fn)` returns a non-function callable, so we wrap it.
+export function proxy(...args: Parameters<typeof handler>) {
+  return (handler as (...a: Parameters<typeof handler>) => ReturnType<typeof handler>)(...args);
+}
 
 export const config = {
   matcher: ["/((?!api/auth|_next|favicon.ico|logos|login|verify).*)"],
