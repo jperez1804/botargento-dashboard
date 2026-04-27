@@ -6,8 +6,8 @@ const LOG_PATH = path.resolve(".playwright-dev-server.log");
 
 test.describe.configure({ mode: "serial" });
 
-test.beforeEach(() => {
-  resetAuthState();
+test.beforeEach(async () => {
+  await resetAuthState();
 });
 
 test("unauthenticated /  → redirected to /login", async ({ page }) => {

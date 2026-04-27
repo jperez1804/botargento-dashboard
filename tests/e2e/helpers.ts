@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
+import postgres from "postgres";
 import type { Page } from "@playwright/test";
 
 const ALLOWED_EMAIL = "dev@botargento.com.ar";
@@ -73,24 +73,19 @@ export async function loginAsDevViaLog(page: Page, logPath: string) {
 
 /**
  * Truncate auth-related dev tables before a test so retries / re-runs don't
- * trip on stale tokens.
+ * trip on stale tokens. Connects directly via TENANT_DB_URL so it works in
+ * both local docker-compose dev and CI's GitHub Actions Postgres service.
  */
-export function resetAuthState() {
-  spawnSync(
-    "docker",
-    [
-      "exec",
-      "docker-postgres-dev-1",
-      "psql",
-      "-U",
-      "postgres",
-      "-d",
-      "dashboard_dev",
-      "-c",
-      "TRUNCATE dashboard.magic_link_tokens; TRUNCATE dashboard.audit_log;",
-    ],
-    { encoding: "utf8" },
-  );
+export async function resetAuthState() {
+  const url = process.env.TENANT_DB_URL;
+  if (!url) throw new Error("TENANT_DB_URL is required for resetAuthState");
+  const sql = postgres(url, { max: 1, idle_timeout: 1 });
+  try {
+    await sql`TRUNCATE dashboard.magic_link_tokens`;
+    await sql`TRUNCATE dashboard.audit_log`;
+  } finally {
+    await sql.end({ timeout: 1 });
+  }
 }
 
 /** Read the freshest magic-link URL from Postgres + the rendered email body. */

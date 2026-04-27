@@ -80,4 +80,5 @@ jobs:
           path: |
             playwright-report
             test-results
+            .playwright-dev-server.log
           retention-days: 7

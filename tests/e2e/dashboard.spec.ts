@@ -7,7 +7,7 @@ const LOG_PATH = path.resolve(".playwright-dev-server.log");
 test.describe.configure({ mode: "serial" });
 
 test.beforeEach(async ({ page }) => {
-  resetAuthState();
+  await resetAuthState();
   await loginAsDevViaLog(page, LOG_PATH);
 });
 
