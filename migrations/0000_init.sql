@@ -52,6 +52,7 @@ END $$;
 
 DO $$
 BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO dashboard_app', current_database());
   IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'automation') THEN
     GRANT USAGE ON SCHEMA automation TO dashboard_app;
     GRANT SELECT ON ALL TABLES IN SCHEMA automation TO dashboard_app;

@@ -34,7 +34,14 @@ function substitute(content) {
 }
 
 async function run() {
-  await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS dashboard`);
+  try {
+    await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS dashboard`);
+  } catch (err) {
+    // Provisioning creates the dashboard schema with an elevated DB user.
+    // If the app role cannot create schemas at the database level, continue
+    // as long as the schema already exists.
+    if (err?.code !== "42501") throw err;
+  }
   await sql.unsafe(`
     CREATE TABLE IF NOT EXISTS dashboard.__migrations (
       filename    text PRIMARY KEY,
