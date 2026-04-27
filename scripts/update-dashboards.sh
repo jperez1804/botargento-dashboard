@@ -17,6 +17,21 @@ TENANT_FILTER="${1:-all}"
 TAG="${2:-latest}"
 TENANT_ROOT="/opt/n8n"
 REGISTRY="/opt/scripts/tenants.txt"
+COMPOSE_CMD=()
+
+detect_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker compose)
+    return
+  fi
+  if docker-compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker-compose)
+    return
+  fi
+
+  echo "✗ Neither 'docker compose' nor 'docker-compose' is available."
+  exit 1
+}
 
 if [[ "$TENANT_FILTER" == "all" ]]; then
   if [[ ! -f "$REGISTRY" ]]; then
@@ -27,6 +42,8 @@ if [[ "$TENANT_FILTER" == "all" ]]; then
 else
   TENANTS="$TENANT_FILTER"
 fi
+
+detect_compose
 
 for t in $TENANTS; do
   COMPOSE_FILE="$TENANT_ROOT/$t/dashboard.compose.yml"
@@ -52,8 +69,12 @@ for t in $TENANTS; do
   fi
 
   cd "$TENANT_ROOT/$t"
-  docker compose --env-file dashboard.env -f dashboard.compose.yml pull dashboard
-  docker compose --env-file dashboard.env -f dashboard.compose.yml up -d dashboard
+  set -a
+  # shellcheck disable=SC1091
+  source "$ENV_FILE"
+  set +a
+  "${COMPOSE_CMD[@]}" -f dashboard.compose.yml pull dashboard
+  "${COMPOSE_CMD[@]}" -f dashboard.compose.yml up -d dashboard
 
   # Wait up to 30s for the new container to settle
   for i in $(seq 1 30); do

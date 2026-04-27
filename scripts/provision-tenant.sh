@@ -30,12 +30,38 @@ N8N_POSTGRES_CONTAINER="n8n-$TENANT-postgres"
 DASHBOARD_CONTAINER="n8n-$TENANT-dashboard"
 DASHBOARD_IMAGE_REPO="${DASHBOARD_IMAGE_REPO:-ghcr.io/jperez1804/dashboard}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/jperez1804/botargento-dashboard/main}"
+COMPOSE_CMD=()
 
 if [[ ! -d "$TENANT_ROOT" ]]; then
   echo "✗ $TENANT_ROOT does not exist."
   echo "  This script provisions the dashboard for an *existing* tenant — n8n + Postgres must already be running."
   exit 1
 fi
+
+detect_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker compose)
+    return
+  fi
+  if docker-compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker-compose)
+    return
+  fi
+
+  echo "✗ Neither 'docker compose' nor 'docker-compose' is available."
+  exit 1
+}
+
+run_compose() {
+  (
+    cd "$TENANT_ROOT"
+    set -a
+    # shellcheck disable=SC1091
+    source "$ENV_FILE"
+    set +a
+    "${COMPOSE_CMD[@]}" -f "$COMPOSE_FILE" "$@"
+  )
+}
 if [[ ! -f "$TENANT_ENV" ]]; then
   echo "✗ $TENANT_ENV missing — can't read POSTGRES_USER / POSTGRES_DB"
   exit 1
@@ -141,14 +167,19 @@ AUTH_SECRET=$(openssl rand -hex 32)
 
 echo
 echo "→ Applying migrations/0000_init.sql (creates dashboard schema + role)…"
+TMP_0000="$(mktemp)"
+sed "s/:'DASHBOARD_APP_PASSWORD'/'$DASHBOARD_APP_PASSWORD'/g" \
+  "$MIGRATIONS_DIR/0000_init.sql" > "$TMP_0000"
 docker exec -i "$N8N_POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-       -v "DASHBOARD_APP_PASSWORD=$DASHBOARD_APP_PASSWORD" \
-  < "$MIGRATIONS_DIR/0000_init.sql"
+       -v ON_ERROR_STOP=1 \
+  < "$TMP_0000"
+rm -f "$TMP_0000"
 
 echo "→ Applying migrations/0001_escalation_type.sql…"
 docker exec -i "$N8N_POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+       -v ON_ERROR_STOP=1 \
   < "$MIGRATIONS_DIR/0001_escalation_type.sql"
 
 echo "→ Seeding allowlist (${#ALLOWLIST[@]} email(s))…"
@@ -163,7 +194,7 @@ echo "→ Seeding allowlist (${#ALLOWLIST[@]} email(s))…"
   done
   echo "ON CONFLICT (email) DO NOTHING;"
 } | docker exec -i "$N8N_POSTGRES_CONTAINER" \
-      psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+      psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1
 
 # ---------------------------------------------------------------------------
 # Network discovery (compose project prefix)
@@ -271,9 +302,9 @@ fi
 
 echo
 echo "→ Pulling latest image and starting container…"
-cd "$TENANT_ROOT"
-docker compose --env-file dashboard.env -f dashboard.compose.yml pull dashboard
-docker compose --env-file dashboard.env -f dashboard.compose.yml up -d dashboard
+detect_compose
+run_compose pull dashboard
+run_compose up -d dashboard
 
 # Wait for the container to settle
 for i in $(seq 1 30); do
