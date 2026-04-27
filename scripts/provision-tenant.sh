@@ -196,6 +196,26 @@ echo "→ Seeding allowlist (${#ALLOWLIST[@]} email(s))…"
 } | docker exec -i "$N8N_POSTGRES_CONTAINER" \
       psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1
 
+echo "→ Handing dashboard schema ownership to dashboard_app and bootstrapping __migrations…"
+docker exec -i "$N8N_POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE TABLE IF NOT EXISTS dashboard.__migrations (
+  filename    text PRIMARY KEY,
+  applied_at  timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER SCHEMA dashboard OWNER TO dashboard_app;
+ALTER TABLE IF EXISTS dashboard.allowed_emails OWNER TO dashboard_app;
+ALTER TABLE IF EXISTS dashboard.magic_link_tokens OWNER TO dashboard_app;
+ALTER TABLE IF EXISTS dashboard.audit_log OWNER TO dashboard_app;
+ALTER TABLE IF EXISTS dashboard.__migrations OWNER TO dashboard_app;
+ALTER SEQUENCE IF EXISTS dashboard.audit_log_id_seq OWNER TO dashboard_app;
+
+INSERT INTO dashboard.__migrations (filename)
+VALUES ('0000_init.sql'), ('0001_escalation_type.sql')
+ON CONFLICT (filename) DO NOTHING;
+SQL
+
 # ---------------------------------------------------------------------------
 # Network discovery (compose project prefix)
 # ---------------------------------------------------------------------------

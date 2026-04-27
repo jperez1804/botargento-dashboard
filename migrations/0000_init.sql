@@ -72,3 +72,15 @@ EXCEPTION
   WHEN insufficient_privilege THEN NULL;
   WHEN undefined_object THEN NULL;
 END $$;
+
+DO $$
+BEGIN
+  ALTER SCHEMA dashboard OWNER TO dashboard_app;
+  ALTER TABLE IF EXISTS dashboard.allowed_emails OWNER TO dashboard_app;
+  ALTER TABLE IF EXISTS dashboard.magic_link_tokens OWNER TO dashboard_app;
+  ALTER TABLE IF EXISTS dashboard.audit_log OWNER TO dashboard_app;
+  ALTER SEQUENCE IF EXISTS dashboard.audit_log_id_seq OWNER TO dashboard_app;
+EXCEPTION
+  WHEN insufficient_privilege THEN NULL;
+  WHEN undefined_object THEN NULL;
+END $$;
