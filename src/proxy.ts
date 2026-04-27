@@ -2,24 +2,11 @@
 // Node.js runtime so the auth config can share node:crypto / postgres.js with
 // the rest of the app without maintaining a separate edge-safe subset.
 
-import { auth } from "@/lib/auth";
-import { NextResponse } from "next/server";
-
-const handler = auth((req) => {
-  if (req.auth) return NextResponse.next();
-  const loginUrl = new URL("/login", req.nextUrl);
-  const { pathname, search } = req.nextUrl;
-  if (pathname !== "/" && pathname !== "/login") {
-    loginUrl.searchParams.set("callbackUrl", pathname + search);
-  }
-  return NextResponse.redirect(loginUrl);
-});
-
-// Next 16's proxy convention requires a named `proxy` export (or a default
-// function). `auth(fn)` returns a non-function callable, so we wrap it.
-export function proxy(...args: Parameters<typeof handler>) {
-  return (handler as (...a: Parameters<typeof handler>) => ReturnType<typeof handler>)(...args);
-}
+// Canonical NextAuth v5 pattern: re-export `auth` as the proxy/middleware.
+// The gating logic (allow vs redirect-to-signin) lives in the `authorized`
+// callback in src/lib/auth.ts so it has access to NextAuth's session
+// resolution before the response is built.
+export { auth as proxy } from "@/lib/auth";
 
 export const config = {
   matcher: ["/((?!api/auth|_next|favicon.ico|logos|login|verify).*)"],

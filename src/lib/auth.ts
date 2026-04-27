@@ -70,6 +70,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
       }),
     ],
     callbacks: {
+      authorized({ auth: session }) {
+        // Returning false makes NextAuth redirect unauthenticated requests
+        // to the configured signIn page (/login). The proxy matcher already
+        // excludes /login, /verify, /api/auth, _next, etc.
+        return !!session;
+      },
       async signIn({ user }) {
         const email = user.email?.toLowerCase();
         if (!email) return false;
