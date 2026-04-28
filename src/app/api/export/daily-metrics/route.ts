@@ -20,12 +20,17 @@ async function* iterateMetrics(opts: {
   to?: string;
 }): AsyncIterable<MetricsRow> {
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT day, inbound_count, outbound_count, unique_contacts,
-           handoff_count, handoff_rate
+    SELECT
+      report_date AS day,
+      inbound_messages AS inbound_count,
+      outbound_messages AS outbound_count,
+      unique_contacts,
+      contacts_with_handoff AS handoff_count,
+      handoff_rate
     FROM automation.v_daily_metrics
     WHERE 1=1
-      ${opts.from ? sql`AND day >= ${opts.from}::date` : sql``}
-      ${opts.to ? sql`AND day <= ${opts.to}::date` : sql``}
+      ${opts.from ? sql`AND report_date >= ${opts.from}::date` : sql``}
+      ${opts.to ? sql`AND report_date <= ${opts.to}::date` : sql``}
     ORDER BY day ASC
   `;
   for (const r of rows) {

@@ -1,11 +1,8 @@
-// Typed wrappers around the read-only `automation.v_*` views provided by
-// the tenant's whatsapp-automation-claude Postgres. Drizzle does not model
-// views as first-class entities, so we use postgres.js directly with
-// hand-written TypeScript row shapes that mirror the SQL view definitions.
+// Typed wrappers around the read-only `automation.v_*` reporting surface.
+// Drizzle does not model views as first-class entities, so we use postgres.js
+// directly and coerce the result rows at the boundary.
 
 import { sql as pg } from "@/db/client";
-
-// ── Row shapes ────────────────────────────────────────────────────────────────
 
 export type DailyMetricsRow = {
   day: string;
@@ -47,8 +44,6 @@ export type FollowUpQueueRow = {
   last_seen: string;
 };
 
-// ── Required view names (used by verify-view-compat) ──────────────────────────
-
 export const REQUIRED_VIEWS = [
   "v_daily_metrics",
   "v_flow_breakdown",
@@ -57,10 +52,6 @@ export const REQUIRED_VIEWS = [
   "v_follow_up_queue",
 ] as const;
 
-// ── Coercion helpers ──────────────────────────────────────────────────────────
-// postgres.js returns numbers as `number` when in safe range, but `bigint` /
-// `string` for very large counts; views aggregate counts so we coerce to plain
-// number once at the boundary.
 function toNum(value: unknown): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") return value;
@@ -69,14 +60,17 @@ function toNum(value: unknown): number {
   return 0;
 }
 
-// ── Queries ───────────────────────────────────────────────────────────────────
-
 export async function selectDailyMetrics(days: number): Promise<DailyMetricsRow[]> {
   const rows = await pg<Record<string, unknown>[]>`
-    SELECT day, inbound_count, outbound_count, unique_contacts,
-           handoff_count, handoff_rate
+    SELECT
+      report_date AS day,
+      inbound_messages AS inbound_count,
+      outbound_messages AS outbound_count,
+      unique_contacts,
+      contacts_with_handoff AS handoff_count,
+      handoff_rate
     FROM automation.v_daily_metrics
-    WHERE day >= (CURRENT_DATE - ${days}::int * INTERVAL '1 day')
+    WHERE report_date >= CURRENT_DATE - ${days}::int
     ORDER BY day ASC
   `;
   return rows.map((r) => ({
@@ -91,9 +85,9 @@ export async function selectDailyMetrics(days: number): Promise<DailyMetricsRow[
 
 export async function selectFlowBreakdown(days: number): Promise<FlowBreakdownRow[]> {
   const rows = await pg<Record<string, unknown>[]>`
-    SELECT day, intent, route, inbound_count
+    SELECT report_date AS day, intent, route, inbound_count
     FROM automation.v_flow_breakdown
-    WHERE day >= (CURRENT_DATE - ${days}::int * INTERVAL '1 day')
+    WHERE report_date >= CURRENT_DATE - ${days}::int
     ORDER BY day ASC, intent ASC
   `;
   return rows.map((r) => ({
@@ -114,7 +108,7 @@ export async function selectContactSummary(opts: {
   const { search, from, to, limit = 25, offset = 0 } = opts;
   const rows = await pg<Record<string, unknown>[]>`
     SELECT contact_wa_id, display_name, first_seen, last_seen,
-           message_count, last_intent, handoff_count
+           total_messages AS message_count, last_intent, handoff_count
     FROM automation.v_contact_summary
     WHERE 1=1
       ${from ? pg`AND last_seen >= ${from}::timestamptz` : pg``}
@@ -141,7 +135,10 @@ export async function selectContactSummary(opts: {
 
 export async function selectHandoffSummary(): Promise<HandoffSummaryRow[]> {
   const rows = await pg<Record<string, unknown>[]>`
-    SELECT target, count_all_time, count_24h
+    SELECT
+      handoff_target AS target,
+      total_count AS count_all_time,
+      last_24h_count AS count_24h
     FROM automation.v_handoff_summary
     ORDER BY count_24h DESC, count_all_time DESC
   `;
@@ -154,13 +151,72 @@ export async function selectHandoffSummary(): Promise<HandoffSummaryRow[]> {
 
 export async function selectFollowUpQueue(limit?: number): Promise<FollowUpQueueRow[]> {
   const rows = await pg<Record<string, unknown>[]>`
-    SELECT contact_wa_id, display_name, priority, reason, last_seen
-    FROM automation.v_follow_up_queue
+    WITH contact_activity AS (
+      SELECT
+        contact_wa_id,
+        COALESCE(NULLIF(MAX(lead_name), ''), NULLIF(MAX(profile_name), ''), contact_wa_id) AS display_name,
+        MAX(log_timestamp) AS last_seen,
+        MAX(intent) FILTER (
+          WHERE direction = 'inbound'
+            AND log_timestamp = (
+              SELECT MAX(l2.log_timestamp)
+              FROM automation.lead_log l2
+              WHERE l2.contact_wa_id = lead_log.contact_wa_id
+                AND l2.direction = 'inbound'
+            )
+        ) AS last_intent,
+        MAX(route) FILTER (
+          WHERE log_timestamp = (
+            SELECT MAX(l3.log_timestamp)
+            FROM automation.lead_log l3
+            WHERE l3.contact_wa_id = lead_log.contact_wa_id
+          )
+        ) AS last_route,
+        COUNT(*) FILTER (
+          WHERE direction = 'inbound'
+            AND log_timestamp >= NOW() - INTERVAL '7 days'
+        ) AS inbound_last_7d
+      FROM automation.lead_log
+      WHERE log_timestamp >= NOW() - INTERVAL '30 days'
+      GROUP BY contact_wa_id
+    ),
+    latest_handoff AS (
+      SELECT DISTINCT ON (contact_wa_id)
+        contact_wa_id,
+        escalation_timestamp,
+        handoff_target,
+        reason
+      FROM automation.escalations
+      ORDER BY contact_wa_id, escalation_timestamp DESC
+    )
+    SELECT
+      ca.contact_wa_id,
+      ca.display_name,
+      CASE
+        WHEN lh.escalation_timestamp >= NOW() - INTERVAL '48 hours' THEN 'high'
+        WHEN ca.inbound_last_7d >= 3 AND lh.contact_wa_id IS NULL THEN 'medium'
+        ELSE 'low'
+      END AS priority,
+      CASE
+        WHEN lh.escalation_timestamp >= NOW() - INTERVAL '48 hours'
+          THEN COALESCE(NULLIF(lh.reason, ''), NULLIF(lh.handoff_target, ''), 'Derivacion reciente')
+        WHEN ca.inbound_last_7d >= 3 AND lh.contact_wa_id IS NULL
+          THEN COALESCE(NULLIF(ca.last_intent, ''), NULLIF(ca.last_route, ''), 'Alta actividad reciente')
+        ELSE COALESCE(NULLIF(ca.last_intent, ''), NULLIF(ca.last_route, ''), 'Seguimiento sugerido')
+      END AS reason,
+      ca.last_seen
+    FROM contact_activity ca
+    LEFT JOIN latest_handoff lh ON lh.contact_wa_id = ca.contact_wa_id
     ORDER BY
-      CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
-      last_seen DESC
+      CASE
+        WHEN lh.escalation_timestamp >= NOW() - INTERVAL '48 hours' THEN 0
+        WHEN ca.inbound_last_7d >= 3 AND lh.contact_wa_id IS NULL THEN 1
+        ELSE 2
+      END,
+      ca.last_seen DESC
     ${limit ? pg`LIMIT ${limit}` : pg``}
   `;
+
   return rows.map((r) => {
     const p = String(r.priority);
     const priority: FollowUpQueueRow["priority"] =

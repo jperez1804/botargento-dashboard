@@ -21,7 +21,7 @@ in [`CLAUDE.md`](CLAUDE.md).
 | Apply migrations | `pnpm db:migrate` |
 | Seed dev DB | `pnpm db:seed:dev` |
 | Verify required views | `pnpm db:verify-views` |
-| Provision a new tenant | `./scripts/provision-tenant.sh client3` (run on the VPS) |
+| Provision a new tenant | `cd /home/deploy/_dashboard-checkout && bash ./scripts/provision-tenant.sh client3` (run on the VPS as `deploy`) |
 | Roll out an update | GitHub Actions → **Deploy** → tenant=`all`, tag=`latest` |
 
 ---
@@ -89,18 +89,135 @@ pnpm db:migrate && pnpm db:seed:dev
 
 ---
 
+## VPS prerequisites (one-time, global)
+
+Before the first tenant install, make sure the VPS already satisfies the shared
+deployment assumptions this repo and the GitHub workflows rely on.
+
+### 1. Existing tenant stack
+
+For each `clientN` you want a dashboard for, you already need:
+- `/opt/n8n/<clientN>/` with the existing n8n stack
+- `/opt/n8n/<clientN>/.env` containing at least `POSTGRES_USER`, `POSTGRES_DB`, and `TZ`
+- a running Postgres container named `n8n-<clientN>-postgres`
+- the `automation.*` reporting views:
+  `v_daily_metrics`, `v_flow_breakdown`, `v_contact_summary`,
+  `v_handoff_summary`, `v_follow_up_queue`
+
+The provisioner fails fast if those views do not exist.
+
+### 2. Traefik conventions
+
+The generated compose expects the same Traefik wiring used by the existing
+tenant stack:
+- shared external network named `traefik-public`
+- TLS cert resolver named `letsencrypt`
+- `websecure` entrypoint handling HTTPS traffic
+
+Those names are not placeholders. The generated labels pin them literally.
+
+### 3. `deploy` user and Docker access
+
+The GitHub `Deploy` workflow SSHes as `deploy`, so that user must exist on the
+VPS and be able to talk to Docker. A typical bootstrap looks like:
+
+```bash
+# as root
+adduser deploy
+usermod -aG docker deploy
+```
+
+Start a fresh login shell afterward (`su - deploy`) so the Docker group is
+picked up.
+
+Also ensure `deploy` can write the dashboard-managed files under each tenant
+root:
+- `/opt/n8n/<clientN>/dashboard.compose.yml`
+- `/opt/n8n/<clientN>/dashboard.env`
+- `/opt/n8n/<clientN>/assets/logo.svg`
+
+### 4. Shared deploy registry and update script
+
+Create the shared scripts directory once and install the registry file plus the
+update helper GitHub Actions will call:
+
+```bash
+# as root
+install -d -m 0755 -o deploy -g deploy /opt/scripts
+install -m 0644 -o deploy -g deploy /dev/null /opt/scripts/tenants.txt
+
+curl -fsSL https://raw.githubusercontent.com/jperez1804/botargento-dashboard/main/scripts/update-dashboards.sh \
+  -o /opt/scripts/update-dashboards.sh
+
+chown deploy:deploy /opt/scripts/update-dashboards.sh
+chmod 755 /opt/scripts/update-dashboards.sh
+```
+
+### 5. Repo checkout path
+
+The repo checkout does **not** need to live under `/opt/n8n`. The safest
+operator-owned location is:
+
+```bash
+/home/deploy/_dashboard-checkout
+```
+
+That avoids the permission problems you can hit cloning into `/opt/n8n` as
+`deploy`. The tenant runtime files still live in `/opt/n8n/<clientN>/`.
+
+### 6. GitHub Release image availability
+
+The VPS pulls:
+
+```bash
+ghcr.io/jperez1804/dashboard:latest
+```
+
+That tag only exists after the `Release` workflow succeeds on `main`. If a pull
+returns `manifest unknown`, fix the failed `Release` run first.
+
+If GHCR visibility or policy requires auth on your VPS, log in once as the
+operator account with your GitHub username and a PAT:
+
+```bash
+docker login ghcr.io
+```
+
+### 7. Compose command compatibility
+
+The helper scripts auto-detect both:
+- `docker compose`
+- `docker-compose`
+
+So the VPS can use either spelling. For manual ops, prefer the one already used
+by that host.
+
 ## Provisioning a new tenant
 
 Per blueprint Section 12.3, every new client follows the same runbook.
 Target: ≤ 15 minutes of operator time.
 
-The interactive helper does most of the work:
+### Recommended checkout location
+
+```bash
+sudo -iu deploy
+mkdir -p /home/deploy
+cd /home/deploy
+
+git clone https://github.com/jperez1804/botargento-dashboard.git _dashboard-checkout
+# or, on later runs:
+# git -C /home/deploy/_dashboard-checkout pull
+```
+
+### Per-tenant first install
+
+The interactive helper does most of the work. Run it from the repo checkout,
+not from inside `/opt/n8n/<clientN>`:
 
 ```bash
 # On the VPS, as the deploy user
-sudo -u deploy bash
-cd /opt/n8n  # the existing tenant root
-./scripts/provision-tenant.sh client3
+cd /home/deploy/_dashboard-checkout
+bash ./scripts/provision-tenant.sh client3
 ```
 
 The script will prompt for:
@@ -113,17 +230,34 @@ It then:
 1. Verifies the tenant's Postgres + automation views exist
 2. Generates a strong `dashboard_app` password and `AUTH_SECRET`
 3. Applies `migrations/0000_init.sql` and `migrations/0001_escalation_type.sql`
-4. Seeds the allowlist
-5. Auto-detects the tenant-internal Docker network (handles compose project prefix)
-6. Writes `dashboard.compose.yml` + `dashboard.env` next to the existing n8n compose
-7. Pulls the latest image and brings up the container
-8. Updates `/opt/scripts/tenants.txt` so future `Deploy` runs include it
+4. Grants database access, hands `dashboard.*` ownership to `dashboard_app`,
+   and bootstraps `dashboard.__migrations`
+5. Seeds the allowlist
+6. Auto-detects the tenant-internal Docker network (handles compose project prefix)
+7. Writes `dashboard.compose.yml` + `dashboard.env` into `/opt/n8n/<clientN>/`
+8. Pulls the latest image and brings up the container
+9. Updates `/opt/scripts/tenants.txt` so future `Deploy` runs include it
 
 Two manual prerequisites the script can't automate:
-- **DNS:** in Donweb, add `dashboard.<clientN>` as a CNAME pointing at the VPS hostname (TTL 300)
+- **DNS:** in Donweb, add `dashboard.<clientN>` pointing at the same VPS target
+  as the existing tenant host. If your current tenant record is an `A` record
+  to the VPS IP, create another `A` record. If your current setup uses a
+  hostname, use a `CNAME`.
 - **Logo:** drop the SVG at `/opt/n8n/<clientN>/assets/logo.svg` before launching
 
 Both are reminded by the script.
+
+### First-time VPS verification
+
+After the script finishes, these are the quickest checks:
+
+```bash
+docker logs -f n8n-client3-dashboard
+curl -sI https://dashboard.client3.botargento.com.ar
+```
+
+If the dashboard is up but the browser shows `DNS_PROBE_FINISHED_NXDOMAIN`,
+the app is healthy and public DNS is still missing or propagating.
 
 ---
 
@@ -141,6 +275,7 @@ The Deploy job SSHes to the VPS and runs
 `/opt/scripts/update-dashboards.sh`, which:
 - Reads `/opt/scripts/tenants.txt` for the `all` case
 - Pins `DASHBOARD_TAG` in each tenant's `dashboard.env`
+- Sources `dashboard.env` and supports either `docker compose` or `docker-compose`
 - Pulls the image, restarts the container, waits up to 30 s for `running`
 
 **Rollback:** trigger the same workflow with `tag=<previous-good-sha>`. ~2 min
@@ -148,6 +283,10 @@ round-trip across all tenants.
 
 There is no staging in v1. Validate by deploying to a single canary tenant
 first if a change is risky.
+
+If a manual `docker pull ghcr.io/jperez1804/dashboard:latest` returns
+`manifest unknown`, the latest `Release` workflow has not published successfully
+yet. Fix or rerun `Release` before debugging the VPS further.
 
 ---
 
@@ -208,7 +347,12 @@ container exits with a clear list of missing views.
 
 | Symptom | Most likely cause | Fix |
 |---|---|---|
+| `git clone ... _dashboard-checkout` under `/opt/n8n` fails with `Permission denied` | `deploy` does not own `/opt/n8n` | Clone the repo under `/home/deploy/_dashboard-checkout` instead |
+| `./scripts/provision-tenant.sh: Permission denied` | Missing executable bit on the script | Run `bash ./scripts/provision-tenant.sh clientN` or `chmod +x` once |
+| `docker pull ghcr.io/jperez1804/dashboard:latest` returns `manifest unknown` | `Release` did not publish `:latest` yet | Check GitHub Actions → `Release` and fix the failed run first |
+| Browser shows `DNS_PROBE_FINISHED_NXDOMAIN` | `dashboard.<clientN>` DNS record does not exist yet | Create the DNS record in Donweb and wait for propagation |
 | Container restarts in a loop with `Missing required views` | Tenant Postgres has no `automation` schema | Run `postgres-setup.sql` from `whatsapp-automation-claude` |
+| Container loops on migrations after an early failed first install | Tenant was provisioned with an older script/image before the ownership/bootstrap fixes | Pull latest `main` on the VPS and rerun `bash ./scripts/provision-tenant.sh <clientN>` |
 | Login form submits but no email arrives | Email not in `dashboard.allowed_emails` | Add it (see Allowlist management) |
 | Email arrives but link goes to "AccessDenied" | Email was removed mid-flight, or token expired (>15 min) | Request a new link |
 | `network ..._..._-internal declared as external, but could not be found` | Compose project prefix mismatch | `docker network ls \| grep <clientN>` and update `name:` in `dashboard.compose.yml` |

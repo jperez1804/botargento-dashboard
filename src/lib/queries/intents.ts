@@ -19,7 +19,7 @@ export async function getIntentCounts(days: number): Promise<IntentCount[]> {
       COALESCE(intent, 'Otras') AS intent,
       COALESCE(SUM(inbound_count), 0)::int AS count
     FROM automation.v_flow_breakdown
-    WHERE day >= CURRENT_DATE - ${days}::int
+    WHERE report_date >= CURRENT_DATE - ${days}::int
     GROUP BY 1
     ORDER BY 2 DESC
   `;

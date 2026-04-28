@@ -31,7 +31,7 @@ async function* iterateContacts(opts: {
   while (true) {
     const rows = await sql<Record<string, unknown>[]>`
       SELECT contact_wa_id, display_name, first_seen, last_seen,
-             message_count, last_intent, handoff_count
+             total_messages AS message_count, last_intent, handoff_count
       FROM automation.v_contact_summary
       WHERE 1=1
         ${opts.from ? sql`AND last_seen >= ${opts.from}::date` : sql``}

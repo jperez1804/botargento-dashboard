@@ -26,9 +26,14 @@ export type WindowKpis = {
  */
 export async function getDailyMetrics(days: number): Promise<DailyMetricPoint[]> {
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT day, inbound_count, outbound_count, handoff_count, handoff_rate
+    SELECT
+      report_date AS day,
+      inbound_messages AS inbound_count,
+      outbound_messages AS outbound_count,
+      contacts_with_handoff AS handoff_count,
+      handoff_rate
     FROM automation.v_daily_metrics
-    WHERE day >= CURRENT_DATE - ${days}::int
+    WHERE report_date >= CURRENT_DATE - ${days}::int
     ORDER BY day ASC
   `;
   return rows.map((r) => ({
@@ -36,7 +41,7 @@ export async function getDailyMetrics(days: number): Promise<DailyMetricPoint[]>
     inbound: Number(r.inbound_count ?? 0),
     outbound: Number(r.outbound_count ?? 0),
     handoff: Number(r.handoff_count ?? 0),
-    handoffRate: Number(r.handoff_rate ?? 0) / 100, // view returns 0..100; normalize to 0..1
+    handoffRate: Number(r.handoff_rate ?? 0),
   }));
 }
 
@@ -57,18 +62,19 @@ export async function getWindowKpis(
 ): Promise<WindowKpis> {
   const aggRows = await sql<Record<string, unknown>[]>`
     SELECT
-      COALESCE(SUM(inbound_count),  0)::int AS inbound,
-      COALESCE(SUM(outbound_count), 0)::int AS outbound,
-      COALESCE(SUM(handoff_count),  0)::int AS handoff_total
+      COALESCE(SUM(inbound_messages),      0)::int AS inbound,
+      COALESCE(SUM(outbound_messages),     0)::int AS outbound,
+      COALESCE(SUM(contacts_with_handoff), 0)::int AS handoff_total
     FROM automation.v_daily_metrics
-    WHERE day >= CURRENT_DATE - ${startDaysAgo}::int
-      AND day <  CURRENT_DATE - ${endDaysAgo}::int
+    WHERE report_date >= CURRENT_DATE - ${startDaysAgo}::int
+      AND report_date <  CURRENT_DATE - ${endDaysAgo}::int
   `;
   const uniqRows = await sql<Record<string, unknown>[]>`
     SELECT COALESCE(COUNT(DISTINCT contact_wa_id), 0)::int AS n
     FROM automation.lead_log
-    WHERE created_at >= NOW() - (${startDaysAgo}::int * INTERVAL '1 day')
-      AND created_at <  NOW() - (${endDaysAgo}::int   * INTERVAL '1 day')
+    WHERE direction = 'inbound'
+      AND DATE(log_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires') >= CURRENT_DATE - ${startDaysAgo}::int
+      AND DATE(log_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires') <  CURRENT_DATE - ${endDaysAgo}::int
   `;
 
   const agg = aggRows[0];

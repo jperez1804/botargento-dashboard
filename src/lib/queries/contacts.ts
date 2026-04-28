@@ -46,7 +46,7 @@ export async function listContacts(params: ListContactsParams): Promise<ContactS
   const term = search ? `%${search}%` : null;
   const rows = await sql<Record<string, unknown>[]>`
     SELECT contact_wa_id, display_name, first_seen, last_seen,
-           message_count, last_intent, handoff_count
+           total_messages AS message_count, last_intent, handoff_count
     FROM automation.v_contact_summary
     WHERE 1=1
       ${from ? sql`AND last_seen >= ${from}::date` : sql``}
@@ -75,7 +75,7 @@ export async function countContacts(params: Omit<ListContactsParams, "limit" | "
 export async function getContact(waId: string): Promise<ContactSummary | null> {
   const rows = await sql<Record<string, unknown>[]>`
     SELECT contact_wa_id, display_name, first_seen, last_seen,
-           message_count, last_intent, handoff_count
+           total_messages AS message_count, last_intent, handoff_count
     FROM automation.v_contact_summary
     WHERE contact_wa_id = ${waId}
     LIMIT 1
@@ -86,10 +86,10 @@ export async function getContact(waId: string): Promise<ContactSummary | null> {
 
 export async function getConversation(waId: string): Promise<LeadLogEntry[]> {
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT id, direction, intent, route, message_text, created_at
+    SELECT id, direction, intent, route, text_body AS message_text, log_timestamp AS created_at
     FROM automation.lead_log
     WHERE contact_wa_id = ${waId}
-    ORDER BY created_at ASC, id ASC
+    ORDER BY log_timestamp ASC, id ASC
   `;
   return rows.map((r) => {
     const direction = String(r.direction);

@@ -23,11 +23,12 @@ export async function getHandoffSummary(): Promise<HandoffSummaryRow[]> {
   // v_handoff_summary already filters escalation_type = 'business' upstream,
   // but we still defend in case a tenant runs an older view definition.
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT target,
-           COALESCE(count_all_time, 0)::int AS count_all_time,
-           COALESCE(count_24h,      0)::int AS count_24h
+    SELECT
+      handoff_target AS target,
+      COALESCE(total_count, 0)::int AS count_all_time,
+      COALESCE(last_24h_count, 0)::int AS count_24h
     FROM automation.v_handoff_summary
-    ORDER BY count_24h DESC, count_all_time DESC
+    ORDER BY last_24h_count DESC, total_count DESC
   `;
   return rows.map((r) => ({
     target: String(r.target),
@@ -42,10 +43,16 @@ export async function listBusinessHandoffs(opts: {
 }): Promise<HandoffRow[]> {
   const { limit = 50, offset = 0 } = opts;
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT id, contact_wa_id, display_name, target, reason, created_at
+    SELECT
+      id,
+      contact_wa_id,
+      COALESCE(NULLIF(lead_name, ''), NULLIF(profile_name, ''), contact_wa_id) AS display_name,
+      handoff_target AS target,
+      NULLIF(reason, '') AS reason,
+      escalation_timestamp AS created_at
     FROM automation.escalations
     WHERE escalation_type = 'business'
-    ORDER BY created_at DESC
+    ORDER BY escalation_timestamp DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
   return rows.map((r) => ({
