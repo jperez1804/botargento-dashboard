@@ -3,6 +3,9 @@
 //
 // Idempotent: TRUNCATEs the lead_log + escalations tables first, so re-running
 // always yields the same window. Allowlist seeds are upserted, not replaced.
+//
+// Schema mirrors production (Phase 1): lead_log uses log_timestamp / text_body
+// / handoff; escalations use escalation_timestamp / handoff_target.
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -48,6 +51,31 @@ const CONTACTS: Contact[] = [
   { wa_id: "5491155501015", name: "Lautaro Castro" },
 ];
 
+// Reserved wa_ids that must never collect an escalation, so the follow-up
+// queue can deterministically classify them as "medium" priority.
+const MEDIUM_PRIORITY_WAID = "5491155503001";
+const MEDIUM_PRIORITY_NAME = "Florencia Quiroga";
+
+type LeadLogRow = {
+  contact_wa_id: string;
+  lead_name: string;
+  direction: "inbound" | "outbound";
+  intent: string;
+  route: string;
+  text_body: string;
+  handoff: boolean;
+  log_timestamp: string;
+};
+
+type EscalationRow = {
+  contact_wa_id: string;
+  lead_name: string;
+  handoff_target: string;
+  reason: string;
+  escalation_type: "business" | "error";
+  escalation_timestamp: string;
+};
+
 function pick<T>(arr: readonly T[]): T {
   const i = Math.floor(Math.random() * arr.length);
   return arr[i] as T;
@@ -81,20 +109,12 @@ async function seedActivity() {
   await sql`TRUNCATE automation.escalations RESTART IDENTITY`;
 
   const now = new Date();
-  const messageRows: Array<{
-    contact_wa_id: string;
-    display_name: string;
-    direction: "inbound" | "outbound";
-    intent: string | null;
-    route: string | null;
-    message_text: string;
-    created_at: string;
-  }> = [];
+  const messageRows: LeadLogRow[] = [];
 
+  // Background activity for the main contact pool across 14 days.
   for (let dayOffset = 13; dayOffset >= 0; dayOffset--) {
     const day = new Date(now);
     day.setDate(day.getDate() - dayOffset);
-    // Volume curve: weekdays ~30 inbound, weekends ~10
     const isWeekend = day.getDay() === 0 || day.getDay() === 6;
     const inboundCount = isWeekend ? randInt(8, 14) : randInt(20, 35);
 
@@ -107,112 +127,159 @@ async function seedActivity() {
 
       messageRows.push({
         contact_wa_id: contact.wa_id,
-        display_name: contact.name,
+        lead_name: contact.name,
         direction: "inbound",
         intent,
         route,
-        message_text: `Mensaje sobre ${intent.toLowerCase()}`,
-        created_at: ts.toISOString(),
+        text_body: `Mensaje sobre ${intent.toLowerCase()}`,
+        handoff: false,
+        log_timestamp: ts.toISOString(),
       });
 
-      // Outbound reply ~85% of the time
       if (Math.random() < 0.85) {
         const reply = new Date(ts.getTime() + randInt(30, 600) * 1000);
         messageRows.push({
           contact_wa_id: contact.wa_id,
-          display_name: contact.name,
+          lead_name: contact.name,
           direction: "outbound",
           intent,
           route,
-          message_text: "Respuesta automática del bot",
-          created_at: reply.toISOString(),
+          text_body: "Respuesta automática del bot",
+          handoff: false,
+          log_timestamp: reply.toISOString(),
         });
       }
     }
   }
 
-  // Insert in batches to keep the parameter count reasonable
-  const BATCH = 200;
-  for (let i = 0; i < messageRows.length; i += BATCH) {
-    const slice = messageRows.slice(i, i + BATCH);
-    await sql`INSERT INTO automation.lead_log ${sql(slice, "contact_wa_id", "display_name", "direction", "intent", "route", "message_text", "created_at")}`;
+  // Guaranteed "medium" follow-up: ≥3 inbound in the last 7 days, no escalation.
+  for (let i = 0; i < 4; i++) {
+    const ts = new Date(now.getTime() - (i + 1) * 6 * 3600 * 1000);
+    messageRows.push({
+      contact_wa_id: MEDIUM_PRIORITY_WAID,
+      lead_name: MEDIUM_PRIORITY_NAME,
+      direction: "inbound",
+      intent: "Alquileres",
+      route: "agent_qualifier",
+      text_body: "Consulta sobre alquileres",
+      handoff: false,
+      log_timestamp: ts.toISOString(),
+    });
   }
-  console.log(`  ✓ ${messageRows.length} lead_log rows inserted`);
 
-  // Escalations: pick ~12 business handoffs across the window + 4 error rows
-  const escalationRows: Array<{
-    contact_wa_id: string;
-    display_name: string;
-    target: string;
-    reason: string;
-    escalation_type: "business" | "error";
-    created_at: string;
-  }> = [];
-  for (let i = 0; i < 12; i++) {
+  // Stale leads → "low" priority candidates (single inbound, no escalation,
+  // last_seen older than several days).
+  const staleSpec: Array<{ wa_id: string; name: string; intent: string; daysAgo: number }> = [
+    { wa_id: "5491155502001", name: "Estela Beker",     intent: "Ventas",     daysAgo: 5 },
+    { wa_id: "5491155502002", name: "Roberto Iglesias", intent: "Ventas",     daysAgo: 3 },
+    { wa_id: "5491155502003", name: "Patricia Solé",    intent: "Tasaciones", daysAgo: 6 },
+    { wa_id: "5491155502004", name: "Hernán Vega",      intent: "Tasaciones", daysAgo: 4 },
+    { wa_id: "5491155502005", name: "Gabriela Núñez",   intent: "Otras",      daysAgo: 1 },
+  ];
+  for (const s of staleSpec) {
+    const ts = new Date(now);
+    ts.setDate(ts.getDate() - s.daysAgo);
+    ts.setHours(11, 0, 0);
+    messageRows.push({
+      contact_wa_id: s.wa_id,
+      lead_name: s.name,
+      direction: "inbound",
+      intent: s.intent,
+      route: "agent_qualifier",
+      text_body: `Consulta sobre ${s.intent.toLowerCase()}`,
+      handoff: false,
+      log_timestamp: ts.toISOString(),
+    });
+  }
+
+  // Escalations: 12 business + 4 error. Force the first business escalation
+  // into the last 24h so the follow-up queue always surfaces a "high" badge.
+  const escalationRows: EscalationRow[] = [];
+
+  const recentContact = pick(CONTACTS);
+  const recentTs = new Date(now.getTime() - 6 * 3600 * 1000); // 6h ago
+  escalationRows.push({
+    contact_wa_id: recentContact.wa_id,
+    lead_name: recentContact.name,
+    handoff_target: pick(HANDOFF_TARGETS),
+    reason: "El cliente solicitó hablar con un asesor humano",
+    escalation_type: "business",
+    escalation_timestamp: recentTs.toISOString(),
+  });
+  // Pair the recent escalation with an inbound lead_log row flagged handoff=true,
+  // so v_daily_metrics.contacts_with_handoff is non-zero in dev.
+  messageRows.push({
+    contact_wa_id: recentContact.wa_id,
+    lead_name: recentContact.name,
+    direction: "inbound",
+    intent: "Ventas",
+    route: "human",
+    text_body: "Quiero hablar con un asesor",
+    handoff: true,
+    log_timestamp: new Date(recentTs.getTime() - 60_000).toISOString(),
+  });
+
+  for (let i = 0; i < 11; i++) {
     const contact = pick(CONTACTS);
     const target = pick(HANDOFF_TARGETS);
-    const dayOffset = randInt(0, 13);
+    const dayOffset = randInt(2, 13); // older than 48h, so they classify as "low" not "high"
     const ts = new Date(now);
     ts.setDate(ts.getDate() - dayOffset);
     ts.setHours(randInt(9, 19), randInt(0, 59), randInt(0, 59));
     escalationRows.push({
       contact_wa_id: contact.wa_id,
-      display_name: contact.name,
-      target,
+      lead_name: contact.name,
+      handoff_target: target,
       reason: "El cliente solicitó hablar con un asesor humano",
       escalation_type: "business",
-      created_at: ts.toISOString(),
+      escalation_timestamp: ts.toISOString(),
     });
   }
   for (let i = 0; i < 4; i++) {
     const contact = pick(CONTACTS);
+    const ts = new Date(now.getTime() - randInt(0, 13) * 86400_000);
     escalationRows.push({
       contact_wa_id: contact.wa_id,
-      display_name: contact.name,
-      target: "error-handler",
+      lead_name: contact.name,
+      handoff_target: "",
       reason: `Internal error during workflow execution: ETIMEDOUT`,
       escalation_type: "error",
-      created_at: new Date(now.getTime() - randInt(0, 13) * 86400_000).toISOString(),
+      escalation_timestamp: ts.toISOString(),
     });
   }
-  await sql`INSERT INTO automation.escalations ${sql(escalationRows, "contact_wa_id", "display_name", "target", "reason", "escalation_type", "created_at")}`;
-  console.log(`  ✓ ${escalationRows.length} escalations inserted (12 business + 4 error)`);
 
-  // Stale leads so the follow-up queue has all three priority levels.
-  // The view requires last_seen older than 2/3/12 hours for high/medium/low.
-  const stale: Array<{
-    contact_wa_id: string;
-    display_name: string;
-    direction: "inbound" | "outbound";
-    intent: string | null;
-    route: string | null;
-    message_text: string;
-    created_at: string;
-  }> = [];
-  const make = (waId: string, name: string, intent: string, daysAgo: number) => {
-    const ts = new Date(now);
-    ts.setDate(ts.getDate() - daysAgo);
-    ts.setHours(11, 0, 0);
-    stale.push({
-      contact_wa_id: waId,
-      display_name: name,
-      direction: "inbound",
-      intent,
-      route: "agent_qualifier",
-      message_text: `Consulta sobre ${intent.toLowerCase()}`,
-      created_at: ts.toISOString(),
-    });
-  };
-  // High: Ventas + last_seen >2 days old
-  make("5491155502001", "Estela Beker",   "Ventas",     5);
-  make("5491155502002", "Roberto Iglesias","Ventas",     3);
-  // Medium: Tasaciones + last_seen >3 days old
-  make("5491155502003", "Patricia Solé",   "Tasaciones", 6);
-  make("5491155502004", "Hernán Vega",     "Tasaciones", 4);
-  // Low: anything else with last_seen older than 12 hours
-  make("5491155502005", "Gabriela Núñez",  "Otras",      1);
-  await sql`INSERT INTO automation.lead_log ${sql(stale, "contact_wa_id", "display_name", "direction", "intent", "route", "message_text", "created_at")}`;
-  console.log(`  ✓ ${stale.length} stale leads inserted (drives the follow-up queue)`);
+  // Insert in batches to keep the parameter count reasonable.
+  const BATCH = 200;
+  for (let i = 0; i < messageRows.length; i += BATCH) {
+    const slice = messageRows.slice(i, i + BATCH);
+    await sql`
+      INSERT INTO automation.lead_log ${sql(
+        slice,
+        "contact_wa_id",
+        "lead_name",
+        "direction",
+        "intent",
+        "route",
+        "text_body",
+        "handoff",
+        "log_timestamp",
+      )}
+    `;
+  }
+  console.log(`  ✓ ${messageRows.length} lead_log rows inserted`);
+
+  await sql`
+    INSERT INTO automation.escalations ${sql(
+      escalationRows,
+      "contact_wa_id",
+      "lead_name",
+      "handoff_target",
+      "reason",
+      "escalation_type",
+      "escalation_timestamp",
+    )}
+  `;
+  console.log(`  ✓ ${escalationRows.length} escalations inserted (12 business + 4 error)`);
 }
 
 async function main() {
