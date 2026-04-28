@@ -13,8 +13,8 @@ import { VolumeChart } from "@/components/dashboard/VolumeChart";
 
 export default async function OverviewPage() {
   const [current, previous, dailyMetrics, intentCounts, followUp] = await Promise.all([
-    getWindowKpis(7, 0),
-    getWindowKpis(14, 7),
+    getWindowKpis(6, 0),
+    getWindowKpis(13, 7),
     getDailyMetrics(7),
     getIntentCounts(7),
     getFollowUpQueue(5),

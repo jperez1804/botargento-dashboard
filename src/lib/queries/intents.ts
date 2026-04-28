@@ -8,8 +8,8 @@ export type IntentCount = {
 };
 
 /**
- * Sums inbound_count per intent across the last `days` days. Returns one row
- * per intent that appears in the window, sorted by count desc. The page
+ * Sums inbound_count per intent across the last `days` days, including today.
+ * Returns one row per intent that appears in the window, sorted by count desc. The page
  * matches these `intent` strings against verticalConfig.intents and the
  * automation-label display helper before falling back to the "Otras" bucket.
  */
@@ -19,7 +19,7 @@ export async function getIntentCounts(days: number): Promise<IntentCount[]> {
       COALESCE(intent, 'Otras') AS intent,
       COALESCE(SUM(inbound_count), 0)::int AS count
     FROM automation.v_flow_breakdown
-    WHERE report_date >= CURRENT_DATE - ${days}::int
+    WHERE report_date >= DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - (${days}::int - 1)
     GROUP BY 1
     ORDER BY 2 DESC
   `;

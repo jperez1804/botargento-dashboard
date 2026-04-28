@@ -4,11 +4,11 @@
 import { sql } from "@/db/client";
 
 export type DailyMetricPoint = {
-  day: string; // ISO date in tenant tz (as emitted by v_daily_metrics)
+  day: string; // ISO date in tenant tz, as emitted by v_daily_metrics.
   inbound: number;
   outbound: number;
   handoff: number;
-  handoffRate: number; // 0..1 (pre-calc'd in the view)
+  handoffRate: number; // 0..1, pre-calculated in the view.
 };
 
 export type WindowKpis = {
@@ -20,9 +20,8 @@ export type WindowKpis = {
 };
 
 /**
- * Daily rows from v_daily_metrics for the last `days` days, oldest first.
- * Consumed by the KPI tiles (to split current/previous windows) and the
- * 7-day volume chart in Step 9.
+ * Daily rows from v_daily_metrics for the last `days` days, including today,
+ * oldest first. For days=7, this returns today plus the previous six dates.
  */
 export async function getDailyMetrics(days: number): Promise<DailyMetricPoint[]> {
   const rows = await sql<Record<string, unknown>[]>`
@@ -33,7 +32,7 @@ export async function getDailyMetrics(days: number): Promise<DailyMetricPoint[]>
       contacts_with_handoff AS handoff_count,
       handoff_rate
     FROM automation.v_daily_metrics
-    WHERE report_date >= CURRENT_DATE - ${days}::int
+    WHERE report_date >= DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - (${days}::int - 1)
     ORDER BY day ASC
   `;
   return rows.map((r) => ({
@@ -46,14 +45,15 @@ export async function getDailyMetrics(days: number): Promise<DailyMetricPoint[]>
 }
 
 /**
- * KPI aggregates over a window defined as `[now - startDaysAgo, now - endDaysAgo)`.
+ * KPI aggregates over inclusive date bounds:
+ * `[today - startDaysAgo, today - endDaysAgo]`.
  *
  * Examples:
- *   - last 7 days  → getWindowKpis(7, 0)
- *   - prior 7 days → getWindowKpis(14, 7)
+ *   - last 7 days including today: getWindowKpis(6, 0)
+ *   - prior 7 days: getWindowKpis(13, 7)
  *
- * inbound / outbound / handoff_total sum the view rows. unique_contacts
- * runs its own DISTINCT query against lead_log — summing daily uniques
+ * inbound / outbound / handoff_total sum the view rows. unique_contacts runs
+ * its own DISTINCT query against lead_log because summing daily uniques
  * double-counts returning contacts.
  */
 export async function getWindowKpis(
@@ -66,15 +66,15 @@ export async function getWindowKpis(
       COALESCE(SUM(outbound_messages),     0)::int AS outbound,
       COALESCE(SUM(contacts_with_handoff), 0)::int AS handoff_total
     FROM automation.v_daily_metrics
-    WHERE report_date >= CURRENT_DATE - ${startDaysAgo}::int
-      AND report_date <  CURRENT_DATE - ${endDaysAgo}::int
+    WHERE report_date >= DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - ${startDaysAgo}::int
+      AND report_date <= DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - ${endDaysAgo}::int
   `;
   const uniqRows = await sql<Record<string, unknown>[]>`
     SELECT COALESCE(COUNT(DISTINCT contact_wa_id), 0)::int AS n
     FROM automation.lead_log
     WHERE direction = 'inbound'
-      AND DATE(log_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires') >= CURRENT_DATE - ${startDaysAgo}::int
-      AND DATE(log_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires') <  CURRENT_DATE - ${endDaysAgo}::int
+      AND DATE(log_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires') >= DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - ${startDaysAgo}::int
+      AND DATE(log_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires') <= DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - ${endDaysAgo}::int
   `;
 
   const agg = aggRows[0];
