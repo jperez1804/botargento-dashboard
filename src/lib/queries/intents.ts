@@ -10,8 +10,8 @@ export type IntentCount = {
 /**
  * Sums inbound_count per intent across the last `days` days. Returns one row
  * per intent that appears in the window, sorted by count desc. The page
- * matches these `intent` strings against verticalConfig.intents to colour and
- * label them; intents not in the config show up under the "Otras" bucket.
+ * matches these `intent` strings against verticalConfig.intents and the
+ * automation-label display helper before falling back to the "Otras" bucket.
  */
 export async function getIntentCounts(days: number): Promise<IntentCount[]> {
   const rows = await sql<Record<string, unknown>[]>`

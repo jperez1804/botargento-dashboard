@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/date";
+import { formatAutomationLabel } from "@/lib/automation-labels";
 import type { FollowUpQueueRow } from "@/db/views";
 
 type Props = {
@@ -40,6 +41,7 @@ export function FollowUpQueue({
     <ul className="rounded-md border border-[#e5e7eb] bg-white divide-y divide-[#e5e7eb] overflow-hidden">
       {rows.map((row) => {
         const style = PRIORITY_STYLES[row.priority];
+        const reason = formatAutomationLabel(row.reason);
         return (
           <li key={row.contact_wa_id} className="px-4 py-3 hover:bg-[#fafafa]">
             <Link
@@ -56,7 +58,7 @@ export function FollowUpQueue({
                 <div className="text-sm font-medium text-[#111827] truncate">
                   {row.display_name ?? row.contact_wa_id}
                 </div>
-                <div className="text-xs text-[#6b7280] truncate">{row.reason ?? "—"}</div>
+                <div className="text-xs text-[#6b7280] truncate">{reason ?? "—"}</div>
               </div>
               <div
                 className={cn(

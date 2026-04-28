@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { formatNumber } from "@/lib/format";
+import { formatAutomationLabel } from "@/lib/automation-labels";
 import type { HandoffSummaryRow } from "@/lib/queries/handoffs";
 import type { HandoffTargetDef } from "@/config/verticals/_types";
 
@@ -12,7 +13,7 @@ type Props = {
 function friendlyName(target: string, defs: ReadonlyArray<HandoffTargetDef>): string {
   const lower = target.toLowerCase();
   const hit = defs.find((d) => lower.includes(d.match.toLowerCase()));
-  return hit?.label ?? target;
+  return hit?.label ?? formatAutomationLabel(target) ?? target;
 }
 
 export function HandoffSummaryCards({ rows, targets, locale }: Props) {
@@ -28,7 +29,7 @@ export function HandoffSummaryCards({ rows, targets, locale }: Props) {
       {rows.map((row) => (
         <Card key={row.target} className="ring-1 ring-black/5">
           <CardContent className="px-5 py-4 space-y-2">
-            <div className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">
+            <div className="text-xs font-medium text-[#6b7280] truncate">
               {friendlyName(row.target, targets)}
             </div>
             <div className="flex items-baseline gap-3">

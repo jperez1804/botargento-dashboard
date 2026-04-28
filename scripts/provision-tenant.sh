@@ -264,6 +264,8 @@ services:
       TZ: "\${TZ}"
       NODE_ENV: production
       LOG_LEVEL: info
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
     volumes:
       - ${TENANT_ROOT}/assets/logo.svg:/app/public/logos/client.svg:ro
     networks:

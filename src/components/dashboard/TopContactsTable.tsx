@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/date";
 import { formatNumber } from "@/lib/format";
+import { formatAutomationLabel } from "@/lib/automation-labels";
 import type { ContactSummary } from "@/lib/queries/contacts";
 import type { IntentDef } from "@/config/verticals/_types";
 
@@ -31,7 +32,7 @@ type Props = {
 function intentLabel(value: string | null, intents: ReadonlyArray<IntentDef>): string | null {
   if (!value) return null;
   const hit = intents.find((i) => i.key.toLowerCase() === value.toLowerCase());
-  return hit?.label ?? value;
+  return hit?.label ?? formatAutomationLabel(value) ?? value;
 }
 
 function intentColor(value: string | null, intents: ReadonlyArray<IntentDef>): string {

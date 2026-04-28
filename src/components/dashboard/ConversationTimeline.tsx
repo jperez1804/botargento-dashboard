@@ -2,6 +2,7 @@
 // the tenant tz, then renders inbound/outbound bubbles with intent tags.
 
 import { cn } from "@/lib/utils";
+import { formatAutomationLabel } from "@/lib/automation-labels";
 import type { LeadLogEntry } from "@/lib/queries/contacts";
 import type { IntentDef } from "@/config/verticals/_types";
 
@@ -59,7 +60,7 @@ function intentColor(value: string | null, intents: ReadonlyArray<IntentDef>): s
 function intentLabel(value: string | null, intents: ReadonlyArray<IntentDef>): string | null {
   if (!value) return null;
   const hit = intents.find((i) => i.key.toLowerCase() === value.toLowerCase());
-  return hit?.label ?? value;
+  return hit?.label ?? formatAutomationLabel(value) ?? value;
 }
 
 export function ConversationTimeline({ entries, intents, locale, timezone }: Props) {

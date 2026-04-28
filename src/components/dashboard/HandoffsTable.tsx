@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/date";
+import { formatAutomationLabel } from "@/lib/automation-labels";
 import type { HandoffRow } from "@/lib/queries/handoffs";
 import type { HandoffTargetDef } from "@/config/verticals/_types";
 
@@ -35,7 +36,7 @@ type Props = {
 function friendlyName(target: string, defs: ReadonlyArray<HandoffTargetDef>): string {
   const lower = target.toLowerCase();
   const hit = defs.find((d) => lower.includes(d.match.toLowerCase()));
-  return hit?.label ?? target;
+  return hit?.label ?? formatAutomationLabel(target) ?? target;
 }
 
 export function HandoffsTable({ data, targets, locale, timezone }: Props) {
@@ -79,7 +80,9 @@ export function HandoffsTable({ data, targets, locale, timezone }: Props) {
         accessorKey: "reason",
         header: "Motivo",
         cell: (ctx) => (
-          <span className="text-[#374151]">{(ctx.getValue() as string | null) ?? "—"}</span>
+          <span className="text-[#374151]">
+            {formatAutomationLabel(ctx.getValue() as string | null) ?? "—"}
+          </span>
         ),
         enableSorting: false,
       },

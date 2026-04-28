@@ -22,4 +22,10 @@ node scripts/migrate.mjs
 echo "→ Verifying automation.v_* views exist..."
 node scripts/verify-view-compat.mjs
 
+# Next.js standalone server reads HOSTNAME/PORT when booting `server.js`.
+# In Docker, HOSTNAME defaults to the container id and can resolve to only one
+# attached network, which breaks Traefik on multi-network tenants.
+export HOSTNAME=0.0.0.0
+export PORT="${PORT:-3000}"
+
 exec "$@"
