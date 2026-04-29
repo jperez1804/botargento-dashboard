@@ -16,6 +16,25 @@ describe("formatAutomationLabel", () => {
     expect(formatAutomationLabel("owners_advisor")).toBe("Consulta de propietario");
   });
 
+  it("formats guided post-results workflow reasons", () => {
+    expect(formatAutomationLabel("guided_sales_post_results_advisor")).toBe(
+      "Consulta por compra",
+    );
+    expect(formatAutomationLabel("guided_sales_post_results_visit")).toBe("Consulta por compra");
+    expect(formatAutomationLabel("guided_rents_post_results_advisor")).toBe(
+      "Consulta por alquiler",
+    );
+    expect(formatAutomationLabel("guided_rents_post_results_visit")).toBe(
+      "Consulta por alquiler",
+    );
+    expect(formatAutomationLabel("otras_handoff")).toBe("Otras consultas");
+  });
+
+  it("formats short post-results aliases shown in seguimiento", () => {
+    expect(formatAutomationLabel("post_results_advisor")).toBe("Consulta por compra");
+    expect(formatAutomationLabel("post_results_visit")).toBe("Consulta por compra");
+  });
+
   it("formats known handoff target labels case-insensitively", () => {
     expect(formatAutomationLabel("Owners")).toBe("Propietarios");
     expect(formatAutomationLabel("valuations")).toBe("Tasaciones");
