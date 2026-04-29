@@ -5,7 +5,14 @@ const BASE = "http://localhost:3000";
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 60_000,
-  fullyParallel: false, // single dev server, sequential keeps the audit_log + token state predictable
+  fullyParallel: false,
+  // Single worker — auth.spec and dashboard.spec share the same allowlisted
+  // email, and both beforeEach hooks TRUNCATE dashboard.magic_link_tokens.
+  // Running specs in parallel lets one worker wipe the other's freshly-issued
+  // token, so the magic-link callback sees AccessDenied and the test hangs on
+  // page.waitForURL("/"). Serializing across files keeps token + audit_log
+  // state predictable.
+  workers: 1,
   reporter: [["list"]],
   use: {
     baseURL: BASE,
