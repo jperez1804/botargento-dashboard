@@ -102,8 +102,11 @@ After tuning, no DB migration or rebuild is needed beyond a redeploy.
 
 These query params survive reload and copy/paste:
 
-- `?touch=last|first|any` — attribution mode for `Contactos por intención`. Default `last` (per-intent counts then sum to global unique contacts). `any` is the legacy multi-intent view (counts may exceed unique contacts; documented in the chart's summary).
-- `?heatmapIntent=<bucket label>` — filters the heatmap to a single intent (`Ventas`, `Alquileres`, …).
+- `?touch=last|first|any` — attribution mode for `Contactos por intención`.
+  - `last` (default): each contact lands in exactly one bucket — their last inbound business intent. Per-intent counts sum to *unique contacts whose last inbound intent was a business intent*, which is **less than or equal to** the global `Contactos únicos` KPI: contacts whose last inbound was the `menu` token (navigation only, no engagement) are dropped from the chart but still counted globally.
+  - `first`: same shape as `last`, but the FIRST inbound intent. Useful for "what did the customer originally ask about?".
+  - `any`: legacy multi-intent view — a contact who moved Ventas → Tasaciones counts in BOTH buckets. Sums exceed unique contacts; the chart's summary line warns about this.
+- `?heatmapIntent=<bucket label>` — filters the heatmap to a single intent (`Ventas`, `Alquileres`, `Tasaciones`, `Emprendimientos`, `Administracion`, `Otras`).
 
 ### Dev database details
 The dev compose brings up Postgres 16 on host port `5433` with database
@@ -400,7 +403,7 @@ container exits with a clear list of missing views.
 | Email arrives but link goes to "AccessDenied" | Email was removed mid-flight, or token expired (>15 min) | Request a new link |
 | `network ..._..._-internal declared as external, but could not be found` | Compose project prefix mismatch | `docker network ls \| grep <clientN>` and update `name:` in `dashboard.compose.yml` |
 | Charts show zeros despite known activity | View tz drift or wrong `CLIENT_TIMEZONE` | Compare `SELECT day FROM automation.v_daily_metrics` against `CLIENT_TIMEZONE` in env |
-| Per-intent handoff rates don't match the global handoff-rate KPI | Expected: per-intent rates use last-touch attribution, the global KPI counts each contact once across all intents | Disclosure is on screen under the chart; reconciliation isn't possible by design |
+| Per-intent handoff rates don't match the global handoff-rate KPI | Expected: per-intent denominators exclude `menu`-only contacts (counted globally) and the average of per-bucket ratios is not the same as the ratio of totals | Disclosure is on screen under the chart; reconciliation isn't possible by design |
 | `Resueltas por el bot` looks too high | Self-resolution v1 only excludes business handoffs; contacts still in the follow-up queue count as resolved | Cross-check with `/follow-up`; refinement deferred per `docs/INTENT_KPIS_PLAN.md` |
 | Completion-rate row shows `—` for an intent | No `terminalIntents` configured for that bucket in `src/config/verticals/<vertical>.ts` | Add the raw terminal token(s) for the flow; redeploy |
 | Heatmap looks empty / sparse | Tenant traffic is thin and the 28-day window still doesn't fill 168 cells | Expected — the metric is more useful once volume grows; nothing to fix |

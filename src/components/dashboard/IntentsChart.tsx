@@ -279,8 +279,10 @@ export function IntentsChart({
               })}
             </div>
             <p className="text-[11px] text-[#9ca3af]">
-              Atribución por último contacto. Un contacto con varias intenciones puede aparecer en
-              más de una fila; la suma de tasas no equivale a la tasa global de derivación.
+              Atribución por último contacto: cada contacto aparece en una sola fila. La suma de
+              tasas no equivale a la tasa global de derivación: contactos cuya última actividad fue
+              navegación del menú quedan fuera de estas filas pero cuentan en la tasa global, y el
+              promedio de proporciones por bucket no coincide con el cociente total.
             </p>
           </div>
         ) : null}
