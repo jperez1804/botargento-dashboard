@@ -79,8 +79,11 @@ export type IntentTouchMode = "first" | "last" | "any";
  *
  * Touch attribution:
  *  - `last` (default): bucket = the contact's LAST inbound intent in the
- *    window. Each contact contributes to exactly ONE bucket, so per-intent
- *    counts SUM TO unique contacts (reconciles with the global KPI). Matches
+ *    window. Each contact contributes to AT MOST one bucket. Per-intent counts
+ *    sum to "contacts whose last inbound was a business intent" — strictly
+ *    LESS THAN OR EQUAL to the global `unique_contacts` KPI, because contacts
+ *    whose last inbound was the `menu` token (navigation only) are excluded
+ *    here via `formatBusinessIntentLabel` but still count globally. Matches
  *    the attribution rule used by handoff rates and time-to-handoff.
  *  - `first`: bucket = the contact's FIRST inbound intent. Useful for "what
  *    did they originally ask about?" — buyer-funnel research.

@@ -170,8 +170,8 @@ Now that `Otras` is no longer a black box, per-intent metrics are trustworthy.
 - New query `getIntentHandoffRates(days)` returning `{ intent, contacts, contactsHandedOff, rate }[]`.
 - SQL: `lead_log` ↔ `escalations` joined on `contact_wa_id`, `escalation_type = 'business'`, `escalation_timestamp` in window. Intent attribution = contact's last inbound intent in window via `DISTINCT ON (contact_wa_id) ... ORDER BY log_timestamp DESC`.
 - UI: chip next to each bar in `Contactos por intención`. Color = green if `actual ≥ desired - 0.10`, red if `actual < desired - 0.10`, gray if undefined.
-- **Required UI disclaimer:** *"Atribución por último contacto. Un contacto con varias intenciones puede aparecer en más de una fila."*
-- Per-intent rates do NOT sum to the global handoff KPI — intentional and disclosed.
+- **Required UI disclaimer:** *"Atribución por último contacto: cada contacto aparece en una sola fila. La suma de tasas no equivale a la tasa global de derivación: contactos cuya última actividad fue navegación del menú quedan fuera de estas filas pero cuentan en la tasa global, y el promedio de proporciones por bucket no coincide con el cociente total."*
+- Per-intent rates do NOT sum to the global handoff KPI — intentional and disclosed. Two distinct reasons: (1) `menu`-only contacts are excluded from per-intent denominators by `formatBusinessIntentLabel` but counted by the global `v_daily_metrics.handoff_rate` denominator; (2) `Σ (handoffs / contacts)` ≠ `Σ handoffs / Σ contacts` regardless of attribution.
 
 ### Phase 3 — Per-bucket delta arrows (was item 4)
 
