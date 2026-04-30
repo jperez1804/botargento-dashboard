@@ -142,7 +142,7 @@ botargento-dashboard/
 │   │   ├── logger.ts                      # pino instance
 │   │   └── queries/
 │   │       ├── metrics.ts                 # v_daily_metrics selects
-│   │       ├── intents.ts                 # v_flow_breakdown selects
+│   │       ├── intents.ts                 # lead_log unique-contact intent buckets
 │   │       ├── contacts.ts                # v_contact_summary + lead_log selects
 │   │       ├── handoffs.ts                # escalations + v_handoff_summary selects
 │   │       └── follow-up.ts               # v_follow_up_queue selects
@@ -178,7 +178,7 @@ Schema: `automation` (already exists on every tenant's DB, defined in `whatsapp-
 | View | Shape | Used by |
 |------|-------|---------|
 | `automation.v_daily_metrics` | One row per day (BA tz): `day`, `inbound_count`, `outbound_count`, `unique_contacts`, `handoff_count`, `handoff_rate` | Overview KPIs, 7-day volume chart |
-| `automation.v_flow_breakdown` | One row per (day × intent × route): `day`, `intent`, `route`, `inbound_count` | Intents bar chart |
+| `automation.v_flow_breakdown` | One row per (day × intent × route): `day`, `intent`, `route`, `inbound_count` | Compatibility check; chart now dedupes contacts from `lead_log` |
 | `automation.v_contact_summary` | One row per contact: `contact_wa_id`, `display_name`, `first_seen`, `last_seen`, `message_count`, `last_intent`, `handoff_count` | Conversations list, Top Contacts |
 | `automation.v_handoff_summary` | One row per handoff target: `target`, `count_all_time`, `count_24h` | Handoffs summary card |
 | `automation.v_follow_up_queue` | Prioritized contacts: `contact_wa_id`, `display_name`, `priority` (`high` / `medium` / `low`), `reason`, `last_seen` | Follow-up queue |
@@ -797,7 +797,7 @@ Create `src/app/api/auth/[...nextauth]/route.ts` exporting `handlers.GET` and `h
 
 ### Step 10: Overview — intents bar chart
 
-- `src/lib/queries/intents.ts` — aggregates `v_flow_breakdown` by intent for a date range.
+- `src/lib/queries/intents.ts` — counts distinct `lead_log.contact_wa_id` values per business intent for a date range.
 - `src/components/dashboard/IntentsChart.tsx` (client) — horizontal bar chart, bar colors from `verticalConfig.intents[].color`, value labels on bars.
 - Add to overview page.
 

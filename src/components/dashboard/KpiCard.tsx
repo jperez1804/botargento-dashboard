@@ -13,6 +13,11 @@ type Props = {
   format: KpiFormat;
   higherIsBetter: boolean;
   locale: string;
+  // Optional string that replaces the big numeric display (e.g. an intent name
+  // for the leading-intent card). The numeric `value` is still used for delta
+  // math and shown in `valueCaption` if provided.
+  display?: string;
+  valueCaption?: string;
 };
 
 type DeltaState = {
@@ -28,9 +33,19 @@ function computeDelta(current: number, previous: number): DeltaState {
   return { direction: pct > 0 ? "up" : "down", pctChange: pct };
 }
 
-export function KpiCard({ label, value, previousValue, format, higherIsBetter, locale }: Props) {
-  const display =
+export function KpiCard({
+  label,
+  value,
+  previousValue,
+  format,
+  higherIsBetter,
+  locale,
+  display,
+  valueCaption,
+}: Props) {
+  const formattedValue =
     format === "percent" ? formatPercent(value, locale) : formatNumber(value, locale);
+  const bigDisplay = display ?? formattedValue;
 
   const delta = computeDelta(value, previousValue);
 
@@ -64,9 +79,17 @@ export function KpiCard({ label, value, previousValue, format, higherIsBetter, l
         <div className="text-xs font-medium text-[#6b7280] uppercase tracking-wide">
           {label}
         </div>
-        <div className="font-[var(--font-geist-sans)] text-[36px] leading-none font-semibold tabular-nums">
-          {display}
+        <div
+          className={cn(
+            "font-[var(--font-geist-sans)] font-semibold tabular-nums",
+            display ? "text-2xl leading-tight" : "text-[36px] leading-none",
+          )}
+        >
+          {bigDisplay}
         </div>
+        {valueCaption ? (
+          <div className="text-xs text-[#6b7280]">{valueCaption}</div>
+        ) : null}
         <div className={cn("flex items-center gap-1 text-xs", deltaColor)}>
           <Icon className="size-3.5" aria-hidden="true" />
           <span>{deltaText}</span>

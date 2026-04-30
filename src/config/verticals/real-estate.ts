@@ -19,12 +19,56 @@ export const realEstate: VerticalConfig = {
   ],
 
   intents: [
-    { key: "Ventas", label: "Ventas", color: "#3b82f6" },
-    { key: "Alquileres", label: "Alquileres", color: "#10b981" },
-    { key: "Tasaciones", label: "Tasaciones", color: "#f59e0b" },
-    { key: "Emprendimientos", label: "Emprendimientos", color: "#8b5cf6" },
-    { key: "Administracion", label: "Administración", color: "#6b7280" },
-    { key: "Otras", label: "Otras", color: "#94a3b8" },
+    {
+      key: "Ventas",
+      label: "Ventas",
+      color: "#3b82f6",
+      desiredHandoffRate: 0.8,
+      terminalIntents: [
+        "guided_sales_post_results_advisor",
+        "guided_sales_post_results_visit",
+        "post_results_advisor",
+        "post_results_visit",
+      ],
+    },
+    {
+      key: "Alquileres",
+      label: "Alquileres",
+      color: "#10b981",
+      desiredHandoffRate: 0.8,
+      terminalIntents: [
+        "guided_rents_post_results_advisor",
+        "guided_rents_post_results_visit",
+      ],
+    },
+    {
+      key: "Tasaciones",
+      label: "Tasaciones",
+      color: "#f59e0b",
+      desiredHandoffRate: 0.95,
+      terminalIntents: ["valuations"],
+    },
+    {
+      key: "Emprendimientos",
+      label: "Emprendimientos",
+      color: "#8b5cf6",
+      desiredHandoffRate: 0.2,
+      // No clear terminal token yet — completion-rate strip renders "—" for this bucket
+    },
+    {
+      key: "Administracion",
+      label: "Administración",
+      color: "#6b7280",
+      desiredHandoffRate: 0.9,
+      terminalIntents: ["owners_advisor"],
+    },
+    {
+      key: "Otras",
+      label: "Otras",
+      color: "#94a3b8",
+      desiredHandoffRate: 0.7,
+      terminalIntents: ["otras_handoff"],
+    },
   ],
 
   handoffTargets: [

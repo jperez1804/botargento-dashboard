@@ -24,10 +24,14 @@ test("Overview renders KPI cards + both charts + follow-up preview", async ({ pa
   expect(kpiLabels).toContain("Mensajes salientes");
   expect(kpiLabels).toContain("Contactos únicos");
   expect(kpiLabels).toContain("Tasa de derivación");
+  expect(kpiLabels).toContain("Intención líder");
+  expect(kpiLabels).toContain("Resueltas por el bot");
 
-  // Both charts present
+  // Three charts + heatmap present: daily volume + two intent views + heatmap
   await expect(page.getByText("Volumen de mensajes")).toBeVisible();
-  await expect(page.getByText("Mensajes por intención")).toBeVisible();
+  await expect(page.getByText("Contactos por intención")).toBeVisible();
+  await expect(page.getByText("Volumen por intención")).toBeVisible();
+  await expect(page.getByText(/Demanda por hora/)).toBeVisible();
 
   // Follow-up preview section
   await expect(page.getByRole("heading", { name: "Seguimiento prioritario" })).toBeVisible();
@@ -61,6 +65,20 @@ test("Follow-up page renders all three priority badges", async ({ page }) => {
   expect(badges).toContain("Alta");
   expect(badges).toContain("Media");
   expect(badges).toContain("Baja");
+});
+
+test("Touch-mode toggle on Contactos por intención updates URL state", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".recharts-surface");
+
+  // Default = last; URL has no `touch` param.
+  expect(new URL(page.url()).searchParams.get("touch")).toBeNull();
+  await expect(page.getByText(/contactos por último contacto/i)).toBeVisible();
+
+  // Switching to "Primer contacto" sets ?touch=first and pins the new label.
+  await page.getByRole("radio", { name: "Primer contacto" }).click();
+  await page.waitForFunction(() => new URL(location.href).searchParams.get("touch") === "first");
+  await expect(page.getByText(/contactos por primer contacto/i)).toBeVisible();
 });
 
 test("CSV export downloads a correctly-formatted file", async ({ page }) => {

@@ -20,5 +20,8 @@
       "Bash(curl -s -o /dev/null http://localhost:3000/login)",
       "Bash(pnpm test *)"
     ]
+  },
+  "enabledPlugins": {
+    "business-analytics@claude-code-workflows": true
   }
 }

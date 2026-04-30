@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatAutomationLabel, normalizeAutomationToken } from "@/lib/automation-labels";
+import {
+  formatAutomationLabel,
+  formatBusinessIntentLabel,
+  normalizeAutomationToken,
+} from "@/lib/automation-labels";
 
 describe("normalizeAutomationToken", () => {
   it("normalizes case, spaces, and dashes", () => {
@@ -37,10 +41,12 @@ describe("formatAutomationLabel", () => {
 
   it("formats known handoff target labels case-insensitively", () => {
     expect(formatAutomationLabel("Owners")).toBe("Propietarios");
+    expect(formatAutomationLabel("owners_lead")).toBe("Propietarios");
     expect(formatAutomationLabel("valuations")).toBe("Tasaciones");
     expect(formatAutomationLabel("UNSPECIFIED")).toBe("Sin especificar");
     expect(formatAutomationLabel("Rents")).toBe("Alquileres");
     expect(formatAutomationLabel("Sales")).toBe("Ventas");
+    expect(formatAutomationLabel("emprendimientos_lead")).toBe("Emprendimientos");
   });
 
   it("supports separator variants", () => {
@@ -57,5 +63,31 @@ describe("formatAutomationLabel", () => {
     expect(formatAutomationLabel(null)).toBeNull();
     expect(formatAutomationLabel(undefined)).toBeNull();
     expect(formatAutomationLabel("   ")).toBeNull();
+  });
+});
+
+describe("formatBusinessIntentLabel", () => {
+  it("formats known flow intents into client-friendly buckets", () => {
+    expect(formatBusinessIntentLabel("sales_lead")).toBe("Consulta por compra");
+    expect(formatBusinessIntentLabel("guided_sales_post_results_visit")).toBe(
+      "Consulta por compra",
+    );
+    expect(formatBusinessIntentLabel("post_results_advisor")).toBe("Consulta por compra");
+    expect(formatBusinessIntentLabel("rental_lead")).toBe("Consulta por alquiler");
+    expect(formatBusinessIntentLabel("guided_rents_post_results_advisor")).toBe(
+      "Consulta por alquiler",
+    );
+  });
+
+  it("keeps configured business buckets visible", () => {
+    expect(formatBusinessIntentLabel("emprendimientos")).toBe("Emprendimientos");
+    expect(formatBusinessIntentLabel("owners_lead")).toBe("Propietarios");
+    expect(formatBusinessIntentLabel("tasaciones")).toBe("Tasaciones");
+    expect(formatBusinessIntentLabel("otras")).toBe("Otras");
+  });
+
+  it("excludes menu and groups unknowns under Otras", () => {
+    expect(formatBusinessIntentLabel("menu")).toBeNull();
+    expect(formatBusinessIntentLabel(" custom_token ")).toBe("Otras");
   });
 });

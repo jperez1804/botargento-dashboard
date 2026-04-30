@@ -86,6 +86,17 @@ function randInt(min: number, max: number): number {
 }
 
 async function applyAutomationSchema() {
+  // Drop the schema first so a previously-seeded dev DB whose tables drifted
+  // from the canonical shape (column renames, dropped columns) is brought
+  // forward cleanly. The setup file uses CREATE TABLE IF NOT EXISTS, which
+  // would otherwise silently keep the old structure. Safe — this seed always
+  // TRUNCATEs and re-inserts everything.
+  // SET client_min_messages WARNING silences the cascade-drop NOTICE that
+  // postgres.js dumps to stdout — purely cosmetic.
+  await sql.unsafe(
+    `SET client_min_messages = WARNING; DROP SCHEMA IF EXISTS automation CASCADE;`,
+  );
+
   const path = resolve(__dirname, "dev-automation-setup.sql");
   const ddl = readFileSync(path, "utf8");
   await sql.unsafe(ddl);
