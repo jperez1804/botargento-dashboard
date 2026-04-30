@@ -27,6 +27,39 @@ const INTENT_BUCKET_LABELS: Record<string, string> = {
   otras: "Otras",
 };
 
+// Maps raw automation tokens to the BUSINESS BUCKET they belong to for chart
+// aggregation. Bucket name must match an `IntentDef.key` in the vertical config
+// so the bar chart and heatmap picker reconcile.
+//
+// IMPORTANT: this is intentionally separate from `AUTOMATION_LABELS`, which
+// drives tables / follow-up reasons / handoff cells (operators want the more
+// specific term there, e.g. "Consulta de propietario"). Both can exist for the
+// same token because the operator-facing strings differ from the bucket name.
+const INTENT_BUCKET_OVERRIDES: Record<string, string> = {
+  // Ventas family
+  sales_lead: "Ventas",
+  sales: "Ventas",
+  guided_sales_post_results_advisor: "Ventas",
+  guided_sales_post_results_visit: "Ventas",
+  post_results_advisor: "Ventas",
+  post_results_visit: "Ventas",
+  // Alquileres family
+  rental_lead: "Alquileres",
+  rents: "Alquileres",
+  guided_rents_post_results_advisor: "Alquileres",
+  guided_rents_post_results_visit: "Alquileres",
+  // Tasaciones
+  valuations: "Tasaciones",
+  // Administracion (combines the "Administración / Propietarios" menu option)
+  owners: "Administracion",
+  owners_lead: "Administracion",
+  owners_advisor: "Administracion",
+  // Emprendimientos
+  emprendimientos_lead: "Emprendimientos",
+  // Otras
+  otras_handoff: "Otras",
+};
+
 const EXCLUDED_INTENT_BUCKETS = new Set(["menu"]);
 
 export function normalizeAutomationToken(value: string): string {
@@ -44,7 +77,15 @@ export function formatAutomationLabel(value: string | null | undefined): string 
 
 /**
  * Business KPI bucket for intent charts. Unknown raw automation values are grouped
- * under "Otras", while display-only labels keep their client-friendly Spanish names.
+ * under "Otras". Lookup order:
+ *   1. INTENT_BUCKET_OVERRIDES — folds operator-friendly token families into
+ *      their canonical chart bucket (e.g. owners* → "Administracion").
+ *   2. INTENT_BUCKET_LABELS — direct bucket-name lookup (e.g. "ventas" → "Ventas").
+ *   3. "Otras" — anything we don't recognize.
+ *
+ * AUTOMATION_LABELS is intentionally NOT consulted here — that map drives
+ * operator-facing display strings (table rows, follow-up reasons), which
+ * deliberately differ from the bucket label.
  */
 export function formatBusinessIntentLabel(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -55,5 +96,7 @@ export function formatBusinessIntentLabel(value: string | null | undefined): str
   const normalized = normalizeAutomationToken(trimmed);
   if (EXCLUDED_INTENT_BUCKETS.has(normalized)) return null;
 
-  return AUTOMATION_LABELS[normalized] ?? INTENT_BUCKET_LABELS[normalized] ?? "Otras";
+  return (
+    INTENT_BUCKET_OVERRIDES[normalized] ?? INTENT_BUCKET_LABELS[normalized] ?? "Otras"
+  );
 }

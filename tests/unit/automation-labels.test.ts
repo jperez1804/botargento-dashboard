@@ -67,27 +67,51 @@ describe("formatAutomationLabel", () => {
 });
 
 describe("formatBusinessIntentLabel", () => {
-  it("formats known flow intents into client-friendly buckets", () => {
-    expect(formatBusinessIntentLabel("sales_lead")).toBe("Consulta por compra");
-    expect(formatBusinessIntentLabel("guided_sales_post_results_visit")).toBe(
-      "Consulta por compra",
-    );
-    expect(formatBusinessIntentLabel("post_results_advisor")).toBe("Consulta por compra");
-    expect(formatBusinessIntentLabel("rental_lead")).toBe("Consulta por alquiler");
-    expect(formatBusinessIntentLabel("guided_rents_post_results_advisor")).toBe(
-      "Consulta por alquiler",
-    );
+  it("folds Ventas-family raw tokens into the configured Ventas bucket", () => {
+    expect(formatBusinessIntentLabel("sales_lead")).toBe("Ventas");
+    expect(formatBusinessIntentLabel("sales")).toBe("Ventas");
+    expect(formatBusinessIntentLabel("guided_sales_post_results_visit")).toBe("Ventas");
+    expect(formatBusinessIntentLabel("guided_sales_post_results_advisor")).toBe("Ventas");
+    expect(formatBusinessIntentLabel("post_results_advisor")).toBe("Ventas");
+    expect(formatBusinessIntentLabel("post_results_visit")).toBe("Ventas");
+  });
+
+  it("folds Alquileres-family raw tokens into the configured Alquileres bucket", () => {
+    expect(formatBusinessIntentLabel("rental_lead")).toBe("Alquileres");
+    expect(formatBusinessIntentLabel("rents")).toBe("Alquileres");
+    expect(formatBusinessIntentLabel("guided_rents_post_results_advisor")).toBe("Alquileres");
+    expect(formatBusinessIntentLabel("guided_rents_post_results_visit")).toBe("Alquileres");
+  });
+
+  it("folds owners-family raw tokens into the configured Administracion bucket", () => {
+    // The "Administración / Propietarios" menu option lives in the same bucket
+    // for chart aggregation; "Propietarios" remains the friendly term in tables.
+    expect(formatBusinessIntentLabel("owners")).toBe("Administracion");
+    expect(formatBusinessIntentLabel("owners_lead")).toBe("Administracion");
+    expect(formatBusinessIntentLabel("owners_advisor")).toBe("Administracion");
   });
 
   it("keeps configured business buckets visible", () => {
+    expect(formatBusinessIntentLabel("ventas")).toBe("Ventas");
+    expect(formatBusinessIntentLabel("alquileres")).toBe("Alquileres");
     expect(formatBusinessIntentLabel("emprendimientos")).toBe("Emprendimientos");
-    expect(formatBusinessIntentLabel("owners_lead")).toBe("Propietarios");
+    expect(formatBusinessIntentLabel("emprendimientos_lead")).toBe("Emprendimientos");
     expect(formatBusinessIntentLabel("tasaciones")).toBe("Tasaciones");
+    expect(formatBusinessIntentLabel("valuations")).toBe("Tasaciones");
     expect(formatBusinessIntentLabel("otras")).toBe("Otras");
+    expect(formatBusinessIntentLabel("otras_handoff")).toBe("Otras");
   });
 
   it("excludes menu and groups unknowns under Otras", () => {
     expect(formatBusinessIntentLabel("menu")).toBeNull();
     expect(formatBusinessIntentLabel(" custom_token ")).toBe("Otras");
+  });
+
+  it("does not affect formatAutomationLabel display strings", () => {
+    // formatAutomationLabel must keep showing operator-friendly text in tables
+    // and follow-up reasons even though the chart bucket differs.
+    expect(formatAutomationLabel("owners_advisor")).toBe("Consulta de propietario");
+    expect(formatAutomationLabel("owners")).toBe("Propietarios");
+    expect(formatAutomationLabel("sales_lead")).toBe("Consulta por compra");
   });
 });

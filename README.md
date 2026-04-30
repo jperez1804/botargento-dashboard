@@ -16,7 +16,7 @@ in [`CLAUDE.md`](CLAUDE.md).
 |---|---|
 | Run dev server | `pnpm dev` |
 | Run unit tests | `pnpm test` |
-| Run E2E tests | `pnpm test:e2e` (needs Docker for the dev DB) |
+| Run E2E tests | `TENANT_DB_URL=… pnpm test:e2e` (needs Docker for the dev DB) |
 | Type check | `pnpm exec tsc --noEmit` |
 | Apply migrations | `pnpm db:migrate` |
 | Seed dev DB | `pnpm db:seed:dev` |
@@ -73,14 +73,57 @@ All SQL goes through `src/lib/queries/*.ts`. All env vars go through
 `src/lib/env.ts`. All UI labels come from `verticalConfig` or `tenantConfig`.
 See [`CLAUDE.md`](CLAUDE.md) for the non-negotiable rules.
 
+### Overview surfaces (intent KPIs)
+
+The overview page (`/`) now layers per-intent analytics on top of the volume
+KPIs. Design rationale and tuning guidance live in
+[`docs/INTENT_KPIS_PLAN.md`](docs/INTENT_KPIS_PLAN.md).
+
+| Surface | What it answers |
+|---|---|
+| KPI strip | Inbound · outbound · contactos únicos · tasa de derivación · **Intención líder** (top bucket + Δ) · **Resueltas por el bot** (% sin handoff) |
+| `Contactos por intención` | Unique contacts per intent, with per-bucket Δ vs prior 7d, per-intent **handoff-rate chips** colored against `desiredHandoffRate`, and an attribution disclaimer |
+| `Volumen por intención` | Flow-step volume per intent (chatbot load), with Δ chips and **Interacciones por contacto** (engagement density) |
+| `Top valores en Otras` | Collapsed `<details>` listing raw tokens that fell into Otras — feeds the labeling backlog |
+| `Demanda por hora` | 7×24 heatmap, **default 28-day window** (independent from the 7d page filter), filterable by intent via `?heatmapIntent=` |
+| `Finalización de flujos` | Per-intent completion rate based on `terminalIntents` config; renders `—` for buckets without configured terminals |
+| `Tiempo hasta derivación` | Per-intent median + p90; `—` when `n < 5`; wall-clock disclaimer |
+
+### Tuning the per-intent thresholds
+
+The chip coloring and completion logic read from `src/config/verticals/<vertical>.ts`:
+
+- `desiredHandoffRate` (0..1) per intent — green when actual is at/above target ± 10% tolerance, red when below, gray when undefined.
+- `terminalIntents: string[]` per intent — raw automation tokens that mark the end of the flow. Omit when no clear terminal exists; the strip will render `—`.
+
+After tuning, no DB migration or rebuild is needed beyond a redeploy.
+
+### Shareable URL state
+
+These query params survive reload and copy/paste:
+
+- `?touch=last|first|any` — attribution mode for `Contactos por intención`. Default `last` (per-intent counts then sum to global unique contacts). `any` is the legacy multi-intent view (counts may exceed unique contacts; documented in the chart's summary).
+- `?heatmapIntent=<bucket label>` — filters the heatmap to a single intent (`Ventas`, `Alquileres`, …).
+
 ### Dev database details
 The dev compose brings up Postgres 16 on host port `5433` with database
-`dashboard_dev`. The seed script (`scripts/seed-dev.ts`) creates a synthetic
-`automation.*` schema (the upstream views the production tenant Postgres
-provides) and inserts 14 days of fake activity plus stale leads to populate
-the follow-up queue with all three priorities.
+`dashboard_dev`. The seed script (`scripts/seed-dev.ts`) recreates the
+`automation.*` schema from `scripts/dev-automation-setup.sql` (mirrors the
+production tenant views) and inserts 14 days of fake activity plus stale leads
+to populate the follow-up queue with all three priorities.
 
-To reset:
+The seed `DROP SCHEMA automation CASCADE`s before re-applying setup, so
+re-running `pnpm db:seed:dev` always brings a drifted dev DB forward — no
+manual reset needed when columns/views change.
+
+`pnpm test:e2e` requires `TENANT_DB_URL` exported in the shell (the helpers
+run outside Next, so `.env.local` isn't picked up automatically):
+
+```bash
+TENANT_DB_URL='postgres://postgres:devpass@localhost:5433/dashboard_dev' pnpm test:e2e
+```
+
+To wipe the volume entirely:
 ```bash
 docker compose -f docker/docker-compose.dev.yml down -v
 docker compose -f docker/docker-compose.dev.yml up -d
@@ -357,6 +400,10 @@ container exits with a clear list of missing views.
 | Email arrives but link goes to "AccessDenied" | Email was removed mid-flight, or token expired (>15 min) | Request a new link |
 | `network ..._..._-internal declared as external, but could not be found` | Compose project prefix mismatch | `docker network ls \| grep <clientN>` and update `name:` in `dashboard.compose.yml` |
 | Charts show zeros despite known activity | View tz drift or wrong `CLIENT_TIMEZONE` | Compare `SELECT day FROM automation.v_daily_metrics` against `CLIENT_TIMEZONE` in env |
+| Per-intent handoff rates don't match the global handoff-rate KPI | Expected: per-intent rates use last-touch attribution, the global KPI counts each contact once across all intents | Disclosure is on screen under the chart; reconciliation isn't possible by design |
+| `Resueltas por el bot` looks too high | Self-resolution v1 only excludes business handoffs; contacts still in the follow-up queue count as resolved | Cross-check with `/follow-up`; refinement deferred per `docs/INTENT_KPIS_PLAN.md` |
+| Completion-rate row shows `—` for an intent | No `terminalIntents` configured for that bucket in `src/config/verticals/<vertical>.ts` | Add the raw terminal token(s) for the flow; redeploy |
+| Heatmap looks empty / sparse | Tenant traffic is thin and the 28-day window still doesn't fill 168 cells | Expected — the metric is more useful once volume grows; nothing to fix |
 | 429 on CSV export | 10/minute/session rate limit | Wait a minute; `src/lib/rate-limit.ts` if you need to adjust |
 | Refresh button does nothing | Browser cached aggressively | Force-reload (Ctrl+Shift+R); the route response is `Cache-Control: no-store` |
 
