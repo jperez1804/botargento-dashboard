@@ -491,6 +491,51 @@ Geist is already in the BotArgento landing page stack — consistent identity ac
 - Number display: `1.234,56`
 - All Spanish copy lives in `src/config/verticals/<vertical>.ts`; no hardcoded UI strings in components
 
+### Reserved Operations addendum (post-v1)
+
+The "Reserved Operations" redesign supersedes the original flat-Geist spec
+above without removing it — older components still in the codebase reference
+the original tokens, and the addendum below describes the *current* canonical
+direction for new work. Treat the older table as historical; see
+[`CLAUDE.md`](../CLAUDE.md#design-system) for the live token list.
+
+- **Display font: Fraunces** (variable axes `SOFT` + `opsz`, exposed as
+  `--font-fraunces`). Used for page mastheads, section headings, and hero
+  KPI values. Geist Sans stays the body face; Geist Mono stays for numerics
+  + kicker captions.
+- **Accent-only color**: monochrome canvas with the tenant's
+  `--client-primary` as the only colored element. Cards carry a 2px top
+  border in the accent (the "masthead rule").
+- **Editorial rhythm**: every top-level page section has a mono kicker
+  caption + Fraunces section heading. The overview is structured as
+  Volumen diario → Intenciones → Operativo → Seguimiento.
+- **Theming control plane**: `--client-primary` is no longer just an env
+  var. See "Theming control plane" below for the storage + UI + audit flow.
+
+### Theming control plane
+
+The brand accent is the first piece of operator-controlled tenant config that
+isn't an env var. The pattern below is reusable for future settings (logo
+URL, default date range, etc.) — anything we want operators to change
+without redeploying.
+
+| Layer | What lives here |
+|---|---|
+| **Storage** | `dashboard.app_settings` — single-row table per tenant DB. PK constrained to `id = 1`. Migration `0002_app_settings.sql` creates + back-fills from `CLIENT_PRIMARY_COLOR`. |
+| **Read** | `getAppSettings()` in `src/lib/queries/app-settings.ts`. Returns the persisted row, falls back to env defensively (post-migration the row always exists). |
+| **Write** | `updateAppSettings({primaryColor}, by)` — same module. Validates hex, upserts on `id=1`, audits via `dashboard.audit_log` with `action='theme_update'` and `metadata={from, to}`. |
+| **API** | `POST /api/settings/theme` — Zod-validated, role-guarded (`requireRole("admin")`). |
+| **UI** | `/settings` page (Server Component, `requireRole("admin")` first) renders `<ColorPicker>` (Client Component). The picker writes to `document.documentElement.style` for live preview, then POSTs on save and `router.refresh()`s. |
+| **Layout injection** | `src/app/layout.tsx` awaits `getAppSettings()` and injects `--client-primary` inline on `<body>` so the var is set before any paint. |
+
+The pattern for a new admin-controlled setting is:
+1. Add a column to `dashboard.app_settings` in a fresh additive migration.
+2. Extend `AppSettings` type + getter/setter in `src/lib/queries/app-settings.ts`.
+3. Add the field to the `/settings` page (still guarded by
+   `requireRole("admin")`); reuse `<ColorPicker>` as the model for live-preview
+   inputs.
+4. Audit the change via `auditLog` insert with a stable `action` string.
+
 ---
 
 ## 8. Authentication & Authorization
@@ -528,11 +573,19 @@ Geist is already in the BotArgento landing page stack — consistent identity ac
 
 ### Roles & Permissions
 
-v1 is single-role. The `role` column in `dashboard.allowed_emails` exists for forward compatibility.
+The `role` column in `dashboard.allowed_emails` is enforced server-side via
+`src/lib/role-guard.ts`. Pages and route handlers that require elevation call
+`await requireRole("admin")` at the top; the guard redirects viewers and
+emits a `role_denied` audit row.
 
 | Role | Can Do |
 |------|--------|
-| `viewer` (only role in v1) | View all dashboard pages, export CSV |
+| `viewer` | View all dashboard pages, export CSV |
+| `admin` | Everything `viewer` can do, plus change tenant-scoped settings (currently `--client-primary` via `/settings`) |
+
+The first admin is bootstrapped during `scripts/provision-tenant.sh` (a
+prompt collects an email and seeds it as `admin`). Existing tenants promote
+via `UPDATE dashboard.allowed_emails SET role='admin' WHERE email='…';`.
 
 ### Session Management
 

@@ -20,7 +20,7 @@ test("unauthenticated /  → redirected to /login", async ({ page }) => {
 test("login + verify happy path", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "Panel" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operaciones del período" })).toBeVisible();
 });
 
 test("non-allowlisted email never gets a session", async ({ page, request }) => {

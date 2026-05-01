@@ -18,7 +18,7 @@ async function handleSignOut() {
 
 export function Header({ userEmail, navItems }: HeaderProps) {
   return (
-    <header className="h-14 shrink-0 border-b border-[#e5e7eb] bg-white flex items-center justify-between gap-4 px-4">
+    <header className="h-14 shrink-0 border-b border-[var(--rule)] bg-[var(--surface)] flex items-center justify-between gap-4 px-4">
       <div className="flex items-center gap-2 min-w-0">
         <MobileNav items={navItems} />
         <TenantBadge />
@@ -26,7 +26,7 @@ export function Header({ userEmail, navItems }: HeaderProps) {
       <div className="flex items-center gap-2">
         <RefreshButton />
         {userEmail && (
-          <span className="hidden sm:inline text-xs text-[#6b7280] max-w-[200px] truncate">
+          <span className="hidden sm:inline text-xs text-[var(--muted-ink)] max-w-[200px] truncate">
             {userEmail}
           </span>
         )}

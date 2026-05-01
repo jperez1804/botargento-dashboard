@@ -63,32 +63,72 @@ Server Components await Drizzle queries from `src/lib/queries/*.ts` and render H
 ## Design System
 
 ### Colors
-- Primary: CSS var `--client-primary`, default `#3b82f6` (overridable per tenant)
-- Background: `#fafafa`
-- Surface: `#ffffff`
-- Text: `#111827`
-- Muted: `#6b7280`
-- Border: `#e5e7eb`
-- Destructive: `#dc2626`
-- Success: `#059669`
-- Warning: `#d97706`
-- Priority high: bg `#F4CCCC`, text `#8A1A1A`
-- Priority medium: bg `#FCE5CD`, text `#8A4B00`
-- Priority low: bg `#E6F4EA`, text `#1B5E20`
+
+The dashboard ships the **Reserved Operations** aesthetic: monochrome canvas
+with the tenant's `--client-primary` as the only colored element. Always
+reference these CSS vars from feature code — do not introduce new hex literals.
+
+| Token | Default | Purpose |
+|---|---|---|
+| `--client-primary` | `#3b82f6` | Tenant accent; injected from `dashboard.app_settings` at request time. Operators with `role='admin'` change this from `/settings`; the env value is the boot fallback only. |
+| `--ink` | `#111827` | Primary text |
+| `--muted-ink` | `#6b7280` | Secondary text / kicker captions |
+| `--soft-ink` | `#9ca3af` | Tertiary captions, disclaimers |
+| `--rule` | `#e5e7eb` | Hairline borders + dividers |
+| `--surface` | `#ffffff` | Card backgrounds |
+| `--canvas` | `#fafafa` | Page background, hover states |
+| `--good` | `#059669` | Positive deltas (semantic, brand-independent) |
+| `--bad` | `#dc2626` | Negative deltas (semantic, brand-independent) |
+
+Semantic palettes that stay as hardcoded hex (intentional — they map to
+domain meaning, not brand): priority chips (`#F4CCCC`/`#8A1A1A`,
+`#FCE5CD`/`#8A4B00`, `#E6F4EA`/`#1B5E20`) and per-intent chart colors
+configured in `src/config/verticals/*.ts`.
 
 ### Typography
-- Font: Geist Sans (body, headings), Geist Mono (numbers, code)
-- Display / KPI value: 36px/600
-- h1 / h2 / h3: 28 / 20 / 16 px / 600
-- Body: 14px/400
-- Table cells: 13px/400
+- Body / nav / table: **Geist Sans** (variable `--font-geist-sans`)
+- Display headings + hero KPI values: **Fraunces** (variable `--font-fraunces`,
+  axes `SOFT` + `opsz`). Used on page mastheads, section headings, and the
+  big KPI display values to give the editorial Reserved Operations gravitas.
+- Numerics + code + kicker labels: **Geist Mono** (variable `--font-geist-mono`)
+  with `tabular-nums` always on.
+- Page masthead: 44px / Fraunces 600 / -tracking
+- Section heading: 22px / Fraunces 500 + 10px mono kicker line above
+- Hero KPI value: 40px / Fraunces 600 / `tabular-nums`
+- Standard KPI value: 40px / Fraunces 600 / `tabular-nums`
+- Body: 14px / 400
+- Table cells: 13px / 400
+- Mono kicker: 10px / 500 / 0.18em letter-spacing / uppercase
 
 ### Style
-- Border radius: 6px default, 8px for cards
+- Border radius: 6px default (`rounded-md`), Card uses 6px
+- Cards carry a 2px **`--client-primary` top border** (masthead rule) on top of
+  the standard 1px `--rule` hairline. The accent strip is the only color on
+  the card by default.
 - Spacing base: 4px (Tailwind defaults)
-- Aesthetic: flat surfaces, 1px borders, minimal shadows, information-dense, no gratuitous animation
+- Aesthetic: flat surfaces, hairline borders, no shadows, information-dense.
+  Page-load reveal is the *only* motion: `[data-reveal]` with staggered
+  `--reveal-delay` per top-level section. Respects `prefers-reduced-motion`.
+- Background: `--canvas` plus a ~3% inline-SVG paper-grain texture on `<body>`.
 - Locale: es-AR, DD/MM/YYYY, thousand separator `.`, decimal `,`
 - Timezone: America/Argentina/Buenos_Aires (overridable per tenant)
+
+## Roles
+
+`dashboard.allowed_emails.role` ∈ `{viewer, admin}`. Any allowlisted email is
+a viewer by default; admins are promoted explicitly (the provisioner prompts
+for a first admin during a fresh install, existing tenants run an `UPDATE`).
+
+- **Viewer**: read-only access to all dashboard pages.
+- **Admin**: viewer + write access to tenant-scoped settings (currently
+  `/settings` → `--client-primary`). Privileged routes call
+  `requireRole("admin")` from `src/lib/role-guard.ts`, which redirects
+  viewers to `/` and emits a `role_denied` audit row.
+
+The first time a privileged surface gets added, it should `await
+requireRole("admin")` at the top of its Server Component or route handler —
+the proxy + `auth()` already enforce that *some* allowlisted email is signed
+in, so role-guard only adds the role check on top.
 
 ## Environment Variables
 
@@ -112,7 +152,7 @@ Server Components await Drizzle queries from `src/lib/queries/*.ts` and render H
 2. **No hardcoded Spanish strings in JSX.** All UI text comes from `verticalConfig` or `tenantConfig`.
 3. **No `process.env.X` in feature code.** Read through validated config modules.
 4. **Every page query is a Server Component.** Never fetch data from a Client Component.
-5. **Every auth-sensitive action is logged to `dashboard.audit_log`.** Logins, denials, exports.
+5. **Every auth-sensitive action is logged to `dashboard.audit_log`.** Logins, denials, exports, theme updates, role denials.
 6. **Magic link tokens are SHA-256 hashed before storage.** Never plaintext, never logged.
 7. **Migrations are additive only.** No `DROP COLUMN` or destructive changes without a multi-deploy migration plan.
 8. **Max 300 lines per component file.** Extract when larger.

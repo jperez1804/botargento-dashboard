@@ -358,6 +358,53 @@ docker exec -i n8n-<clientN>-postgres \
 In-flight magic links are invalidated automatically — `useVerificationToken`
 re-checks allowlist membership on every verify.
 
+### Roles
+
+`dashboard.allowed_emails.role` is one of `viewer` (default) or `admin`.
+Admins are the only role allowed to change tenant-scoped settings (today
+that's just the brand color via `/settings`; future privileged surfaces will
+follow the same `requireRole("admin")` pattern in `src/lib/role-guard.ts`).
+
+The provisioner prompts for a first-admin email during a fresh
+`scripts/provision-tenant.sh` run. **Existing tenants** need a one-time
+promotion:
+```bash
+docker exec -i n8n-<clientN>-postgres \
+  psql -U postgres -d <dbname> \
+  -c "UPDATE dashboard.allowed_emails SET role='admin' WHERE email='owner@cliente.com';"
+```
+
+Role denials (a viewer attempting `/settings` or POST `/api/settings/theme`)
+land in `dashboard.audit_log` with `action='role_denied'` and a metadata
+payload of `{required, actual}` so escalation attempts are visible alongside
+`login_denied` entries.
+
+### Theming
+
+The brand accent (`--client-primary`) lives in
+`dashboard.app_settings.primary_color` — a one-row table per tenant DB. On
+container start, migration `0002_app_settings.sql` creates the row and
+back-fills it from the `CLIENT_PRIMARY_COLOR` env var, so existing tenants do
+not go blank between a theming-enabled deploy and the first manual change.
+
+After the deploy, admins change the color from `/settings` (UI picker + hex
+input + curated swatches). The env var becomes the **boot fallback only** —
+once the row exists, the DB is the source of truth and there is no need to
+edit `/opt/n8n/<clientN>/dashboard.env` to recolor a tenant.
+
+Every change emits a row in `dashboard.audit_log`:
+```sql
+SELECT created_at, email, metadata
+  FROM dashboard.audit_log
+ WHERE action = 'theme_update'
+ ORDER BY created_at DESC LIMIT 10;
+-- metadata: { "from": "#3b82f6", "to": "#8b0000" }
+```
+
+Per-intent chart colors stay vertical-locked in
+`src/config/verticals/<vertical>.ts` — those map to domain meaning (Ventas,
+Alquileres, …) rather than to brand, so they are not picker-controlled.
+
 ### Audit log
 Every login, denied attempt, and CSV export lands in `dashboard.audit_log`.
 For a quick incident review:
@@ -409,6 +456,10 @@ container exits with a clear list of missing views.
 | Heatmap looks empty / sparse | Tenant traffic is thin and the 28-day window still doesn't fill 168 cells | Expected — the metric is more useful once volume grows; nothing to fix |
 | 429 on CSV export | 10/minute/session rate limit | Wait a minute; `src/lib/rate-limit.ts` if you need to adjust |
 | Refresh button does nothing | Browser cached aggressively | Force-reload (Ctrl+Shift+R); the route response is `Cache-Control: no-store` |
+| `/settings` returns 307 / redirects to `/` | Logged-in email is not an admin | Promote it: `UPDATE dashboard.allowed_emails SET role='admin' WHERE email='…';` (see Roles) |
+| Color picker change doesn't persist after reload | Migration `0002_app_settings.sql` did not run on this tenant | `docker logs n8n-<clientN>-dashboard 2>&1 \| grep -i 0002` — if missing, redeploy `:latest`; `0002` is additive and idempotent |
+| All tenants show `#3b82f6` after the theming deploy | Migration ran but the back-fill from `CLIENT_PRIMARY_COLOR` was skipped because the row already existed | Run once per tenant: `UPDATE dashboard.app_settings SET primary_color = '<env-color>' WHERE id = 1;` |
+| Fonts flash to a serif-less fallback for ~200ms | First-paint before Fraunces loads (`display: swap`) | Expected on cold loads; subsequent navigations hit the cache |
 
 ---
 

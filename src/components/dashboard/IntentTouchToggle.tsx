@@ -32,11 +32,11 @@ export function IntentTouchToggle({ value }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-[#6b7280]">Atribución:</span>
+      <span className="text-[var(--muted-ink)]">Atribución:</span>
       <div
         role="radiogroup"
         aria-label="Atribución de intención"
-        className="inline-flex rounded-md border border-[#e5e7eb] bg-white p-0.5"
+        className="inline-flex rounded-md border border-[var(--rule)] bg-[var(--surface)] p-0.5"
       >
         {OPTIONS.map((opt) => {
           const active = opt.value === value;
@@ -51,8 +51,8 @@ export function IntentTouchToggle({ value }: Props) {
               className={cn(
                 "rounded px-2 py-1 transition-colors",
                 active
-                  ? "bg-[#111827] text-white"
-                  : "text-[#374151] hover:bg-[#f3f4f6]",
+                  ? "bg-[var(--ink)] text-[var(--surface)]"
+                  : "text-[var(--ink)] hover:bg-[var(--canvas)]",
                 isPending && "opacity-60",
               )}
             >

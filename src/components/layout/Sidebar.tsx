@@ -3,7 +3,13 @@
 import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeftRight, LayoutDashboard, ListTodo, MessageSquare } from "lucide-react";
+import {
+  ArrowLeftRight,
+  LayoutDashboard,
+  ListTodo,
+  MessageSquare,
+  Settings,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavIconKey, NavItemDef } from "@/config/verticals/_types";
 
@@ -14,6 +20,7 @@ const ICON_MAP: Record<NavIconKey, IconComponent> = {
   conversations: MessageSquare,
   handoffs: ArrowLeftRight,
   "follow-up": ListTodo,
+  settings: Settings,
 };
 
 function isActive(pathname: string, href: string): boolean {
@@ -30,7 +37,7 @@ export function Sidebar({ items }: SidebarProps) {
   return (
     <nav
       aria-label="Navegación principal"
-      className="hidden md:flex w-[240px] shrink-0 flex-col gap-1 border-r border-[#e5e7eb] bg-white px-3 py-4"
+      className="hidden md:flex w-[240px] shrink-0 flex-col gap-1 border-r border-[var(--rule)] bg-[var(--surface)] px-3 py-4"
     >
       {items.map(({ href, label, icon }) => {
         const Icon = ICON_MAP[icon];
@@ -40,10 +47,10 @@ export function Sidebar({ items }: SidebarProps) {
             key={href}
             href={href}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+              "group/nav relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
               active
-                ? "bg-[var(--client-primary)]/10 text-[var(--client-primary)] font-medium"
-                : "text-[#374151] hover:bg-[#f3f4f6]",
+                ? "bg-[var(--client-primary)]/10 text-[var(--client-primary)] font-medium before:content-[''] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:bg-[var(--client-primary)] before:rounded-full"
+                : "text-[var(--ink)] hover:bg-[var(--canvas)]",
             )}
           >
             <Icon className="size-4 shrink-0" aria-hidden="true" />

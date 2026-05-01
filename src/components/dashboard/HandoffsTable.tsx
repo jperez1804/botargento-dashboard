@@ -61,11 +61,11 @@ export function HandoffsTable({ data, targets, locale, timezone }: Props) {
           const row = ctx.row.original;
           return (
             <div className="min-w-0">
-              <div className="font-medium text-[#111827] truncate">
+              <div className="font-medium text-[var(--ink)] truncate">
                 {row.displayName ?? row.contactWaId}
               </div>
               {row.displayName && (
-                <div className="text-xs text-[#9ca3af] truncate">{row.contactWaId}</div>
+                <div className="text-xs text-[var(--soft-ink)] truncate">{row.contactWaId}</div>
               )}
             </div>
           );
@@ -80,7 +80,7 @@ export function HandoffsTable({ data, targets, locale, timezone }: Props) {
         accessorKey: "reason",
         header: "Motivo",
         cell: (ctx) => (
-          <span className="text-[#374151]">
+          <span className="text-[var(--ink)]">
             {formatAutomationLabel(ctx.getValue() as string | null) ?? "—"}
           </span>
         ),
@@ -103,14 +103,14 @@ export function HandoffsTable({ data, targets, locale, timezone }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="rounded-md border border-[#e5e7eb] bg-white p-6 text-sm text-[#6b7280]">
+      <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-6 text-sm text-[var(--muted-ink)]">
         No hay derivaciones en este período.
       </div>
     );
   }
 
   return (
-    <div className="rounded-md border border-[#e5e7eb] bg-white overflow-hidden">
+    <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] overflow-hidden">
       <div className="overflow-x-auto">
       <Table>
         <TableHeader>
@@ -124,7 +124,7 @@ export function HandoffsTable({ data, targets, locale, timezone }: Props) {
                     key={h.id}
                     onClick={sortable ? h.column.getToggleSortingHandler() : undefined}
                     className={cn(
-                      "text-xs font-medium text-[#6b7280] uppercase tracking-wide",
+                      "text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide",
                       sortable && "cursor-pointer select-none",
                     )}
                   >
@@ -152,7 +152,7 @@ export function HandoffsTable({ data, targets, locale, timezone }: Props) {
         </TableBody>
       </Table>
       </div>
-      <div className="flex items-center justify-between border-t border-[#e5e7eb] px-4 py-2 text-xs text-[#6b7280]">
+      <div className="flex items-center justify-between border-t border-[var(--rule)] px-4 py-2 text-xs text-[var(--muted-ink)]">
         <div>
           Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount() || 1}
         </div>

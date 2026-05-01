@@ -104,15 +104,18 @@ async function applyAutomationSchema() {
 }
 
 async function seedAllowlist() {
+  // dev@ is admin so the local /settings page works without a manual UPDATE.
+  // The other emails stay as viewers — production-shaped allowlist for testing
+  // role gates.
   await sql`
     INSERT INTO dashboard.allowed_emails (email, role, created_by)
     VALUES
-      ('dev@botargento.com.ar',     'viewer', 'seed'),
+      ('dev@botargento.com.ar',     'admin',  'seed'),
       ('owner@cliente.com',         'viewer', 'seed'),
       ('jonatanperez1804@gmail.com','viewer', 'seed')
-    ON CONFLICT (email) DO NOTHING
+    ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role
   `;
-  console.log("  ✓ allowlist seeded");
+  console.log("  ✓ allowlist seeded (dev@ promoted to admin)");
 }
 
 async function seedActivity() {

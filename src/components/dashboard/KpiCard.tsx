@@ -58,10 +58,10 @@ export function KpiCard({
 
   const deltaColor =
     goodDirection === "good"
-      ? "text-[#059669]"
+      ? "text-[var(--good)]"
       : goodDirection === "bad"
-        ? "text-[#dc2626]"
-        : "text-[#6b7280]";
+        ? "text-[var(--bad)]"
+        : "text-[var(--muted-ink)]";
 
   const Icon =
     delta.direction === "up" ? ArrowUpRight : delta.direction === "down" ? ArrowDownRight : Minus;
@@ -74,26 +74,28 @@ export function KpiCard({
         : formatSignedPercent(delta.pctChange, locale);
 
   return (
-    <Card className="ring-1 ring-black/5">
+    <Card>
       <CardContent className="px-5 py-4 space-y-2">
-        <div className="text-xs font-medium text-[#6b7280] uppercase tracking-wide">
+        <div className="text-[10px] font-medium text-[var(--muted-ink)] uppercase tracking-[0.14em] font-[var(--font-geist-mono)]">
           {label}
         </div>
         <div
           className={cn(
-            "font-[var(--font-geist-sans)] font-semibold tabular-nums",
-            display ? "text-2xl leading-tight" : "text-[36px] leading-none",
+            "font-semibold tabular-nums text-[var(--ink)]",
+            display
+              ? "text-[26px] leading-tight font-[var(--font-fraunces)] tracking-tight"
+              : "text-[40px] leading-none font-[var(--font-fraunces)] tracking-tight",
           )}
         >
           {bigDisplay}
         </div>
         {valueCaption ? (
-          <div className="text-xs text-[#6b7280]">{valueCaption}</div>
+          <div className="text-xs text-[var(--muted-ink)]">{valueCaption}</div>
         ) : null}
         <div className={cn("flex items-center gap-1 text-xs", deltaColor)}>
           <Icon className="size-3.5" aria-hidden="true" />
-          <span>{deltaText}</span>
-          <span className="text-[#9ca3af]">vs período anterior</span>
+          <span className="tabular-nums">{deltaText}</span>
+          <span className="text-[var(--soft-ink)]">vs período anterior</span>
         </div>
       </CardContent>
     </Card>

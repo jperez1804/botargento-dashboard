@@ -11,34 +11,36 @@ export function IntentTimeToHandoff({ rows, locale }: Props) {
   if (rows.length === 0) return null;
 
   return (
-    <Card className="ring-1 ring-black/5">
+    <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Tiempo hasta derivación</CardTitle>
+        <CardTitle className="text-base font-semibold text-[var(--ink)]">
+          Tiempo hasta derivación
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide text-[#9ca3af]">
+              <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--soft-ink)]">
                 <th className="py-1 pr-4 font-medium">Intención</th>
                 <th className="py-1 pr-4 font-medium">Mediana</th>
                 <th className="py-1 pr-4 font-medium">p90</th>
                 <th className="py-1 text-right font-medium">n</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e5e7eb] text-[13px]">
+            <tbody className="divide-y divide-[var(--rule)] text-[13px]">
               {rows.map((row) => (
                 <tr key={row.intent}>
-                  <td className="py-2 pr-4 text-[#374151]">{row.intent}</td>
-                  <td className="py-2 pr-4 tabular-nums text-[#111827]">
+                  <td className="py-2 pr-4 text-[var(--ink)]">{row.intent}</td>
+                  <td className="py-2 pr-4 tabular-nums text-[var(--ink)]">
                     {row.medianSeconds === null
                       ? "—"
                       : formatDuration(row.medianSeconds, locale)}
                   </td>
-                  <td className="py-2 pr-4 tabular-nums text-[#6b7280]">
+                  <td className="py-2 pr-4 tabular-nums text-[var(--muted-ink)]">
                     {row.p90Seconds === null ? "—" : formatDuration(row.p90Seconds, locale)}
                   </td>
-                  <td className="py-2 text-right tabular-nums text-[#6b7280]">
+                  <td className="py-2 text-right tabular-nums text-[var(--muted-ink)]">
                     {formatNumber(row.sampleSize, locale)}
                   </td>
                 </tr>
@@ -46,7 +48,7 @@ export function IntentTimeToHandoff({ rows, locale }: Props) {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-[11px] text-[#9ca3af]">
+        <p className="mt-3 text-[11px] text-[var(--soft-ink)]">
           Tiempo en reloj real desde el primer mensaje del contacto hasta la derivación, incluye
           horario no laboral. Buckets con n &lt; 5 muestran &quot;—&quot; para evitar medianas
           engañosas con muestras pequeñas.

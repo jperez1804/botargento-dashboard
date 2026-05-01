@@ -66,7 +66,7 @@ function intentLabel(value: string | null, intents: ReadonlyArray<IntentDef>): s
 export function ConversationTimeline({ entries, intents, locale, timezone }: Props) {
   if (entries.length === 0) {
     return (
-      <div className="rounded-md border border-[#e5e7eb] bg-white p-6 text-sm text-[#6b7280]">
+      <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-6 text-sm text-[var(--muted-ink)]">
         No hay mensajes registrados para este contacto.
       </div>
     );
@@ -84,8 +84,8 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
     <div className="space-y-6">
       {buckets.map((bucket) => (
         <section key={bucket.dayKey} className="space-y-3">
-          <div className="sticky top-0 z-10 -mx-1 px-1 py-1 bg-[#fafafa]/85 backdrop-blur">
-            <div className="text-xs font-medium uppercase tracking-wide text-[#6b7280]">
+          <div className="sticky top-0 z-10 -mx-1 px-1 py-1 bg-[var(--canvas)]/85 backdrop-blur">
+            <div className="text-xs font-medium uppercase tracking-wide text-[var(--muted-ink)]">
               {bucket.dayLabel}
             </div>
           </div>
@@ -104,7 +104,7 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
                     className={cn(
                       "max-w-[80%] rounded-lg px-3 py-2 text-sm",
                       isInbound
-                        ? "bg-white border border-[#e5e7eb]"
+                        ? "bg-[var(--surface)] border border-[var(--rule)]"
                         : "bg-[var(--client-primary)]/5 border border-[var(--client-primary)]/20",
                     )}
                   >
@@ -112,12 +112,12 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
                       <span
                         className={cn(
                           "font-medium",
-                          isInbound ? "text-[#111827]" : "text-[var(--client-primary)]",
+                          isInbound ? "text-[var(--ink)]" : "text-[var(--client-primary)]",
                         )}
                       >
                         {isInbound ? "Cliente" : "Bot"}
                       </span>
-                      <span className="text-[#9ca3af] tabular-nums">
+                      <span className="text-[var(--soft-ink)] tabular-nums">
                         {timeFmt.format(new Date(e.createdAt))}
                       </span>
                       {intent && (
@@ -134,11 +134,11 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
                         </span>
                       )}
                       {e.route && (
-                        <span className="text-[10px] text-[#9ca3af]">· {e.route}</span>
+                        <span className="text-[10px] text-[var(--soft-ink)]">· {e.route}</span>
                       )}
                     </div>
-                    <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#111827]">
-                      {e.messageText ?? <span className="text-[#9ca3af]">(sin texto)</span>}
+                    <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--ink)]">
+                      {e.messageText ?? <span className="text-[var(--soft-ink)]">(sin texto)</span>}
                     </div>
                   </div>
                 </li>

@@ -1,4 +1,4 @@
-import { pgSchema, text, timestamp, bigserial, jsonb } from "drizzle-orm/pg-core";
+import { pgSchema, text, timestamp, bigserial, jsonb, smallint } from "drizzle-orm/pg-core";
 
 export const dashboardSchema = pgSchema("dashboard");
 
@@ -23,4 +23,13 @@ export const auditLog = dashboardSchema.table("audit_log", {
   action: text("action").notNull(),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Single-row table — id is locked to 1 by a CHECK constraint at the DB level
+// (see migrations/0002_app_settings.sql). Backs the /settings page.
+export const appSettings = dashboardSchema.table("app_settings", {
+  id: smallint("id").primaryKey().default(1),
+  primaryColor: text("primary_color").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text("updated_by").notNull(),
 });

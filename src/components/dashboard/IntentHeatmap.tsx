@@ -52,18 +52,18 @@ export function IntentHeatmap({ data, intents, selectedIntent, locale, windowDay
   const titleSuffix = selectedIntent ? `· ${selectedIntent}` : "· Todas las intenciones";
 
   return (
-    <Card className="ring-1 ring-black/5">
+    <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between gap-3">
-        <CardTitle className="text-base font-semibold">
+        <CardTitle className="text-base font-semibold text-[var(--ink)]">
           Demanda por hora — últimos {windowDays} días
         </CardTitle>
-        <div className="flex items-center gap-3 text-xs text-[#6b7280]">
+        <div className="flex items-center gap-3 text-xs text-[var(--muted-ink)]">
           <select
             aria-label="Filtrar por intención"
             value={selectedIntent ?? ALL_OPTION}
             onChange={(e) => setIntent(e.target.value)}
             disabled={isPending}
-            className="rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-xs text-[#374151]"
+            className="rounded-md border border-[var(--rule)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--client-primary)]/40"
           >
             <option value={ALL_OPTION}>Todas</option>
             {intents.map((intent) => (
@@ -81,7 +81,7 @@ export function IntentHeatmap({ data, intents, selectedIntent, locale, windowDay
         <div className="overflow-x-auto">
           <div className="min-w-[640px]">
             <div
-              className="grid gap-px text-[10px] text-[#9ca3af]"
+              className="grid gap-px text-[10px] text-[var(--soft-ink)]"
               style={{ gridTemplateColumns: `32px repeat(24, minmax(0, 1fr))` }}
             >
               <div />
@@ -102,7 +102,7 @@ export function IntentHeatmap({ data, intents, selectedIntent, locale, windowDay
             </div>
           </div>
         </div>
-        <p className="mt-3 text-[11px] text-[#9ca3af]">
+        <p className="mt-3 text-[11px] text-[var(--soft-ink)]">
           Hora del tenant ({"America/Argentina/Buenos_Aires"}). Intensidad relativa al máximo de la
           ventana.
         </p>
@@ -124,7 +124,7 @@ function ContiguousRow({
 }) {
   return (
     <>
-      <div className="flex items-center justify-end pr-1 font-medium text-[#374151]">{label}</div>
+      <div className="flex items-center justify-end pr-1 font-medium text-[var(--ink)]">{label}</div>
       {counts.map((count, hour) => {
         const opacity = max > 0 ? count / max : 0;
         return (
@@ -135,7 +135,7 @@ function ContiguousRow({
             style={{
               backgroundColor:
                 count === 0
-                  ? "#f3f4f6"
+                  ? "var(--canvas)"
                   : `color-mix(in oklab, var(--client-primary, #3b82f6) ${Math.max(15, Math.round(opacity * 100))}%, transparent)`,
             }}
           />

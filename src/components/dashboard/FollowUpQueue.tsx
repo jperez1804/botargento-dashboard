@@ -32,18 +32,21 @@ export function FollowUpQueue({
 }: Props) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-md border border-[#e5e7eb] bg-white p-6 text-sm text-[#6b7280]">
+      <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-6 text-sm text-[var(--muted-ink)]">
         {emptyText}
       </div>
     );
   }
   return (
-    <ul className="rounded-md border border-[#e5e7eb] bg-white divide-y divide-[#e5e7eb] overflow-hidden">
+    <ul className="rounded-md border border-[var(--rule)] bg-[var(--surface)] divide-y divide-[var(--rule)] overflow-hidden">
       {rows.map((row) => {
         const style = PRIORITY_STYLES[row.priority];
         const reason = formatAutomationLabel(row.reason);
         return (
-          <li key={row.contact_wa_id} className="px-4 py-3 hover:bg-[#fafafa]">
+          <li
+            key={row.contact_wa_id}
+            className="group/row relative px-4 py-3 hover:bg-[var(--canvas)] transition-colors before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-[var(--client-primary)] before:opacity-0 hover:before:opacity-100 before:transition-opacity"
+          >
             <Link
               href={`/conversations/${row.contact_wa_id}`}
               className="flex items-center gap-3 min-w-0"
@@ -55,19 +58,19 @@ export function FollowUpQueue({
                 {style.label}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-[#111827] truncate">
+                <div className="text-sm font-medium text-[var(--ink)] truncate">
                   {row.display_name ?? row.contact_wa_id}
                 </div>
-                <div className="text-xs text-[#6b7280] truncate">{reason ?? "—"}</div>
+                <div className="text-xs text-[var(--muted-ink)] truncate">{reason ?? "—"}</div>
               </div>
               <div
                 className={cn(
-                  "shrink-0 hidden sm:block text-xs text-[#9ca3af] tabular-nums",
+                  "shrink-0 hidden sm:block text-xs text-[var(--soft-ink)] tabular-nums",
                 )}
               >
                 {formatDateTime(row.last_seen, locale, timezone)}
               </div>
-              <ChevronRight className="shrink-0 size-4 text-[#9ca3af]" aria-hidden="true" />
+              <ChevronRight className="shrink-0 size-4 text-[var(--soft-ink)]" aria-hidden="true" />
             </Link>
           </li>
         );

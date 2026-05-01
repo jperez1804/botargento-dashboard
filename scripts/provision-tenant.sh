@@ -134,7 +134,15 @@ read -rp "→ RESEND_API_KEY: " RESEND_API_KEY
 [[ -n "$RESEND_API_KEY" ]] || { echo "✗ RESEND_API_KEY is required"; exit 1; }
 
 echo
-echo "→ Initial allowlist emails (one per line, blank line to finish):"
+echo "→ First admin email (sees /settings, can change the brand color):"
+read -rp "    > " FIRST_ADMIN_EMAIL
+FIRST_ADMIN_EMAIL="$(echo "$FIRST_ADMIN_EMAIL" | tr '[:upper:]' '[:lower:]' | xargs)"
+if [[ ! "$FIRST_ADMIN_EMAIL" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
+  echo "✗ '$FIRST_ADMIN_EMAIL' is not a valid email"; exit 1
+fi
+
+echo
+echo "→ Additional allowlist emails as VIEWERS (one per line, blank to finish):"
 ALLOWLIST=()
 while true; do
   read -rp "    > " EMAIL
@@ -143,9 +151,15 @@ while true; do
     echo "    ✗ '$EMAIL' is not a valid email — skipping"
     continue
   fi
-  ALLOWLIST+=("$EMAIL")
+  EMAIL_LC="$(echo "$EMAIL" | tr '[:upper:]' '[:lower:]')"
+  # Skip if it's the admin we already collected — avoids inserting it twice
+  # with the wrong role.
+  if [[ "$EMAIL_LC" == "$FIRST_ADMIN_EMAIL" ]]; then
+    echo "    · '$EMAIL_LC' is the admin — already covered, skipping"
+    continue
+  fi
+  ALLOWLIST+=("$EMAIL_LC")
 done
-[[ ${#ALLOWLIST[@]} -gt 0 ]] || { echo "✗ at least one email required"; exit 1; }
 
 # ---------------------------------------------------------------------------
 # DB migrations + role
@@ -160,6 +174,8 @@ if [[ ! -f "$MIGRATIONS_DIR/0000_init.sql" ]]; then
     -o "$MIGRATIONS_DIR/0000_init.sql"
   curl -fsSL "$RAW_BASE_URL/migrations/0001_escalation_type.sql" \
     -o "$MIGRATIONS_DIR/0001_escalation_type.sql"
+  curl -fsSL "$RAW_BASE_URL/migrations/0002_app_settings.sql" \
+    -o "$MIGRATIONS_DIR/0002_app_settings.sql"
 fi
 
 DASHBOARD_APP_PASSWORD=$(openssl rand -hex 24)
@@ -182,17 +198,30 @@ docker exec -i "$N8N_POSTGRES_CONTAINER" \
        -v ON_ERROR_STOP=1 \
   < "$MIGRATIONS_DIR/0001_escalation_type.sql"
 
-echo "→ Seeding allowlist (${#ALLOWLIST[@]} email(s))…"
+echo "→ Applying migrations/0002_app_settings.sql…"
+docker exec -i "$N8N_POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+       -v ON_ERROR_STOP=1 \
+  < "$MIGRATIONS_DIR/0002_app_settings.sql"
+
+# Re-seed app_settings.primary_color from the operator's input so the row
+# matches what they typed at the top, not the migration's placeholder.
+docker exec -i "$N8N_POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 \
+  -c "UPDATE dashboard.app_settings SET primary_color = '$CLIENT_PRIMARY_COLOR', updated_by = 'provision-tenant.sh' WHERE id = 1;"
+
+TOTAL_SEED=$((${#ALLOWLIST[@]} + 1))
+echo "→ Seeding allowlist (${TOTAL_SEED} email(s); 1 admin + ${#ALLOWLIST[@]} viewer(s))…"
 {
   echo "INSERT INTO dashboard.allowed_emails (email, role, created_by) VALUES"
-  first=1
+  printf "  ('%s', 'admin', 'provision-tenant.sh')" "$FIRST_ADMIN_EMAIL"
   for e in "${ALLOWLIST[@]}"; do
-    sep=$([[ $first -eq 1 ]] && echo "" || echo ",")
-    first=0
-    printf "%s ('%s', 'viewer', 'provision-tenant.sh')" "$sep" "$(echo "$e" | tr '[:upper:]' '[:lower:]')"
-    echo
+    printf ",\n  ('%s', 'viewer', 'provision-tenant.sh')" "$e"
   done
-  echo "ON CONFLICT (email) DO NOTHING;"
+  echo
+  # Promote the admin even if the row pre-existed from a partial earlier run.
+  echo "ON CONFLICT (email) DO UPDATE SET"
+  echo "  role = CASE WHEN dashboard.allowed_emails.role = 'admin' THEN 'admin' ELSE EXCLUDED.role END;"
 } | docker exec -i "$N8N_POSTGRES_CONTAINER" \
       psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1
 
@@ -212,8 +241,10 @@ ALTER TABLE IF EXISTS dashboard.__migrations OWNER TO dashboard_app;
 ALTER SEQUENCE IF EXISTS dashboard.audit_log_id_seq OWNER TO dashboard_app;
 
 INSERT INTO dashboard.__migrations (filename)
-VALUES ('0000_init.sql'), ('0001_escalation_type.sql')
+VALUES ('0000_init.sql'), ('0001_escalation_type.sql'), ('0002_app_settings.sql')
 ON CONFLICT (filename) DO NOTHING;
+
+ALTER TABLE IF EXISTS dashboard.app_settings OWNER TO dashboard_app;
 SQL
 
 # ---------------------------------------------------------------------------

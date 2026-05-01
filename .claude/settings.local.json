@@ -18,7 +18,8 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/verify)",
       "Bash(curl -s http://localhost:3000/login?sent=1)",
       "Bash(curl -s -o /dev/null http://localhost:3000/login)",
-      "Bash(pnpm test *)"
+      "Bash(pnpm test *)",
+      "Bash(TENANT_DB_URL='postgres://postgres:devpass@localhost:5433/dashboard_dev' pnpm test:e2e)"
     ]
   },
   "enabledPlugins": {

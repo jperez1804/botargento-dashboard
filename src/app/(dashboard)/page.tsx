@@ -108,21 +108,41 @@ export default async function OverviewPage({
     .filter((d) => d.perContact > 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-[28px] font-semibold leading-tight">Panel</h1>
-          <p className="text-sm text-[#6b7280]">
-            Últimos 7 días, comparado con los 7 anteriores.
+    <div className="space-y-8">
+      {/* Editorial masthead — Fraunces h1, mono kicker line above, hairline rule
+          below. Carries the "Reserved Operations" gravitas without competing
+          with the tenant accent. */}
+      <header
+        data-reveal
+        style={{ ["--reveal-delay" as string]: "0ms" }}
+        className="space-y-3 border-b border-[var(--rule)] pb-5"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--muted-ink)] font-[var(--font-geist-mono)]">
+            Panel · Últimos 7 días
+          </p>
+          <ExportCsvButton
+            endpoint="/api/export/daily-metrics"
+            label="Exportar métricas"
+          />
+        </div>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="font-[var(--font-fraunces)] text-[44px] leading-[1.05] tracking-tight text-[var(--ink)] font-semibold">
+            Operaciones del período
+          </h1>
+          <p className="text-sm text-[var(--muted-ink)]">
+            Comparado con los 7 días anteriores.
           </p>
         </div>
-        <ExportCsvButton
-          endpoint="/api/export/daily-metrics"
-          label="Exportar métricas"
-        />
-      </div>
+      </header>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {/* Standard KPI strip — 4 volume metrics. Gives a quick read of the
+          period without overwhelming the eye. */}
+      <div
+        data-reveal
+        style={{ ["--reveal-delay" as string]: "80ms" }}
+        className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+      >
         {vertical.kpis.map((kpi) => (
           <KpiCard
             key={kpi.id}
@@ -134,6 +154,16 @@ export default async function OverviewPage({
             locale={tenant.locale}
           />
         ))}
+      </div>
+
+      {/* Hero KPI row — the two cards that deserve weight. Leading intent and
+          bot self-resolution are conversion signals, so they get a wider
+          treatment than the volume cards above. */}
+      <div
+        data-reveal
+        style={{ ["--reveal-delay" as string]: "160ms" }}
+        className="grid gap-4 grid-cols-1 lg:grid-cols-2"
+      >
         {leadingIntent ? (
           <KpiCard
             label="Intención líder"
@@ -143,7 +173,7 @@ export default async function OverviewPage({
             higherIsBetter={true}
             locale={tenant.locale}
             display={leadingIntent.intent}
-            valueCaption={`${formatNumber(leadingIntent.count, tenant.locale)} contactos`}
+            valueCaption={`${formatNumber(leadingIntent.count, tenant.locale)} contactos en 7 días`}
           />
         ) : null}
         <KpiCard
@@ -157,52 +187,83 @@ export default async function OverviewPage({
         />
       </div>
 
-      <VolumeChart data={dailyMetrics} locale={tenant.locale} />
+      {/* Daily volume — full-width, kicker caption above. */}
+      <section
+        data-reveal
+        style={{ ["--reveal-delay" as string]: "240ms" }}
+        className="space-y-2"
+      >
+        <SectionHeading kicker="Volumen diario">Mensajes entrantes y salientes</SectionHeading>
+        <VolumeChart data={dailyMetrics} locale={tenant.locale} />
+      </section>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <div className="space-y-3">
+      {/* Intenciones block. Touch-attribution toggle moves into the section
+          header line so the page reads like a story, not a control panel. */}
+      <section
+        data-reveal
+        style={{ ["--reveal-delay" as string]: "320ms" }}
+        className="space-y-3"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-dotted border-[var(--rule)] pb-2">
+          <SectionHeading kicker="Intenciones">Composición de la demanda</SectionHeading>
           <IntentTouchToggle value={touch} />
+        </div>
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          <div className="space-y-3">
+            <IntentsChart
+              data={intentCounts}
+              previousData={intentCountsPrevious}
+              intents={vertical.intents}
+              locale={tenant.locale}
+              handoffRates={intentHandoffRates}
+              summarySuffix={touchSummary}
+            />
+            <OtrasBreakdown rows={otrasBreakdown} locale={tenant.locale} />
+          </div>
           <IntentsChart
-            data={intentCounts}
-            previousData={intentCountsPrevious}
+            data={intentMessageCounts}
+            previousData={intentMessageCountsPrevious}
             intents={vertical.intents}
             locale={tenant.locale}
-            handoffRates={intentHandoffRates}
-            summarySuffix={touchSummary}
+            title="Volumen por intención"
+            summarySuffix="interacciones en flujos en 7 días"
+            tooltipLabel="Interacciones"
+            engagementDensity={engagementDensity}
           />
-          <OtrasBreakdown rows={otrasBreakdown} locale={tenant.locale} />
         </div>
-        <IntentsChart
-          data={intentMessageCounts}
-          previousData={intentMessageCountsPrevious}
+        <IntentHeatmap
+          data={intentHeatmap}
           intents={vertical.intents}
+          selectedIntent={heatmapIntent}
           locale={tenant.locale}
-          title="Volumen por intención"
-          summarySuffix="interacciones en flujos en 7 días"
-          tooltipLabel="Interacciones"
-          engagementDensity={engagementDensity}
+          windowDays={HEATMAP_WINDOW_DAYS}
         />
-      </div>
+      </section>
 
-      <IntentHeatmap
-        data={intentHeatmap}
-        intents={vertical.intents}
-        selectedIntent={heatmapIntent}
-        locale={tenant.locale}
-        windowDays={HEATMAP_WINDOW_DAYS}
-      />
+      {/* Operativo block — completion + time-to-handoff. */}
+      <section
+        data-reveal
+        style={{ ["--reveal-delay" as string]: "400ms" }}
+        className="space-y-3"
+      >
+        <SectionHeading kicker="Operativo">Eficiencia de los flujos</SectionHeading>
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          <IntentCompletionStrip rows={completionRates} locale={tenant.locale} />
+          <IntentTimeToHandoff rows={timeToHandoff} locale={tenant.locale} />
+        </div>
+      </section>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <IntentCompletionStrip rows={completionRates} locale={tenant.locale} />
-        <IntentTimeToHandoff rows={timeToHandoff} locale={tenant.locale} />
-      </div>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Seguimiento prioritario</h2>
+      {/* Seguimiento — top-5 follow-up preview, link to full queue. */}
+      <section
+        data-reveal
+        style={{ ["--reveal-delay" as string]: "480ms" }}
+        className="space-y-3"
+      >
+        <div className="flex items-end justify-between gap-3">
+          <SectionHeading kicker="Seguimiento">Contactos prioritarios</SectionHeading>
           <Link
             href="/follow-up"
-            className="inline-flex items-center gap-1 text-xs text-[#374151] hover:text-[#111827]"
+            className="inline-flex items-center gap-1 text-xs text-[var(--muted-ink)] hover:text-[var(--client-primary)] transition-colors"
           >
             Ver todos <ArrowRight className="size-3" />
           </Link>
@@ -214,6 +275,28 @@ export default async function OverviewPage({
           emptyText="No hay contactos pendientes en este momento."
         />
       </section>
+    </div>
+  );
+}
+
+// Section heading: mono kicker label up top + Fraunces title below. Used as
+// the header for each block on the overview to keep the editorial rhythm
+// consistent without re-implementing the markup five times.
+function SectionHeading({
+  kicker,
+  children,
+}: {
+  kicker: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--muted-ink)] font-[var(--font-geist-mono)]">
+        {kicker}
+      </p>
+      <h2 className="font-[var(--font-fraunces)] text-[22px] leading-tight tracking-tight text-[var(--ink)] font-medium">
+        {children}
+      </h2>
     </div>
   );
 }

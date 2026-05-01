@@ -65,7 +65,7 @@ function chipToneFor(rate: number, desired: number | undefined): HandoffChipTone
 const CHIP_CLASSES: Record<HandoffChipTone, string> = {
   good: "bg-[#E6F4EA] text-[#1B5E20]",
   bad: "bg-[#F4CCCC] text-[#8A1A1A]",
-  neutral: "bg-[#f3f4f6] text-[#6b7280]",
+  neutral: "bg-[var(--canvas)] text-[var(--muted-ink)]",
 };
 
 export function IntentsChart({
@@ -141,10 +141,10 @@ export function IntentsChart({
   const total = chartData.reduce((acc, r) => acc + r.count, 0);
 
   return (
-    <Card className="ring-1 ring-black/5">
+    <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
-        <CardTitle className="text-base font-semibold">{title}</CardTitle>
-        <span className="text-xs text-[#6b7280]">
+        <CardTitle className="text-base font-semibold text-[var(--ink)]">{title}</CardTitle>
+        <span className="text-xs text-[var(--muted-ink)] tabular-nums">
           {formatNumber(total, locale)} {summarySuffix}
         </span>
       </CardHeader>
@@ -159,20 +159,21 @@ export function IntentsChart({
             <YAxis
               type="category"
               dataKey="label"
-              tick={{ fontSize: 12, fill: "#374151" }}
+              tick={{ fontSize: 12, fill: "var(--ink)" }}
               axisLine={false}
               tickLine={false}
               width={120}
             />
             <Tooltip
-              cursor={{ fill: "#f3f4f6" }}
+              cursor={{ fill: "var(--canvas)" }}
               formatter={(value) => [formatNumber(Number(value), locale), tooltipLabel]}
               labelFormatter={(label) => String(label)}
               contentStyle={{
-                background: "#ffffff",
-                border: "1px solid #e5e7eb",
+                background: "var(--surface)",
+                border: "1px solid var(--rule)",
                 borderRadius: 6,
                 fontSize: 12,
+                color: "var(--ink)",
               }}
             />
             <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={24}>
@@ -183,7 +184,7 @@ export function IntentsChart({
                 dataKey="count"
                 position="right"
                 formatter={(v) => formatNumber(Number(v ?? 0), locale)}
-                style={{ fontSize: 12, fill: "#374151" }}
+                style={{ fontSize: 12, fill: "var(--ink)" }}
               />
             </Bar>
           </BarChart>
@@ -201,10 +202,10 @@ export function IntentsChart({
                     : Minus;
               const color =
                 delta.direction === "flat"
-                  ? "text-[#6b7280]"
+                  ? "text-[var(--muted-ink)]"
                   : delta.direction === "down"
-                    ? "text-[#dc2626]"
-                    : "text-[#059669]";
+                    ? "text-[var(--bad)]"
+                    : "text-[var(--good)]";
               const text =
                 delta.direction === "new"
                   ? "Nuevo"
@@ -214,10 +215,10 @@ export function IntentsChart({
               return (
                 <span
                   key={row.key}
-                  className={`inline-flex items-center gap-1 rounded-md bg-[#f9fafb] px-1.5 py-0.5 text-[11px] ${color}`}
+                  className={`inline-flex items-center gap-1 rounded-md bg-[var(--canvas)] px-1.5 py-0.5 text-[11px] ${color}`}
                   title={`${row.label}: período actual ${row.count} · anterior ${row.previousCount}`}
                 >
-                  <span className="font-medium text-[#374151]">{row.label}</span>
+                  <span className="font-medium text-[var(--ink)]">{row.label}</span>
                   <Icon className="size-3" aria-hidden="true" />
                   <span className="tabular-nums">{text}</span>
                 </span>
@@ -233,11 +234,11 @@ export function IntentsChart({
               return (
                 <span
                   key={row.key}
-                  className="inline-flex items-center gap-1 rounded-md bg-[#f9fafb] px-1.5 py-0.5 text-[11px]"
+                  className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas)] px-1.5 py-0.5 text-[11px]"
                   title={`${row.label}: ${formatNumber(row.count, locale)} interacciones / ${formatNumber(Math.round(row.count / density.perContact), locale)} contactos`}
                 >
-                  <span className="font-medium text-[#374151]">{row.label}</span>
-                  <span className="tabular-nums text-[#6b7280]">
+                  <span className="font-medium text-[var(--ink)]">{row.label}</span>
+                  <span className="tabular-nums text-[var(--muted-ink)]">
                     {density.perContact.toLocaleString(locale, {
                       minimumFractionDigits: 1,
                       maximumFractionDigits: 1,
@@ -278,7 +279,7 @@ export function IntentsChart({
                 );
               })}
             </div>
-            <p className="text-[11px] text-[#9ca3af]">
+            <p className="text-[11px] text-[var(--soft-ink)]">
               Atribución por último contacto: cada contacto aparece en una sola fila. La suma de
               tasas no equivale a la tasa global de derivación: contactos cuya última actividad fue
               navegación del menú quedan fuera de estas filas pero cuentan en la tasa global, y el

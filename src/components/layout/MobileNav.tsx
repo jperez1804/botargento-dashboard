@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   ListTodo,
   MessageSquare,
+  Settings,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ const ICON_MAP: Record<NavIconKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   conversations: MessageSquare,
   handoffs: ArrowLeftRight,
   "follow-up": ListTodo,
+  settings: Settings,
 };
 
 function isActive(pathname: string, href: string): boolean {
@@ -74,7 +76,7 @@ export function MobileNav({ items }: Props) {
           />
           <nav
             aria-label="Navegación móvil"
-            className="absolute left-0 top-0 bottom-0 w-[260px] bg-white border-r border-[#e5e7eb] p-3 flex flex-col gap-1"
+            className="absolute left-0 top-0 bottom-0 w-[260px] bg-[var(--surface)] border-r border-[var(--rule)] p-3 flex flex-col gap-1"
           >
             <div className="flex justify-end">
               <Button
@@ -98,7 +100,7 @@ export function MobileNav({ items }: Props) {
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                     active
                       ? "bg-[var(--client-primary)]/10 text-[var(--client-primary)] font-medium"
-                      : "text-[#374151] hover:bg-[#f3f4f6]",
+                      : "text-[var(--ink)] hover:bg-[var(--canvas)]",
                   )}
                 >
                   <Icon className="size-4 shrink-0" aria-hidden="true" />

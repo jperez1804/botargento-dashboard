@@ -14,7 +14,10 @@ test.beforeEach(async ({ page }) => {
 test("Overview renders KPI cards + both charts + follow-up preview", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".recharts-surface");
-  await expect(page.getByRole("heading", { name: "Panel" })).toBeVisible();
+  // Editorial masthead from the Reserved Operations redesign.
+  await expect(
+    page.getByRole("heading", { name: "Operaciones del período" }),
+  ).toBeVisible();
 
   // 4 KPI cards
   const kpiLabels = await page
@@ -34,7 +37,7 @@ test("Overview renders KPI cards + both charts + follow-up preview", async ({ pa
   await expect(page.getByText(/Demanda por hora/)).toBeVisible();
 
   // Follow-up preview section
-  await expect(page.getByRole("heading", { name: "Seguimiento prioritario" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Contactos prioritarios" })).toBeVisible();
 });
 
 test("Conversations list filters and paginates", async ({ page }) => {

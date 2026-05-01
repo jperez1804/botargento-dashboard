@@ -2,7 +2,12 @@
 // cross the server/client boundary as data. The client Sidebar maps icon keys
 // to lucide icons; add a new key here AND in Sidebar's ICON_MAP when you need
 // a new icon.
-export type NavIconKey = "dashboard" | "conversations" | "handoffs" | "follow-up";
+export type NavIconKey =
+  | "dashboard"
+  | "conversations"
+  | "handoffs"
+  | "follow-up"
+  | "settings";
 
 export type NavItemDef = {
   href: string;
