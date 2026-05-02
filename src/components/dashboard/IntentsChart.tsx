@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -38,6 +39,13 @@ type Props = {
   // window. Surfaces as a chip strip below the bars. Useful on the volume
   // chart to answer "how chatty is each flow per person?".
   engagementDensity?: ReadonlyArray<{ intent: string; perContact: number }>;
+  // Short visible disclaimer rendered above the (collapsible) long detail at
+  // the handoff-rate chip strip. Sourced from `verticalConfig.attribution`.
+  handoffDisclaimerShort?: string;
+  handoffDisclaimerDetail?: string;
+  // One-line note rendered above the engagement-density chip strip, surfacing
+  // that the per-contact denominator changes with the touch selector.
+  engagementDensityNote?: string;
 };
 
 type DeltaState = {
@@ -78,7 +86,11 @@ export function IntentsChart({
   handoffRates,
   previousData,
   engagementDensity,
+  handoffDisclaimerShort,
+  handoffDisclaimerDetail,
+  engagementDensityNote,
 }: Props) {
+  const [handoffDetailOpen, setHandoffDetailOpen] = useState(false);
   // Server data is already deduped into business labels. The chart only folds
   // labels that match configured vertical buckets and leaves new labels visible.
   const byKey = new Map<string, IntentDef>();
@@ -227,27 +239,34 @@ export function IntentsChart({
           </div>
         ) : null}
         {engagementDensity && engagementDensity.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-1.5 px-2">
-            {chartData.map((row) => {
-              const density = engagementDensity.find((d) => d.intent === row.label);
-              if (!density || density.perContact <= 0) return null;
-              return (
-                <span
-                  key={row.key}
-                  className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas)] px-1.5 py-0.5 text-[11px]"
-                  title={`${row.label}: ${formatNumber(row.count, locale)} interacciones / ${formatNumber(Math.round(row.count / density.perContact), locale)} contactos`}
-                >
-                  <span className="font-medium text-[var(--ink)]">{row.label}</span>
-                  <span className="tabular-nums text-[var(--muted-ink)]">
-                    {density.perContact.toLocaleString(locale, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}{" "}
-                    por contacto
+          <div className="mt-3 space-y-1.5 px-2">
+            {engagementDensityNote ? (
+              <p className="text-[11px] leading-snug text-[var(--soft-ink)]">
+                {engagementDensityNote}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-1.5">
+              {chartData.map((row) => {
+                const density = engagementDensity.find((d) => d.intent === row.label);
+                if (!density || density.perContact <= 0) return null;
+                return (
+                  <span
+                    key={row.key}
+                    className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas)] px-1.5 py-0.5 text-[11px]"
+                    title={`${row.label}: ${formatNumber(row.count, locale)} interacciones / ${formatNumber(Math.round(row.count / density.perContact), locale)} contactos`}
+                  >
+                    <span className="font-medium text-[var(--ink)]">{row.label}</span>
+                    <span className="tabular-nums text-[var(--muted-ink)]">
+                      {density.perContact.toLocaleString(locale, {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })}{" "}
+                      por contacto
+                    </span>
                   </span>
-                </span>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         ) : null}
         {handoffRates && handoffRates.length > 0 ? (
@@ -279,12 +298,26 @@ export function IntentsChart({
                 );
               })}
             </div>
-            <p className="text-[11px] text-[var(--soft-ink)]">
-              Atribución por último contacto: cada contacto aparece en una sola fila. La suma de
-              tasas no equivale a la tasa global de derivación: contactos cuya última actividad fue
-              navegación del menú quedan fuera de estas filas pero cuentan en la tasa global, y el
-              promedio de proporciones por bucket no coincide con el cociente total.
-            </p>
+            {handoffDisclaimerShort && handoffDisclaimerDetail ? (
+              <div className="space-y-1">
+                <p className="text-[11px] text-[var(--soft-ink)]">
+                  {handoffDisclaimerShort}{" "}
+                  <button
+                    type="button"
+                    aria-expanded={handoffDetailOpen}
+                    onClick={() => setHandoffDetailOpen((o) => !o)}
+                    className="text-[var(--muted-ink)] underline underline-offset-2 hover:text-[var(--ink)]"
+                  >
+                    {handoffDetailOpen ? "Ocultar detalle" : "Ver detalle"}
+                  </button>
+                </p>
+                {handoffDetailOpen ? (
+                  <p className="text-[11px] leading-snug text-[var(--soft-ink)]">
+                    {handoffDisclaimerDetail}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </CardContent>

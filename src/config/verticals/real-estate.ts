@@ -76,4 +76,39 @@ export const realEstate: VerticalConfig = {
     { match: "alquileres", label: "Equipo de Alquileres" },
     { match: "admin", label: "Administración" },
   ],
+
+  attribution: {
+    controlLabel: "Cómo contar contactos",
+    controlTooltip:
+      "Si una persona consulta por varias cosas, elegimos cómo asignarla a una categoría. Por defecto usamos su último interés porque muestra dónde terminó la conversación.",
+    scopeNote:
+      "Cambia Contactos por intención, Intención líder y métricas por contacto. No cambia el volumen de mensajes ni los KPIs globales.",
+    advancedToggleLabel: "Análisis avanzado",
+    options: [
+      {
+        value: "last",
+        label: "Último interés",
+        helper: "Cuenta al contacto donde terminó su conversación.",
+      },
+      {
+        value: "first",
+        label: "Interés inicial",
+        helper: "Cuenta al contacto por lo primero que consultó.",
+        advanced: true,
+      },
+      {
+        value: "any",
+        label: "Todas las consultas",
+        helper: "Puede contar una misma persona en más de una categoría.",
+        advanced: true,
+      },
+    ],
+    anyModeWarning: "Una misma persona puede aparecer en más de una categoría.",
+    leadingIntentCaptionTemplate: "Según: {label}",
+    handoffDisclaimerShort: "Derivación calculada por último interés.",
+    handoffDisclaimerDetail:
+      "Cada contacto aparece en una sola fila. La suma de tasas no equivale a la tasa global de derivación: contactos cuya última actividad fue navegación del menú quedan fuera de estas filas pero cuentan en la tasa global, y el promedio de proporciones por bucket no coincide con el cociente total.",
+    engagementDensityNote:
+      "El volumen no cambia con esta vista; el promedio usa los contactos de la vista seleccionada.",
+  },
 };

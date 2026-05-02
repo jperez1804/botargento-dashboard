@@ -1281,10 +1281,11 @@ chmod 0600 /opt/n8n/<clientN>/dashboard.env
 
 ```bash
 cd /opt/n8n/<clientN>
-docker compose --env-file dashboard.env -f dashboard.compose.yml up -d
+set -a; source dashboard.env; set +a
+docker compose -f dashboard.compose.yml up -d
 
 # Follow logs to confirm startup
-docker compose --env-file dashboard.env -f dashboard.compose.yml logs -f dashboard
+docker compose -f dashboard.compose.yml logs -f dashboard
 ```
 
 Note: n8n ops still use the plain `docker compose up -d` in the same directory (picks up the default `docker-compose.yml`). The two compose files coexist peacefully because they have different service names (`n8n` + `postgres` vs `dashboard`) and different project contexts (implicit via `-f` flag).
@@ -1483,58 +1484,30 @@ jobs:
 
 ### 12.5 `update-dashboards.sh` — the VPS deploy script
 
-Lives at `/opt/scripts/update-dashboards.sh`. Read by the `deploy.yml` workflow, but also runnable manually.
+Lives at `/opt/scripts/update-dashboards.sh`. Read by the `deploy.yml`
+workflow, but also runnable manually. The source of truth is
+[`scripts/update-dashboards.sh`](../scripts/update-dashboards.sh) in this
+repo — refresh `/opt/scripts/update-dashboards.sh` on the VPS with the
+`curl` from § 12.4 whenever it changes.
 
-```bash
-#!/usr/bin/env bash
-# /opt/scripts/update-dashboards.sh
-set -euo pipefail
+What it does, in order:
 
-TENANT_FILTER="${1:-all}"
-TAG="${2:-latest}"
-TENANT_ROOT="/opt/n8n"
-REGISTRY="/opt/scripts/tenants.txt"
+1. If `<tenant>` is `all`, read `/opt/scripts/tenants.txt`; otherwise treat
+   the argument as a single tenant directory name.
+2. Auto-detect `docker compose` (v2 plugin) vs `docker-compose` (v1).
+3. For each tenant:
+   - Skip if `dashboard.compose.yml` or `dashboard.env` is missing.
+   - Pin `DASHBOARD_TAG=<tag>` in `dashboard.env` so a host reboot brings up
+     the same version.
+   - `source dashboard.env` (so compose interpolates the env vars), then
+     `docker compose -f dashboard.compose.yml pull dashboard` followed by
+     `... up -d dashboard`.
+   - Poll `docker inspect ... .State.Status` for up to 30 s; fail loudly if
+     the container doesn't reach `running`.
 
-if [[ "$TENANT_FILTER" == "all" ]]; then
-  # Source of truth for which tenants have a dashboard deployed
-  TENANTS=$(cat "$REGISTRY")
-else
-  TENANTS="$TENANT_FILTER"
-fi
-
-for t in $TENANTS; do
-  COMPOSE_FILE="$TENANT_ROOT/$t/dashboard.compose.yml"
-  ENV_FILE="$TENANT_ROOT/$t/dashboard.env"
-
-  if [[ ! -f "$COMPOSE_FILE" ]]; then
-    echo "⚠  $t has no dashboard.compose.yml — skipping"
-    continue
-  fi
-
-  CONTAINER="n8n-$t-dashboard"
-  echo "→ Updating $CONTAINER to tag '$TAG'"
-
-  # Pin the tag in the env file so restarts use the same version
-  sed -i "s/^DASHBOARD_TAG=.*/DASHBOARD_TAG=$TAG/" "$ENV_FILE"
-
-  cd "$TENANT_ROOT/$t"
-  # Service name in the compose file is 'dashboard' (not per-tenant),
-  # container_name is what's per-tenant.
-  docker compose --env-file dashboard.env -f dashboard.compose.yml pull dashboard
-  docker compose --env-file dashboard.env -f dashboard.compose.yml up -d dashboard
-
-  # Wait for health (30s max)
-  for i in $(seq 1 30); do
-    if docker inspect "$CONTAINER" --format '{{.State.Status}}' 2>/dev/null | grep -q "running"; then
-      echo "✓ $CONTAINER is running"
-      break
-    fi
-    sleep 1
-  done
-done
-
-echo "✓ All done"
-```
+The script does **not** use `docker compose --env-file` — earlier versions
+did, but that flag's placement is fragile across compose versions. Sourcing
+the env into the shell is more portable.
 
 ### 12.6 Rollback
 

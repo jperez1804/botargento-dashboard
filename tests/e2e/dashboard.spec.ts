@@ -76,12 +76,13 @@ test("Touch-mode toggle on Contactos por intención updates URL state", async ({
 
   // Default = last; URL has no `touch` param.
   expect(new URL(page.url()).searchParams.get("touch")).toBeNull();
-  await expect(page.getByText(/contactos por último contacto/i)).toBeVisible();
+  await expect(page.getByText(/cuenta al contacto donde terminó/i)).toBeVisible();
 
-  // Switching to "Primer contacto" sets ?touch=first and pins the new label.
-  await page.getByRole("radio", { name: "Primer contacto" }).click();
+  // Advanced modes are gated behind a disclosure; expand it before clicking.
+  await page.getByRole("button", { name: /análisis avanzado/i }).click();
+  await page.getByRole("radio", { name: "Interés inicial" }).click();
   await page.waitForFunction(() => new URL(location.href).searchParams.get("touch") === "first");
-  await expect(page.getByText(/contactos por primer contacto/i)).toBeVisible();
+  await expect(page.getByText(/cuenta al contacto por lo primero/i)).toBeVisible();
 });
 
 test("CSV export downloads a correctly-formatted file", async ({ page }) => {

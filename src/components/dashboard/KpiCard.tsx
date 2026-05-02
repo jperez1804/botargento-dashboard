@@ -18,6 +18,11 @@ type Props = {
   // math and shown in `valueCaption` if provided.
   display?: string;
   valueCaption?: string;
+  // Tiny mono kicker rendered under the value, used to surface a hidden
+  // dependency (e.g. "Según: Último interés" when the value depends on a
+  // selector elsewhere on the page). Stays visually subordinate to
+  // `valueCaption`.
+  meta?: string;
 };
 
 type DeltaState = {
@@ -42,6 +47,7 @@ export function KpiCard({
   locale,
   display,
   valueCaption,
+  meta,
 }: Props) {
   const formattedValue =
     format === "percent" ? formatPercent(value, locale) : formatNumber(value, locale);
@@ -91,6 +97,11 @@ export function KpiCard({
         </div>
         {valueCaption ? (
           <div className="text-xs text-[var(--muted-ink)]">{valueCaption}</div>
+        ) : null}
+        {meta ? (
+          <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
+            {meta}
+          </div>
         ) : null}
         <div className={cn("flex items-center gap-1 text-xs", deltaColor)}>
           <Icon className="size-3.5" aria-hidden="true" />

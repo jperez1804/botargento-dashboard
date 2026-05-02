@@ -49,6 +49,49 @@ export type HandoffTargetDef = {
   label: string;
 };
 
+// Mirror of IntentTouchMode in src/lib/queries/intents. Re-declared here so
+// VerticalConfig has no dependency on the queries layer.
+export type AttributionMode = "last" | "first" | "any";
+
+export type AttributionOptionDef = {
+  value: AttributionMode;
+  // Client-friendly product label (e.g. "Último interés"). Replaces the older
+  // analyst-facing strings like "Último contacto".
+  label: string;
+  // Helper sentence shown next to the option and used for chart summary copy.
+  helper: string;
+  // First-touch and any-touch modes are advanced analysis. The selector keeps
+  // them behind a disclosure so the default view stays decision-oriented.
+  advanced?: boolean;
+};
+
+export type AttributionConfig = {
+  // Visible label on the selector itself (e.g. "Cómo contar contactos").
+  controlLabel: string;
+  // Long explanation surfaced via the info tooltip next to the control.
+  controlTooltip: string;
+  // Scope note rendered beside/below the selector explaining which surfaces
+  // it actually changes vs which stay fixed.
+  scopeNote: string;
+  // Label for the disclosure that hides advanced modes.
+  advancedToggleLabel: string;
+  options: ReadonlyArray<AttributionOptionDef>;
+  // Inline warning when "any" is selected: a contact may appear in multiple
+  // categories so totals can exceed `Contactos únicos`.
+  anyModeWarning: string;
+  // Caption template for the `Intención líder` KPI card. `{label}` is replaced
+  // with the active option's `label`. Surfaces the hidden coupling between
+  // the card and the selector.
+  leadingIntentCaptionTemplate: string;
+  // Short, always-visible disclaimer at the handoff-rate chip strip.
+  handoffDisclaimerShort: string;
+  // Long disclaimer, hidden behind a "Ver detalle" toggle.
+  handoffDisclaimerDetail: string;
+  // One-line note above the per-intent engagement-density chip strip — the
+  // volume bars don't change, but the per-contact denominator does.
+  engagementDensityNote: string;
+};
+
 export type VerticalConfig = {
   key: string;
   label: string;
@@ -56,4 +99,5 @@ export type VerticalConfig = {
   kpis: ReadonlyArray<KpiDef>;
   intents: ReadonlyArray<IntentDef>;
   handoffTargets: ReadonlyArray<HandoffTargetDef>;
+  attribution: AttributionConfig;
 };

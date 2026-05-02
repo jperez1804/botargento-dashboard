@@ -45,12 +45,18 @@ export default async function OverviewPage({
   const touchParam = typeof params.touch === "string" ? params.touch : null;
   const touch: "first" | "last" | "any" =
     touchParam === "first" || touchParam === "any" ? touchParam : "last";
+  const activeOption = vertical.attribution.options.find((o) => o.value === touch);
+  const optionHelper = activeOption?.helper ?? "";
+  const optionLabel = activeOption?.label ?? "";
+  const baseTouchSummary = `contactos en 7 días · ${optionHelper.toLowerCase()}`;
   const touchSummary =
-    touch === "first"
-      ? "contactos por primer contacto en 7 días"
-      : touch === "any"
-        ? "contactos por cualquier intención en 7 días (un contacto puede sumar en varias)"
-        : "contactos por último contacto en 7 días";
+    touch === "any"
+      ? `${baseTouchSummary} ${vertical.attribution.anyModeWarning.toLowerCase()}`
+      : baseTouchSummary;
+  const leadingIntentMeta = vertical.attribution.leadingIntentCaptionTemplate.replace(
+    "{label}",
+    optionLabel,
+  );
 
   const [
     current,
@@ -174,6 +180,7 @@ export default async function OverviewPage({
             locale={tenant.locale}
             display={leadingIntent.intent}
             valueCaption={`${formatNumber(leadingIntent.count, tenant.locale)} contactos en 7 días`}
+            meta={leadingIntentMeta}
           />
         ) : null}
         <KpiCard
@@ -206,7 +213,7 @@ export default async function OverviewPage({
       >
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-dotted border-[var(--rule)] pb-2">
           <SectionHeading kicker="Intenciones">Composición de la demanda</SectionHeading>
-          <IntentTouchToggle value={touch} />
+          <IntentTouchToggle value={touch} attribution={vertical.attribution} />
         </div>
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
           <div className="space-y-3">
@@ -217,6 +224,8 @@ export default async function OverviewPage({
               locale={tenant.locale}
               handoffRates={intentHandoffRates}
               summarySuffix={touchSummary}
+              handoffDisclaimerShort={vertical.attribution.handoffDisclaimerShort}
+              handoffDisclaimerDetail={vertical.attribution.handoffDisclaimerDetail}
             />
             <OtrasBreakdown rows={otrasBreakdown} locale={tenant.locale} />
           </div>
@@ -229,6 +238,7 @@ export default async function OverviewPage({
             summarySuffix="interacciones en flujos en 7 días"
             tooltipLabel="Interacciones"
             engagementDensity={engagementDensity}
+            engagementDensityNote={vertical.attribution.engagementDensityNote}
           />
         </div>
         <IntentHeatmap

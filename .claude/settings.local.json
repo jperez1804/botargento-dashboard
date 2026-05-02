@@ -19,7 +19,17 @@
       "Bash(curl -s http://localhost:3000/login?sent=1)",
       "Bash(curl -s -o /dev/null http://localhost:3000/login)",
       "Bash(pnpm test *)",
-      "Bash(TENANT_DB_URL='postgres://postgres:devpass@localhost:5433/dashboard_dev' pnpm test:e2e)"
+      "Bash(TENANT_DB_URL='postgres://postgres:devpass@localhost:5433/dashboard_dev' pnpm test:e2e)",
+      "Bash(gh auth *)",
+      "Bash(gh workflow *)",
+      "Bash(ssh *)",
+      "Bash(gh run *)",
+      "Bash(gh variable *)",
+      "Bash(gh secret *)",
+      "Bash(Get-ChildItem -File *.md)",
+      "Bash(Select-Object Name)",
+      "Bash(pnpm lint *)",
+      "Bash(npx tsc *)"
     ]
   },
   "enabledPlugins": {

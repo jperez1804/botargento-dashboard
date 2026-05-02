@@ -102,10 +102,13 @@ After tuning, no DB migration or rebuild is needed beyond a redeploy.
 
 These query params survive reload and copy/paste:
 
-- `?touch=last|first|any` — attribution mode for `Contactos por intención`.
-  - `last` (default): each contact lands in exactly one bucket — their last inbound business intent. Per-intent counts sum to *unique contacts whose last inbound intent was a business intent*, which is **less than or equal to** the global `Contactos únicos` KPI: contacts whose last inbound was the `menu` token (navigation only, no engagement) are dropped from the chart but still counted globally.
-  - `first`: same shape as `last`, but the FIRST inbound intent. Useful for "what did the customer originally ask about?".
-  - `any`: legacy multi-intent view — a contact who moved Ventas → Tasaciones counts in BOTH buckets. Sums exceed unique contacts; the chart's summary line warns about this.
+- `?touch=last|first|any` — attribution mode for `Contactos por intención`. The
+  selector renders as **"Cómo contar contactos"** in the UI; `first` and `any`
+  are gated behind an `Análisis avanzado` disclosure to keep the default view
+  decision-oriented. Spanish copy and labels live on `verticalConfig.attribution`.
+  - `last` → "Último interés" (default): each contact lands in exactly one bucket — their last inbound business intent. Per-intent counts sum to *unique contacts whose last inbound intent was a business intent*, which is **less than or equal to** the global `Contactos únicos` KPI: contacts whose last inbound was the `menu` token (navigation only, no engagement) are dropped from the chart but still counted globally.
+  - `first` → "Interés inicial": same shape as `last`, but the FIRST inbound intent. Useful for "what did the customer originally ask about?".
+  - `any` → "Todas las consultas": legacy multi-intent view — a contact who moved Ventas → Tasaciones counts in BOTH buckets. Sums exceed unique contacts; the selector and the chart summary both warn about this.
 - `?heatmapIntent=<bucket label>` — filters the heatmap to a single intent (`Ventas`, `Alquileres`, `Tasaciones`, `Emprendimientos`, `Administracion`, `Otras`).
 
 ### Dev database details
