@@ -252,8 +252,11 @@ export async function getOtrasBreakdown(
  * but the global KPI counts them once over all intents. This is intentional;
  * the UI must disclose the attribution rule next to the chart.
  *
- * Only `escalations.escalation_type = 'business'` rows count as handoffs
- * (matches `src/lib/queries/handoffs.ts:54`). Error-handler rows are excluded.
+ * Only real handoffs count: any escalation EXCEPT `escalation_type =
+ * 'workflow_error'` (n8n runtime errors, not customer handoffs). Matches
+ * `src/lib/queries/handoffs.ts`. The bot writes the terminal flow step name
+ * into `escalation_type` (`post_results_advisor`, `otras_handoff`, …); any
+ * non-`workflow_error` row is a customer-facing escalation.
  */
 export async function getIntentHandoffRates(days: number): Promise<IntentHandoffRate[]> {
   const rows = await sql<Record<string, unknown>[]>`
@@ -275,7 +278,7 @@ export async function getIntentHandoffRates(days: number): Promise<IntentHandoff
     handoffs AS (
       SELECT DISTINCT contact_wa_id
       FROM automation.escalations
-      WHERE escalation_type = 'business'
+      WHERE escalation_type <> 'workflow_error'
         AND COALESCE(NULLIF(contact_wa_id, ''), '') <> ''
         AND DATE(escalation_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires')
               >= DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - (${days}::int - 1)
@@ -463,11 +466,14 @@ export async function getIntentCompletionRates(
  * Bot self-resolution rate over the last `days` days.
  *
  * Self-resolved = a contact who appeared inbound in the window AND did NOT
- * produce a `business` escalation row in the same window. This is the ROI
- * metric: "% of conversations the bot handled without a human".
+ * produce a real escalation row in the same window. This is the ROI metric:
+ * "% of conversations the bot handled without a human".
  *
- * Note: error-handler escalations (`escalation_type = 'error'`) are excluded
- * — those are runtime issues, not real handoffs.
+ * "Real escalation" = any `automation.escalations` row whose `escalation_type`
+ * is NOT `'workflow_error'`. The n8n runtime error handler writes
+ * `'workflow_error'` for runtime issues that don't represent a customer
+ * handoff; everything else (`post_results_advisor`, `otras_handoff`,
+ * `owners_advisor`, `emprendimientos_advisor`, …) is a real flow terminal.
  *
  * Future refinement (deferred): subtract contacts that are still in
  * v_follow_up_queue, since "not yet escalated" can also mean "needs follow-up".
@@ -490,7 +496,7 @@ export async function getBotSelfResolutionRate(
     window_handoffs AS (
       SELECT DISTINCT contact_wa_id
       FROM automation.escalations
-      WHERE escalation_type = 'business'
+      WHERE escalation_type <> 'workflow_error'
         AND COALESCE(NULLIF(contact_wa_id, ''), '') <> ''
         AND DATE(escalation_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires')
               BETWEEN DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - (${offsetDays}::int + ${days}::int - 1)
@@ -560,7 +566,7 @@ export async function getIntentTimeToHandoff(days: number): Promise<IntentTimeTo
     first_handoff AS (
       SELECT DISTINCT ON (contact_wa_id) contact_wa_id, escalation_timestamp
       FROM automation.escalations
-      WHERE escalation_type = 'business'
+      WHERE escalation_type <> 'workflow_error'
         AND COALESCE(NULLIF(contact_wa_id, ''), '') <> ''
         AND DATE(escalation_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires')
               >= DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - (${days}::int - 1)

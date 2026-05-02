@@ -1,6 +1,8 @@
-// Read paths for the Handoffs page. Both queries hard-filter to
-// escalation_type = 'business' so error-handler rows from the n8n runtime
-// (escalation_type = 'error') never reach the UI.
+// Read paths for the Handoffs page. Both queries hard-filter out
+// `escalation_type = 'workflow_error'` so n8n runtime errors never reach the
+// UI. Everything else (`post_results_advisor`, `otras_handoff`,
+// `owners_advisor`, `emprendimientos_advisor`, …) is a real customer-facing
+// flow terminal.
 
 import { sql } from "@/db/client";
 
@@ -20,8 +22,8 @@ export type HandoffRow = {
 };
 
 export async function getHandoffSummary(): Promise<HandoffSummaryRow[]> {
-  // v_handoff_summary already filters escalation_type = 'business' upstream,
-  // but we still defend in case a tenant runs an older view definition.
+  // v_handoff_summary already excludes runtime errors upstream; this query
+  // trusts that view (escalation_type filtering happens inside the view).
   const rows = await sql<Record<string, unknown>[]>`
     SELECT
       handoff_target AS target,
@@ -51,7 +53,7 @@ export async function listBusinessHandoffs(opts: {
       NULLIF(reason, '') AS reason,
       escalation_timestamp AS created_at
     FROM automation.escalations
-    WHERE escalation_type = 'business'
+    WHERE escalation_type <> 'workflow_error'
     ORDER BY escalation_timestamp DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -69,7 +71,7 @@ export async function countBusinessHandoffs(): Promise<number> {
   const rows = await sql<Record<string, unknown>[]>`
     SELECT COUNT(*)::int AS n
     FROM automation.escalations
-    WHERE escalation_type = 'business'
+    WHERE escalation_type <> 'workflow_error'
   `;
   return Number(rows[0]?.n ?? 0);
 }
