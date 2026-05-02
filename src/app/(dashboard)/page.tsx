@@ -162,27 +162,15 @@ export default async function OverviewPage({
         ))}
       </div>
 
-      {/* Hero KPI row — the two cards that deserve weight. Leading intent and
-          bot self-resolution are conversion signals, so they get a wider
-          treatment than the volume cards above. */}
+      {/* Hero KPI row — global self-resolution rate. `Intención líder` used to
+          live here, but it depends on `?touch=` so it now lives inside the
+          Composición de la demanda section, next to the selector that drives
+          its value. */}
       <div
         data-reveal
         style={{ ["--reveal-delay" as string]: "160ms" }}
         className="grid gap-4 grid-cols-1 lg:grid-cols-2"
       >
-        {leadingIntent ? (
-          <KpiCard
-            label="Intención líder"
-            value={leadingIntent.count}
-            previousValue={leadingIntentPrev?.count ?? 0}
-            format="number"
-            higherIsBetter={true}
-            locale={tenant.locale}
-            display={leadingIntent.intent}
-            valueCaption={`${formatNumber(leadingIntent.count, tenant.locale)} contactos en 7 días`}
-            meta={leadingIntentMeta}
-          />
-        ) : null}
         <KpiCard
           label="Resueltas por el bot"
           value={selfResolution.rate}
@@ -215,6 +203,19 @@ export default async function OverviewPage({
           <SectionHeading kicker="Intenciones">Composición de la demanda</SectionHeading>
           <IntentTouchToggle value={touch} attribution={vertical.attribution} />
         </div>
+        {leadingIntent ? (
+          <KpiCard
+            label="Intención líder"
+            value={leadingIntent.count}
+            previousValue={leadingIntentPrev?.count ?? 0}
+            format="number"
+            higherIsBetter={true}
+            locale={tenant.locale}
+            display={leadingIntent.intent}
+            valueCaption={`${formatNumber(leadingIntent.count, tenant.locale)} contactos en 7 días`}
+            meta={leadingIntentMeta}
+          />
+        ) : null}
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
           <div className="space-y-3">
             <IntentsChart

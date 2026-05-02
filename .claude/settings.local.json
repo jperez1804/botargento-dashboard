@@ -29,7 +29,9 @@
       "Bash(Get-ChildItem -File *.md)",
       "Bash(Select-Object Name)",
       "Bash(pnpm lint *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   },
   "enabledPlugins": {
