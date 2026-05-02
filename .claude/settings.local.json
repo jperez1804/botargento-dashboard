@@ -32,7 +32,8 @@
       "Bash(npx tsc *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(ls \"C:\\\\\\\\Desarollo\\\\\\\\jperez\\\\\\\\n8n\\\\\\\\whatsapp-automation-claude\\\\\\\\\")"
+      "Bash(ls \"C:\\\\\\\\Desarollo\\\\\\\\jperez\\\\\\\\n8n\\\\\\\\whatsapp-automation-claude\\\\\\\\\")",
+      "Bash(grep *)"
     ]
   },
   "enabledPlugins": {

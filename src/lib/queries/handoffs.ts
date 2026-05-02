@@ -1,6 +1,7 @@
 // Read paths for the Handoffs page. Both queries hard-filter out
-// `escalation_type = 'workflow_error'` so n8n runtime errors never reach the
-// UI. Everything else (`post_results_advisor`, `otras_handoff`,
+// `escalation_type` in (`'workflow_error'`, `'error'`) so n8n runtime errors
+// never reach the UI. Production uses `'workflow_error'`; the dev/CI seed
+// uses `'error'`. Everything else (`post_results_advisor`, `otras_handoff`,
 // `owners_advisor`, `emprendimientos_advisor`, …) is a real customer-facing
 // flow terminal.
 
@@ -53,7 +54,7 @@ export async function listBusinessHandoffs(opts: {
       NULLIF(reason, '') AS reason,
       escalation_timestamp AS created_at
     FROM automation.escalations
-    WHERE escalation_type <> 'workflow_error'
+    WHERE escalation_type NOT IN ('workflow_error', 'error')
     ORDER BY escalation_timestamp DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -71,7 +72,7 @@ export async function countBusinessHandoffs(): Promise<number> {
   const rows = await sql<Record<string, unknown>[]>`
     SELECT COUNT(*)::int AS n
     FROM automation.escalations
-    WHERE escalation_type <> 'workflow_error'
+    WHERE escalation_type NOT IN ('workflow_error', 'error')
   `;
   return Number(rows[0]?.n ?? 0);
 }
