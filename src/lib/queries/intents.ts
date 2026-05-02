@@ -114,6 +114,11 @@ export async function getIntentCounts(
       `;
     }
     if (touch === "first") {
+      // "First interest" = first non-`menu` inbound per contact. The literal
+      // first inbound row is almost always the welcome-menu selection, which
+      // `formatBusinessIntentLabel` filters out as navigation; without this
+      // exclusion, every contact would collapse to no bucket and the chart +
+      // `Intención líder` card would be empty.
       return sql<Record<string, unknown>[]>`
         SELECT DISTINCT ON (contact_wa_id)
           contact_wa_id,
@@ -121,6 +126,7 @@ export async function getIntentCounts(
         FROM automation.lead_log
         WHERE direction = 'inbound'
           AND COALESCE(NULLIF(contact_wa_id, ''), '') <> ''
+          AND intent <> 'menu'
           AND DATE(log_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires')
                 BETWEEN DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - (${offsetDays}::int + ${days}::int - 1)
                     AND DATE(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') - ${offsetDays}::int
