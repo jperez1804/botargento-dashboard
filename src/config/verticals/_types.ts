@@ -95,6 +95,28 @@ export type AttributionConfig = {
   engagementDensityNote: string;
 };
 
+// Allowed analytics-window sizes for the global `?window=` selector on the
+// overview page. Hardcoded set so the param parser can validate by literal
+// equality and downstream queries are never asked for arbitrary day counts.
+export type WindowDays = 7 | 14 | 28 | 56;
+
+export type WindowOptionDef = {
+  value: WindowDays;
+  label: string; // e.g. "7 días"
+};
+
+export type WindowConfig = {
+  // Visible label next to the chip group (e.g. "Período").
+  controlLabel: string;
+  // One-line scope note explaining which surfaces follow this selector and
+  // which keep their own window (the heatmap and the follow-up queue do).
+  scopeNote: string;
+  options: ReadonlyArray<WindowOptionDef>;
+  // Subline template under the page masthead; `{N}` is replaced with the
+  // active window size. Example: "Comparado con los {N} días anteriores."
+  comparisonTemplate: string;
+};
+
 export type VerticalConfig = {
   key: string;
   label: string;
@@ -103,4 +125,5 @@ export type VerticalConfig = {
   intents: ReadonlyArray<IntentDef>;
   handoffTargets: ReadonlyArray<HandoffTargetDef>;
   attribution: AttributionConfig;
+  windows: WindowConfig;
 };

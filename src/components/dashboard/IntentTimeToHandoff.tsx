@@ -5,9 +5,10 @@ import type { IntentTimeToHandoff as IntentTimeToHandoffRow } from "@/lib/querie
 type Props = {
   rows: ReadonlyArray<IntentTimeToHandoffRow>;
   locale: string;
+  windowDays: number;
 };
 
-export function IntentTimeToHandoff({ rows, locale }: Props) {
+export function IntentTimeToHandoff({ rows, locale, windowDays }: Props) {
   if (rows.length === 0) return null;
 
   return (
@@ -49,9 +50,9 @@ export function IntentTimeToHandoff({ rows, locale }: Props) {
           </table>
         </div>
         <p className="mt-3 text-[11px] text-[var(--soft-ink)]">
-          Tiempo en reloj real desde el primer mensaje del contacto hasta la derivación, incluye
-          horario no laboral. Buckets con n &lt; 5 muestran &quot;—&quot; para evitar medianas
-          engañosas con muestras pequeñas.
+          Tiempo en reloj real desde el primer mensaje del contacto hasta la derivación durante los
+          últimos {windowDays} días, incluye horario no laboral. Buckets con n &lt; 5 muestran
+          &quot;—&quot; para evitar medianas engañosas con muestras pequeñas.
         </p>
       </CardContent>
     </Card>

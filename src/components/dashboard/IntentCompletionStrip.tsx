@@ -5,9 +5,10 @@ import type { IntentCompletionRate } from "@/lib/queries/intents";
 type Props = {
   rows: ReadonlyArray<IntentCompletionRate>;
   locale: string;
+  windowDays: number;
 };
 
-export function IntentCompletionStrip({ rows, locale }: Props) {
+export function IntentCompletionStrip({ rows, locale, windowDays }: Props) {
   const visible = rows.filter((row) => row.started > 0);
   if (visible.length === 0) return null;
 
@@ -36,8 +37,8 @@ export function IntentCompletionStrip({ rows, locale }: Props) {
           ))}
         </ul>
         <p className="mt-3 text-[11px] text-[var(--soft-ink)]">
-          % de contactos en cada intención que llegaron al paso terminal del flujo en los últimos 7
-          días. {'"—"'} indica que el flujo no tiene un paso terminal definido.
+          % de contactos en cada intención que llegaron al paso terminal del flujo en los últimos{" "}
+          {windowDays} días. {'"—"'} indica que el flujo no tiene un paso terminal definido.
         </p>
       </CardContent>
     </Card>

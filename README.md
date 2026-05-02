@@ -102,6 +102,12 @@ After tuning, no DB migration or rebuild is needed beyond a redeploy.
 
 These query params survive reload and copy/paste:
 
+- `?window=7|14|28|56` — analytics window for the overview page. Default `7`
+  (omitted from the URL when active, same convention as `?touch=last`).
+  Affects every section except `Demanda por hora` (always 28 días — a 7-day
+  grid is too sparse for the heatmap) and `Contactos prioritarios` (the
+  follow-up queue uses its own freshness logic). The selector lives in the
+  page masthead; copy comes from `verticalConfig.windows`.
 - `?touch=last|first|any` — attribution mode for `Contactos por intención`. The
   selector renders as **"Cómo contar contactos"** in the UI; `first` and `any`
   are gated behind an `Análisis avanzado` disclosure to keep the default view

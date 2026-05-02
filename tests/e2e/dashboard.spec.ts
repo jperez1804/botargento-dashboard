@@ -89,6 +89,19 @@ test("Touch-mode toggle on Contactos por intención updates URL state", async ({
   await expect(page.getByText(/cuenta al contacto por lo primero/i)).toBeVisible();
 });
 
+test("Window selector updates URL state and masthead subline", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".recharts-surface");
+
+  // Default window = 7; URL has no `window` param.
+  expect(new URL(page.url()).searchParams.get("window")).toBeNull();
+  await expect(page.getByText("Comparado con los 7 días anteriores.")).toBeVisible();
+
+  await page.getByRole("radio", { name: "28 días" }).click();
+  await page.waitForFunction(() => new URL(location.href).searchParams.get("window") === "28");
+  await expect(page.getByText("Comparado con los 28 días anteriores.")).toBeVisible();
+});
+
 test("CSV export downloads a correctly-formatted file", async ({ page }) => {
   await page.goto("/conversations");
   await page.waitForSelector("table tbody tr");

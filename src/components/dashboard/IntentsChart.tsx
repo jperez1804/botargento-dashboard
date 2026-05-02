@@ -81,7 +81,7 @@ export function IntentsChart({
   intents,
   locale,
   title = "Contactos por intención",
-  summarySuffix = "contactos únicos por intención en 7 días",
+  summarySuffix = "contactos únicos por intención",
   tooltipLabel = "Contactos",
   handoffRates,
   previousData,

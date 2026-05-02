@@ -24,9 +24,12 @@ import { IntentsChart } from "@/components/dashboard/IntentsChart";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { OtrasBreakdown } from "@/components/dashboard/OtrasBreakdown";
 import { VolumeChart } from "@/components/dashboard/VolumeChart";
+import { WindowToggle } from "@/components/dashboard/WindowToggle";
 import { formatNumber } from "@/lib/format";
+import type { WindowDays } from "@/config/verticals/_types";
 
 const HEATMAP_WINDOW_DAYS = 28;
+const ALLOWED_WINDOWS: ReadonlyArray<WindowDays> = [7, 14, 28, 56];
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -48,7 +51,14 @@ export default async function OverviewPage({
   const activeOption = vertical.attribution.options.find((o) => o.value === touch);
   const optionHelper = activeOption?.helper ?? "";
   const optionLabel = activeOption?.label ?? "";
-  const baseTouchSummary = `contactos en 7 días · ${optionHelper.toLowerCase()}`;
+  const windowParam = typeof params.window === "string" ? Number(params.window) : NaN;
+  const windowDays: WindowDays = (ALLOWED_WINDOWS as ReadonlyArray<number>).includes(
+    windowParam,
+  )
+    ? (windowParam as WindowDays)
+    : 7;
+  const windowSuffix = `${windowDays} días`;
+  const baseTouchSummary = `contactos en ${windowSuffix} · ${optionHelper.toLowerCase()}`;
   const touchSummary =
     touch === "any"
       ? `${baseTouchSummary} ${vertical.attribution.anyModeWarning.toLowerCase()}`
@@ -56,6 +66,10 @@ export default async function OverviewPage({
   const leadingIntentMeta = vertical.attribution.leadingIntentCaptionTemplate.replace(
     "{label}",
     optionLabel,
+  );
+  const comparisonSubline = vertical.windows.comparisonTemplate.replace(
+    "{N}",
+    String(windowDays),
   );
 
   const [
@@ -75,20 +89,20 @@ export default async function OverviewPage({
     timeToHandoff,
     followUp,
   ] = await Promise.all([
-    getWindowKpis(6, 0),
-    getWindowKpis(13, 7),
-    getDailyMetrics(7),
-    getIntentCounts(7, 0, touch),
-    getIntentCounts(7, 7, touch),
-    getIntentMessageCounts(7),
-    getIntentMessageCounts(7, 7),
-    getIntentHandoffRates(7),
-    getOtrasBreakdown(7),
+    getWindowKpis(windowDays - 1, 0),
+    getWindowKpis(windowDays * 2 - 1, windowDays),
+    getDailyMetrics(windowDays),
+    getIntentCounts(windowDays, 0, touch),
+    getIntentCounts(windowDays, windowDays, touch),
+    getIntentMessageCounts(windowDays),
+    getIntentMessageCounts(windowDays, windowDays),
+    getIntentHandoffRates(windowDays),
+    getOtrasBreakdown(windowDays),
     getIntentHeatmap(HEATMAP_WINDOW_DAYS, heatmapIntent ?? undefined),
-    getIntentCompletionRates(7, vertical.intents),
-    getBotSelfResolutionRate(7),
-    getBotSelfResolutionRate(7, 7),
-    getIntentTimeToHandoff(7),
+    getIntentCompletionRates(windowDays, vertical.intents),
+    getBotSelfResolutionRate(windowDays),
+    getBotSelfResolutionRate(windowDays, windowDays),
+    getIntentTimeToHandoff(windowDays),
     getFollowUpQueue(5),
   ]);
   const tenant = tenantConfig();
@@ -123,10 +137,8 @@ export default async function OverviewPage({
         style={{ ["--reveal-delay" as string]: "0ms" }}
         className="space-y-3 border-b border-[var(--rule)] pb-5"
       >
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--muted-ink)] font-[var(--font-geist-mono)]">
-            Panel · Últimos 7 días
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <WindowToggle value={windowDays} config={vertical.windows} />
           <ExportCsvButton
             endpoint="/api/export/daily-metrics"
             label="Exportar métricas"
@@ -136,10 +148,11 @@ export default async function OverviewPage({
           <h1 className="font-[var(--font-fraunces)] text-[44px] leading-[1.05] tracking-tight text-[var(--ink)] font-semibold">
             Operaciones del período
           </h1>
-          <p className="text-sm text-[var(--muted-ink)]">
-            Comparado con los 7 días anteriores.
-          </p>
+          <p className="text-sm text-[var(--muted-ink)]">{comparisonSubline}</p>
         </div>
+        <p className="text-[11px] leading-snug text-[var(--soft-ink)]">
+          {vertical.windows.scopeNote}
+        </p>
       </header>
 
       {/* Standard KPI strip — 4 volume metrics. Gives a quick read of the
@@ -212,7 +225,7 @@ export default async function OverviewPage({
             higherIsBetter={true}
             locale={tenant.locale}
             display={leadingIntent.intent}
-            valueCaption={`${formatNumber(leadingIntent.count, tenant.locale)} contactos en 7 días`}
+            valueCaption={`${formatNumber(leadingIntent.count, tenant.locale)} contactos en ${windowSuffix}`}
             meta={leadingIntentMeta}
           />
         ) : null}
@@ -228,7 +241,11 @@ export default async function OverviewPage({
               handoffDisclaimerShort={vertical.attribution.handoffDisclaimerShort}
               handoffDisclaimerDetail={vertical.attribution.handoffDisclaimerDetail}
             />
-            <OtrasBreakdown rows={otrasBreakdown} locale={tenant.locale} />
+            <OtrasBreakdown
+              rows={otrasBreakdown}
+              locale={tenant.locale}
+              windowDays={windowDays}
+            />
           </div>
           <IntentsChart
             data={intentMessageCounts}
@@ -236,7 +253,7 @@ export default async function OverviewPage({
             intents={vertical.intents}
             locale={tenant.locale}
             title="Volumen por intención"
-            summarySuffix="interacciones en flujos en 7 días"
+            summarySuffix={`interacciones en flujos en ${windowSuffix}`}
             tooltipLabel="Interacciones"
             engagementDensity={engagementDensity}
             engagementDensityNote={vertical.attribution.engagementDensityNote}
@@ -259,8 +276,16 @@ export default async function OverviewPage({
       >
         <SectionHeading kicker="Operativo">Eficiencia de los flujos</SectionHeading>
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-          <IntentCompletionStrip rows={completionRates} locale={tenant.locale} />
-          <IntentTimeToHandoff rows={timeToHandoff} locale={tenant.locale} />
+          <IntentCompletionStrip
+            rows={completionRates}
+            locale={tenant.locale}
+            windowDays={windowDays}
+          />
+          <IntentTimeToHandoff
+            rows={timeToHandoff}
+            locale={tenant.locale}
+            windowDays={windowDays}
+          />
         </div>
       </section>
 

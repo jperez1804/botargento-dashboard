@@ -111,4 +111,17 @@ export const realEstate: VerticalConfig = {
     engagementDensityNote:
       "El volumen no cambia con esta vista; el promedio usa los contactos de la vista seleccionada.",
   },
+
+  windows: {
+    controlLabel: "Período",
+    scopeNote:
+      "La heatmap de demanda y la cola de seguimiento usan ventanas propias.",
+    options: [
+      { value: 7, label: "7 días" },
+      { value: 14, label: "14 días" },
+      { value: 28, label: "28 días" },
+      { value: 56, label: "56 días" },
+    ],
+    comparisonTemplate: "Comparado con los {N} días anteriores.",
+  },
 };
