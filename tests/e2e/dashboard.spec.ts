@@ -30,10 +30,14 @@ test("Overview renders KPI cards + both charts + follow-up preview", async ({ pa
   expect(kpiLabels).toContain("Intención líder");
   expect(kpiLabels).toContain("Resueltas por el bot");
 
-  // Three charts + heatmap present: daily volume + two intent views + heatmap
-  await expect(page.getByText("Volumen de mensajes")).toBeVisible();
-  await expect(page.getByText("Contactos por intención")).toBeVisible();
-  await expect(page.getByText("Volumen por intención")).toBeVisible();
+  // Three charts + heatmap present: daily volume + two intent views + heatmap.
+  // Scope to card titles so the assertions don't accidentally match the
+  // attribution scope note, which mentions "Contactos por intención" +
+  // "Intención líder" inside its body copy.
+  const cardTitles = page.locator('[data-slot="card-title"]');
+  await expect(cardTitles.filter({ hasText: "Volumen de mensajes" })).toBeVisible();
+  await expect(cardTitles.filter({ hasText: "Contactos por intención" })).toBeVisible();
+  await expect(cardTitles.filter({ hasText: "Volumen por intención" })).toBeVisible();
   await expect(page.getByText(/Demanda por hora/)).toBeVisible();
 
   // Follow-up preview section
