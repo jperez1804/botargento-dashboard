@@ -26,9 +26,12 @@ export type IntentDef = {
   // is mostly informational so a low handoff rate is the desired outcome.
   desiredHandoffRate?: number;
   // Raw automation tokens that mark the END of this intent's flow (e.g.
-  // "guided_sales_post_results_visit"). A contact who hits any of these tokens
-  // is counted as "completed" for the corresponding bucket. Omit when no clear
-  // terminal exists; the completion-rate UI renders "—" for that bucket.
+  // "guided_sales_post_results_visit", "tasaciones_handoff"). Matched against
+  // `automation.lead_log.route` — the bot writes terminal step names there
+  // while keeping `intent` at the lead-type label for the whole conversation.
+  // A contact who hits any of these tokens is counted as "completed" for the
+  // corresponding bucket. Omit when no clear terminal exists; the
+  // completion-rate UI renders "—" for that bucket.
   terminalIntents?: ReadonlyArray<string>;
 };
 

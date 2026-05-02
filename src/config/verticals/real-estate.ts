@@ -46,21 +46,21 @@ export const realEstate: VerticalConfig = {
       label: "Tasaciones",
       color: "#f59e0b",
       desiredHandoffRate: 0.95,
-      terminalIntents: ["valuations"],
+      terminalIntents: ["tasaciones_handoff"],
     },
     {
       key: "Emprendimientos",
       label: "Emprendimientos",
       color: "#8b5cf6",
       desiredHandoffRate: 0.2,
-      // No clear terminal token yet — completion-rate strip renders "—" for this bucket
+      terminalIntents: ["emprendimientos_handoff"],
     },
     {
       key: "Administracion",
       label: "Administración",
       color: "#6b7280",
       desiredHandoffRate: 0.9,
-      terminalIntents: ["owners_advisor"],
+      terminalIntents: ["owners_handoff"],
     },
     {
       key: "Otras",

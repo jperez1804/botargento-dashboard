@@ -364,10 +364,13 @@ export async function getIntentHeatmap(
  *
  * Attribution: a contact's bucket is the `formatBusinessIntentLabel` of their
  * LAST inbound intent in the window — same rule as `getIntentHandoffRates`.
- * `completed` counts contacts whose intent history (anywhere in the window)
- * touched any of the terminal tokens configured for THEIR bucket. Buckets
- * without any configured terminals return `completed = null` and `rate = null`,
- * which the UI surfaces as "—" (we don't know what completion means yet).
+ * `completed` counts contacts whose ROUTE history (anywhere in the window)
+ * touched any of the terminal route tokens configured for THEIR bucket.
+ * Terminals are matched against `lead_log.route` because the bot keeps
+ * `intent` pinned to the lead-type label (`sales_lead`, `rental_lead`, …)
+ * for the whole conversation while the per-step name lands in `route`.
+ * Buckets without any configured terminals return `completed = null` and
+ * `rate = null`, which the UI surfaces as "—".
  *
  * This is the metric users intuitively read as "drop-off / completion" — the
  * older `Volumen ÷ Contactos` ratio (Phase 6) measures engagement density,
@@ -380,7 +383,7 @@ export async function getIntentCompletionRates(
   const terminals = buildTerminalIndex(intents);
 
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT contact_wa_id, intent, log_timestamp
+    SELECT contact_wa_id, intent, route, log_timestamp
     FROM automation.lead_log
     WHERE direction = 'inbound'
       AND COALESCE(NULLIF(contact_wa_id, ''), '') <> ''
@@ -388,21 +391,27 @@ export async function getIntentCompletionRates(
     ORDER BY contact_wa_id, log_timestamp ASC
   `;
 
-  // Walk rows once: per contact, track their last-touch bucket and the full
-  // list of normalized inbound tokens they hit in the window.
+  // Walk rows once: per contact, track their last-touch bucket (from `intent`)
+  // and the full list of normalized `route` tokens they hit in the window.
+  // Terminal steps are recorded in the `route` column — `intent` stays at the
+  // lead-type label for the whole conversation, so matching terminals against
+  // `intent` (the prior implementation) never fired.
   const lastBucketByContact = new Map<string, string>();
-  const tokensByContact = new Map<string, string[]>();
+  const routesByContact = new Map<string, string[]>();
   for (const row of rows) {
     const contactWaId = String(row.contact_wa_id ?? "").trim();
     if (!contactWaId) continue;
     const rawIntent = String(row.intent ?? "");
+    const rawRoute = String(row.route ?? "");
     const bucket = formatBusinessIntentLabel(rawIntent);
     if (!bucket) continue; // skips menu
 
     lastBucketByContact.set(contactWaId, bucket); // last write wins, rows ordered by log_timestamp ASC
-    const list = tokensByContact.get(contactWaId) ?? [];
-    list.push(normalizeAutomationToken(rawIntent));
-    tokensByContact.set(contactWaId, list);
+    if (rawRoute.trim()) {
+      const list = routesByContact.get(contactWaId) ?? [];
+      list.push(normalizeAutomationToken(rawRoute));
+      routesByContact.set(contactWaId, list);
+    }
   }
 
   const result = new Map<string, { started: number; completedSet: Set<string> | null }>();
@@ -427,8 +436,8 @@ export async function getIntentCompletionRates(
 
     if (entry.completedSet !== null) {
       const bucketTerminals = terminals.get(bucket);
-      const tokens = tokensByContact.get(contactWaId) ?? [];
-      if (bucketTerminals && tokens.some((t) => bucketTerminals.has(t))) {
+      const routes = routesByContact.get(contactWaId) ?? [];
+      if (bucketTerminals && routes.some((r) => bucketTerminals.has(r))) {
         entry.completedSet.add(contactWaId);
       }
     }
