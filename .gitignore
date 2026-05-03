@@ -42,3 +42,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python (used by scripts/build-walkthrough-deck.py)
+__pycache__/
+*.pyc
+
+# office lock files (PowerPoint / Word create these while a doc is open)
+~$*
+
+# Generated walkthrough decks — rebuild via scripts/build-walkthrough-deck.py.
+# The brand assets and the script ARE committed, so anyone can regenerate.
+/docs/dashboard-walkthrough*.pptx
+
+# Screenshots from the live dashboard — may contain real contact data.
+# Capture locally; do not commit.
+/docs/screenshots/

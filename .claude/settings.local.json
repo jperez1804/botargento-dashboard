@@ -33,7 +33,12 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(ls \"C:\\\\\\\\Desarollo\\\\\\\\jperez\\\\\\\\n8n\\\\\\\\whatsapp-automation-claude\\\\\\\\\")",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(where python *)",
+      "Bash(where python3 *)",
+      "Bash(where py *)",
+      "Bash(ls \"C:\\\\\\\\Desarollo\\\\\\\\jperez\\\\\\\\n8n\\\\\\\\botargento-dashboard\\\\\\\\docs\\\\\\\\screenshots\\\\\\\\\")",
+      "WebFetch(domain:botargento.com.ar)"
     ]
   },
   "enabledPlugins": {
