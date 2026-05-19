@@ -1,9 +1,11 @@
 import { env } from "@/lib/env";
 import type { VerticalConfig } from "./_types";
+import { architecture } from "./architecture";
 import { realEstate } from "./real-estate";
 
 const REGISTRY: Readonly<Record<string, VerticalConfig>> = {
   "real-estate": realEstate,
+  architecture: architecture,
 };
 
 let cached: VerticalConfig | null = null;

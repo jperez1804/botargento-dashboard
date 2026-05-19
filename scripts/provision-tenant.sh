@@ -127,6 +127,12 @@ if ! [[ "$CLIENT_PRIMARY_COLOR" =~ ^#[0-9a-fA-F]{3,8}$ ]]; then
   echo "✗ Color must be a hex like #4a7ec4"; exit 1
 fi
 
+read -rp "→ VERTICAL [real-estate]: " VERTICAL
+VERTICAL="${VERTICAL:-real-estate}"
+if ! [[ "$VERTICAL" =~ ^[a-z0-9-]+$ ]]; then
+  echo "✗ VERTICAL must be lowercase-kebab (e.g. real-estate, architecture)"; exit 1
+fi
+
 read -rp "→ AUTH_EMAIL_FROM [no-reply@botargento.com.ar]: " AUTH_EMAIL_FROM
 AUTH_EMAIL_FROM="${AUTH_EMAIL_FROM:-no-reply@botargento.com.ar}"
 
@@ -282,7 +288,7 @@ services:
       - "3000"
     environment:
       TENANT_DB_URL: "postgres://dashboard_app:\${DASHBOARD_APP_PASSWORD}@postgres:5432/\${POSTGRES_DB}"
-      VERTICAL: real-estate
+      VERTICAL: ${VERTICAL}
       CLIENT_NAME: "${CLIENT_NAME}"
       CLIENT_LOGO_URL: "/logos/client.svg"
       CLIENT_PRIMARY_COLOR: "${CLIENT_PRIMARY_COLOR}"
