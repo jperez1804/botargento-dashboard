@@ -95,7 +95,11 @@ echo "  Timezone:           $TZ"
 
 echo
 echo "→ Pre-flight: verifying automation.v_* views exist…"
-MISSING_VIEWS=$(docker exec -i "$N8N_POSTGRES_CONTAINER" \
+# No -i: `docker exec -i` would consume stdin even though psql -c doesn't read
+# it. That breaks piped-input drivers of this script (the operator inputs below
+# come from stdin too). Same applies to the line-209 UPDATE; everything else
+# uses -i intentionally because it pipes a heredoc or a file into psql.
+MISSING_VIEWS=$(docker exec "$N8N_POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tA -c "
     SELECT name FROM (VALUES
       ('v_daily_metrics'),('v_flow_breakdown'),
@@ -212,7 +216,7 @@ docker exec -i "$N8N_POSTGRES_CONTAINER" \
 
 # Re-seed app_settings.primary_color from the operator's input so the row
 # matches what they typed at the top, not the migration's placeholder.
-docker exec -i "$N8N_POSTGRES_CONTAINER" \
+docker exec "$N8N_POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 \
   -c "UPDATE dashboard.app_settings SET primary_color = '$CLIENT_PRIMARY_COLOR', updated_by = 'provision-tenant.sh' WHERE id = 1;"
 
