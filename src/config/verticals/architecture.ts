@@ -133,4 +133,9 @@ export const architecture: VerticalConfig = {
     ],
     comparisonTemplate: "Comparado con los {N} días anteriores.",
   },
+
+  features: {
+    providersTab: true,
+    laborPoolTab: true,
+  },
 };

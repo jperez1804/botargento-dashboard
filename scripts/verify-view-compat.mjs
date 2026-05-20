@@ -22,6 +22,8 @@ const REQUIRED_VIEWS = [
   "v_contact_summary",
   "v_handoff_summary",
   "v_follow_up_queue",
+  "v_providers",
+  "v_labor_pool",
 ];
 
 const url = process.env.TENANT_DB_URL;

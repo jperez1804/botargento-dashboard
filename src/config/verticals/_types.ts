@@ -7,6 +7,8 @@ export type NavIconKey =
   | "conversations"
   | "handoffs"
   | "follow-up"
+  | "providers"
+  | "labor-pool"
   | "settings";
 
 export type NavItemDef = {
@@ -117,6 +119,18 @@ export type WindowConfig = {
   comparisonTemplate: string;
 };
 
+// Optional per-vertical capabilities. Each flag gates a piece of UI surface
+// (sidebar nav item + route guard). Each vertical config declares which
+// features it supports; the dashboard renders them only when the flag is
+// truthy. Default for any vertical is "no extra features" — equivalent to
+// real-estate today.
+export type VerticalFeatures = {
+  // /providers — supplier directory backed by automation.providers
+  providersTab?: boolean;
+  // /labor-pool — talent / oficios pool backed by automation.labor_pool
+  laborPoolTab?: boolean;
+};
+
 export type VerticalConfig = {
   key: string;
   label: string;
@@ -126,4 +140,5 @@ export type VerticalConfig = {
   handoffTargets: ReadonlyArray<HandoffTargetDef>;
   attribution: AttributionConfig;
   windows: WindowConfig;
+  features?: VerticalFeatures;
 };

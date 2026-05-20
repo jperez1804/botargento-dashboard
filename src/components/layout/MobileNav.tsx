@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import {
   ArrowLeftRight,
+  HardHat,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
   Settings,
+  Truck,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,8 @@ const ICON_MAP: Record<NavIconKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   conversations: MessageSquare,
   handoffs: ArrowLeftRight,
   "follow-up": ListTodo,
+  providers: Truck,
+  "labor-pool": HardHat,
   settings: Settings,
 };
 

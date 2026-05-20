@@ -5,10 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowLeftRight,
+  HardHat,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
   Settings,
+  Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavIconKey, NavItemDef } from "@/config/verticals/_types";
@@ -20,6 +22,8 @@ const ICON_MAP: Record<NavIconKey, IconComponent> = {
   conversations: MessageSquare,
   handoffs: ArrowLeftRight,
   "follow-up": ListTodo,
+  providers: Truck,
+  "labor-pool": HardHat,
   settings: Settings,
 };
 

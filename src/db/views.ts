@@ -44,12 +44,48 @@ export type FollowUpQueueRow = {
   last_seen: string;
 };
 
+export type ProviderRow = {
+  id: number;
+  contact_wa_id: string;
+  business_name: string;
+  category: string;
+  zone: string;
+  email: string;
+  phone: string;
+  status: string;
+  notes: string;
+  lead_name: string;
+  profile_name: string;
+  created_at: string;
+  updated_at: string;
+  last_inbound_at: string | null;
+};
+
+export type LaborPoolRow = {
+  id: number;
+  contact_wa_id: string;
+  worker_name: string;
+  mode: string;
+  specialty: string;
+  zone: string;
+  phone: string;
+  status: string;
+  notes: string;
+  lead_name: string;
+  profile_name: string;
+  created_at: string;
+  updated_at: string;
+  last_inbound_at: string | null;
+};
+
 export const REQUIRED_VIEWS = [
   "v_daily_metrics",
   "v_flow_breakdown",
   "v_contact_summary",
   "v_handoff_summary",
   "v_follow_up_queue",
+  "v_providers",
+  "v_labor_pool",
 ] as const;
 
 function toNum(value: unknown): number {
@@ -229,4 +265,182 @@ export async function selectFollowUpQueue(limit?: number): Promise<FollowUpQueue
       last_seen: String(r.last_seen),
     };
   });
+}
+
+function nullableStr(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value);
+}
+
+export async function selectProviders(opts: {
+  search?: string;
+  category?: string;
+  zone?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<ProviderRow[]> {
+  const { search, category, zone, status, limit = 200, offset = 0 } = opts;
+  const rows = await pg<Record<string, unknown>[]>`
+    SELECT id, contact_wa_id, business_name, category, zone, email, phone,
+           status, notes, lead_name, profile_name, created_at, updated_at,
+           last_inbound_at
+    FROM automation.v_providers
+    WHERE 1=1
+      ${category ? pg`AND category = ${category}` : pg``}
+      ${zone ? pg`AND zone ILIKE ${"%" + zone + "%"}` : pg``}
+      ${status ? pg`AND status = ${status}` : pg``}
+      ${
+        search
+          ? pg`AND (business_name ILIKE ${"%" + search + "%"}
+                OR lead_name ILIKE ${"%" + search + "%"}
+                OR profile_name ILIKE ${"%" + search + "%"}
+                OR email ILIKE ${"%" + search + "%"})`
+          : pg``
+      }
+    ORDER BY created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+  return rows.map((r) => ({
+    id: toNum(r.id),
+    contact_wa_id: String(r.contact_wa_id ?? ""),
+    business_name: String(r.business_name ?? ""),
+    category: String(r.category ?? ""),
+    zone: String(r.zone ?? ""),
+    email: String(r.email ?? ""),
+    phone: String(r.phone ?? ""),
+    status: String(r.status ?? ""),
+    notes: String(r.notes ?? ""),
+    lead_name: String(r.lead_name ?? ""),
+    profile_name: String(r.profile_name ?? ""),
+    created_at: String(r.created_at),
+    updated_at: String(r.updated_at),
+    last_inbound_at: nullableStr(r.last_inbound_at),
+  }));
+}
+
+export async function countProviders(opts: {
+  search?: string;
+  category?: string;
+  zone?: string;
+  status?: string;
+} = {}): Promise<number> {
+  const { search, category, zone, status } = opts;
+  const rows = await pg<{ count: string | number }[]>`
+    SELECT COUNT(*)::bigint AS count
+    FROM automation.v_providers
+    WHERE 1=1
+      ${category ? pg`AND category = ${category}` : pg``}
+      ${zone ? pg`AND zone ILIKE ${"%" + zone + "%"}` : pg``}
+      ${status ? pg`AND status = ${status}` : pg``}
+      ${
+        search
+          ? pg`AND (business_name ILIKE ${"%" + search + "%"}
+                OR lead_name ILIKE ${"%" + search + "%"}
+                OR profile_name ILIKE ${"%" + search + "%"}
+                OR email ILIKE ${"%" + search + "%"})`
+          : pg``
+      }
+  `;
+  return toNum(rows[0]?.count);
+}
+
+export async function listProviderCategories(): Promise<string[]> {
+  const rows = await pg<{ category: string }[]>`
+    SELECT DISTINCT category FROM automation.providers
+    WHERE category <> ''
+    ORDER BY category ASC
+  `;
+  return rows.map((r) => String(r.category));
+}
+
+export async function selectLaborPool(opts: {
+  search?: string;
+  specialty?: string;
+  zone?: string;
+  mode?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<LaborPoolRow[]> {
+  const {
+    search,
+    specialty,
+    zone,
+    mode,
+    status,
+    limit = 200,
+    offset = 0,
+  } = opts;
+  const rows = await pg<Record<string, unknown>[]>`
+    SELECT id, contact_wa_id, worker_name, mode, specialty, zone, phone,
+           status, notes, lead_name, profile_name, created_at, updated_at,
+           last_inbound_at
+    FROM automation.v_labor_pool
+    WHERE 1=1
+      ${specialty ? pg`AND specialty = ${specialty}` : pg``}
+      ${zone ? pg`AND zone ILIKE ${"%" + zone + "%"}` : pg``}
+      ${mode ? pg`AND mode = ${mode}` : pg``}
+      ${status ? pg`AND status = ${status}` : pg``}
+      ${
+        search
+          ? pg`AND (worker_name ILIKE ${"%" + search + "%"}
+                OR lead_name ILIKE ${"%" + search + "%"}
+                OR profile_name ILIKE ${"%" + search + "%"})`
+          : pg``
+      }
+    ORDER BY created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+  return rows.map((r) => ({
+    id: toNum(r.id),
+    contact_wa_id: String(r.contact_wa_id ?? ""),
+    worker_name: String(r.worker_name ?? ""),
+    mode: String(r.mode ?? ""),
+    specialty: String(r.specialty ?? ""),
+    zone: String(r.zone ?? ""),
+    phone: String(r.phone ?? ""),
+    status: String(r.status ?? ""),
+    notes: String(r.notes ?? ""),
+    lead_name: String(r.lead_name ?? ""),
+    profile_name: String(r.profile_name ?? ""),
+    created_at: String(r.created_at),
+    updated_at: String(r.updated_at),
+    last_inbound_at: nullableStr(r.last_inbound_at),
+  }));
+}
+
+export async function countLaborPool(opts: {
+  search?: string;
+  specialty?: string;
+  zone?: string;
+  mode?: string;
+  status?: string;
+} = {}): Promise<number> {
+  const { search, specialty, zone, mode, status } = opts;
+  const rows = await pg<{ count: string | number }[]>`
+    SELECT COUNT(*)::bigint AS count
+    FROM automation.v_labor_pool
+    WHERE 1=1
+      ${specialty ? pg`AND specialty = ${specialty}` : pg``}
+      ${zone ? pg`AND zone ILIKE ${"%" + zone + "%"}` : pg``}
+      ${mode ? pg`AND mode = ${mode}` : pg``}
+      ${status ? pg`AND status = ${status}` : pg``}
+      ${
+        search
+          ? pg`AND (worker_name ILIKE ${"%" + search + "%"}
+                OR lead_name ILIKE ${"%" + search + "%"}
+                OR profile_name ILIKE ${"%" + search + "%"})`
+          : pg``
+      }
+  `;
+  return toNum(rows[0]?.count);
+}
+
+export async function listLaborSpecialties(): Promise<string[]> {
+  const rows = await pg<{ specialty: string }[]>`
+    SELECT DISTINCT specialty FROM automation.labor_pool
+    WHERE specialty <> ''
+    ORDER BY specialty ASC
+  `;
+  return rows.map((r) => String(r.specialty));
 }

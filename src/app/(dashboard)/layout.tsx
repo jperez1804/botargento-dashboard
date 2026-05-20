@@ -11,6 +11,18 @@ const SETTINGS_NAV_ITEM: NavItemDef = {
   icon: "settings",
 };
 
+const PROVIDERS_NAV_ITEM: NavItemDef = {
+  href: "/providers",
+  label: "Proveedores",
+  icon: "providers",
+};
+
+const LABOR_POOL_NAV_ITEM: NavItemDef = {
+  href: "/labor-pool",
+  label: "Mano de obra",
+  icon: "labor-pool",
+};
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // The /proxy.ts guard already redirects unauthenticated requests, so this
   // session() call is a safe source of truth for user-facing chrome.
@@ -21,8 +33,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // click. The /settings page itself still calls requireRole("admin") so
   // direct URL access by a viewer redirects to /.
   const sessionRole = await getSessionRole();
+  const featureItems: NavItemDef[] = [
+    ...(vertical.features?.providersTab ? [PROVIDERS_NAV_ITEM] : []),
+    ...(vertical.features?.laborPoolTab ? [LABOR_POOL_NAV_ITEM] : []),
+  ];
   const navItems: ReadonlyArray<NavItemDef> =
-    sessionRole?.role === "admin" ? [...vertical.nav, SETTINGS_NAV_ITEM] : vertical.nav;
+    sessionRole?.role === "admin"
+      ? [...vertical.nav, ...featureItems, SETTINGS_NAV_ITEM]
+      : [...vertical.nav, ...featureItems];
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">

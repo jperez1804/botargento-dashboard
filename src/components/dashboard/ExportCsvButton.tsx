@@ -6,7 +6,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 type Props = {
-  endpoint: "/api/export/conversations" | "/api/export/daily-metrics";
+  endpoint:
+    | "/api/export/conversations"
+    | "/api/export/daily-metrics"
+    | "/api/export/providers"
+    | "/api/export/labor-pool";
   params?: Record<string, string | undefined>;
   label?: string;
 };
