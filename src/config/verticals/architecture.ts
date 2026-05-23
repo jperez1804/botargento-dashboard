@@ -76,14 +76,15 @@ export const architecture: VerticalConfig = {
     },
   ],
 
+  // Priority tiers from docs/plec-arquitectos/handoff-priority.md
   handoffTargets: [
-    { match: "architect", label: "Arquitectura" },
-    { match: "sales", label: "Comercial" },
-    { match: "technical", label: "Técnico" },
-    { match: "municipal", label: "Gestión municipal" },
-    { match: "development", label: "Desarrollos" },
-    { match: "purchasing", label: "Compras" },
-    { match: "hr", label: "RRHH / Obra" },
+    { match: "technical", label: "Técnico", priority: 1 },
+    { match: "development", label: "Desarrollos", priority: 2 },
+    { match: "architect", label: "Arquitectura", priority: 3 },
+    { match: "sales", label: "Comercial", priority: 3 },
+    { match: "municipal", label: "Gestión municipal", priority: 3 },
+    { match: "purchasing", label: "Compras", priority: 4 },
+    { match: "hr", label: "RRHH / Obra", priority: 4 },
   ],
 
   attribution: {

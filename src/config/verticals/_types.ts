@@ -48,10 +48,18 @@ export type KpiDef = {
   higherIsBetter: boolean;
 };
 
+// Tier of handoff urgency, used by /handoffs to badge + sort. Default 3 when
+// unset (qualified lead, < 24h SLA). See docs/plec-arquitectos/handoff-priority.md
+// for the operational matrix that anchors these values.
+export type HandoffPriority = 1 | 2 | 3 | 4;
+
 export type HandoffTargetDef = {
-  // Substring match against automation.escalations.target; first hit wins.
+  // Substring match against automation.escalations.handoff_target; first hit wins.
   match: string;
   label: string;
+  // Optional tier (1=urgent, 2=high value, 3=qualified default, 4=data capture).
+  // Omitted ⇒ treated as 3 by the dashboard renderer.
+  priority?: HandoffPriority;
 };
 
 // Mirror of IntentTouchMode in src/lib/queries/intents. Re-declared here so

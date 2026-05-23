@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/date";
 import { formatAutomationLabel } from "@/lib/automation-labels";
 import type { HandoffRow } from "@/lib/queries/handoffs";
-import type { HandoffTargetDef } from "@/config/verticals/_types";
+import type { HandoffPriority, HandoffTargetDef } from "@/config/verticals/_types";
 
 type Props = {
   data: ReadonlyArray<HandoffRow>;
@@ -33,17 +33,70 @@ type Props = {
   timezone: string;
 };
 
-function friendlyName(target: string, defs: ReadonlyArray<HandoffTargetDef>): string {
+function resolveTarget(
+  target: string,
+  defs: ReadonlyArray<HandoffTargetDef>,
+): HandoffTargetDef | undefined {
   const lower = target.toLowerCase();
-  const hit = defs.find((d) => lower.includes(d.match.toLowerCase()));
+  return defs.find((d) => lower.includes(d.match.toLowerCase()));
+}
+
+function friendlyName(target: string, defs: ReadonlyArray<HandoffTargetDef>): string {
+  const hit = resolveTarget(target, defs);
   return hit?.label ?? formatAutomationLabel(target) ?? target;
 }
 
+function priorityOf(
+  target: string,
+  defs: ReadonlyArray<HandoffTargetDef>,
+): HandoffPriority {
+  return resolveTarget(target, defs)?.priority ?? 3;
+}
+
+const PRIORITY_LABEL: Record<HandoffPriority, string> = {
+  1: "Urgente",
+  2: "Alto valor",
+  3: "Calificado",
+  4: "Captura",
+};
+
+const PRIORITY_CLASS: Record<HandoffPriority, string> = {
+  1: "bg-red-100 text-red-800",
+  2: "bg-orange-100 text-orange-800",
+  3: "bg-blue-100 text-blue-800",
+  4: "bg-zinc-100 text-zinc-700",
+};
+
+function PriorityBadge({ priority }: { priority: HandoffPriority }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium tabular-nums",
+        PRIORITY_CLASS[priority],
+      )}
+      title={`Tier ${priority} — ${PRIORITY_LABEL[priority]}`}
+    >
+      T{priority} · {PRIORITY_LABEL[priority]}
+    </span>
+  );
+}
+
 export function HandoffsTable({ data, targets, locale, timezone }: Props) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: "createdAt", desc: true }]);
+  // Default: tier ascending (urgent first), then most recent first within tier.
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "priority", desc: false },
+    { id: "createdAt", desc: true },
+  ]);
 
   const columns = useMemo<ColumnDef<HandoffRow>[]>(
     () => [
+      {
+        id: "priority",
+        accessorFn: (r) => priorityOf(r.target, targets),
+        header: "Prioridad",
+        cell: (ctx) => <PriorityBadge priority={ctx.getValue() as HandoffPriority} />,
+        sortingFn: "basic",
+      },
       {
         accessorKey: "createdAt",
         header: "Fecha",
