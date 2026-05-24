@@ -1,3 +1,5 @@
+import { verticalConfig } from "@/config/verticals";
+
 const AUTOMATION_LABELS: Record<string, string> = {
   sales_lead: "Consulta por compra",
   rental_lead: "Consulta por alquiler",
@@ -82,13 +84,38 @@ export function formatAutomationLabel(value: string | null | undefined): string 
   return AUTOMATION_LABELS[normalizeAutomationToken(trimmed)] ?? trimmed;
 }
 
+// Built lazily on first call from the active vertical config so verticals that
+// declare their raw-token → bucket-label mapping inline (intent.key = raw token,
+// intent.label = display bucket — e.g. architecture.ts) bucket correctly
+// without having to re-declare each token in the hardcoded maps above.
+// real-estate.ts uses intent.key = bucket name; the entries this builder
+// produces for it (`ventas → Ventas`, etc.) are redundant with
+// INTENT_BUCKET_LABELS, which is harmless.
+let verticalIntentBucketMap: Record<string, string> | null = null;
+function getVerticalIntentBucketMap(): Record<string, string> {
+  if (verticalIntentBucketMap) return verticalIntentBucketMap;
+  const map: Record<string, string> = {};
+  try {
+    for (const intent of verticalConfig().intents) {
+      map[normalizeAutomationToken(intent.key)] = intent.label;
+    }
+  } catch {
+    // Env not configured (e.g. unit tests that don't set TENANT_DB_URL).
+    // Fall back to hardcoded maps only — preserves legacy real-estate behavior.
+  }
+  verticalIntentBucketMap = map;
+  return map;
+}
+
 /**
  * Business KPI bucket for intent charts. Unknown raw automation values are grouped
  * under "Otras". Lookup order:
  *   1. INTENT_BUCKET_OVERRIDES — folds operator-friendly token families into
  *      their canonical chart bucket (e.g. owners* → "Administracion").
- *   2. INTENT_BUCKET_LABELS — direct bucket-name lookup (e.g. "ventas" → "Ventas").
- *   3. "Otras" — anything we don't recognize.
+ *   2. Active vertical config — intent.key (raw token) → intent.label (bucket).
+ *      Lets verticals declare their own mappings inline instead of editing this file.
+ *   3. INTENT_BUCKET_LABELS — direct bucket-name lookup (e.g. "ventas" → "Ventas").
+ *   4. "Otras" — anything we don't recognize.
  *
  * AUTOMATION_LABELS is intentionally NOT consulted here — that map drives
  * operator-facing display strings (table rows, follow-up reasons), which
@@ -104,6 +131,9 @@ export function formatBusinessIntentLabel(value: string | null | undefined): str
   if (EXCLUDED_INTENT_BUCKETS.has(normalized)) return null;
 
   return (
-    INTENT_BUCKET_OVERRIDES[normalized] ?? INTENT_BUCKET_LABELS[normalized] ?? "Otras"
+    INTENT_BUCKET_OVERRIDES[normalized] ??
+    getVerticalIntentBucketMap()[normalized] ??
+    INTENT_BUCKET_LABELS[normalized] ??
+    "Otras"
   );
 }
