@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ContactRowActions } from "@/components/dashboard/ContactRowActions";
 import { formatDateTime } from "@/lib/date";
 import type { LaborPoolRow } from "@/db/views";
 
@@ -15,6 +16,7 @@ type Props = {
   rows: ReadonlyArray<LaborPoolRow>;
   locale: string;
   timezone: string;
+  brandName: string;
   page: number;
   pageSize: number;
   total: number;
@@ -42,6 +44,7 @@ export function LaborPoolTable({
   rows,
   locale,
   timezone,
+  brandName,
   page,
   pageSize,
   total,
@@ -84,6 +87,9 @@ export function LaborPoolTable({
               <TableHead className="text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide">
                 Estado
               </TableHead>
+              <TableHead className="text-right text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide">
+                Acciones
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -111,6 +117,14 @@ export function LaborPoolTable({
                     >
                       {STATUS_LABEL[r.status] ?? r.status}
                     </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <ContactRowActions
+                      contactWaId={r.contact_wa_id}
+                      displayName={displayName}
+                      brandName={brandName}
+                      context="labor"
+                    />
                   </TableCell>
                 </TableRow>
               );

@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ContactRowActions } from "@/components/dashboard/ContactRowActions";
 import { formatDateTime } from "@/lib/date";
 import type { ProviderRow } from "@/db/views";
 
@@ -15,6 +16,7 @@ type Props = {
   rows: ReadonlyArray<ProviderRow>;
   locale: string;
   timezone: string;
+  brandName: string;
   page: number;
   pageSize: number;
   total: number;
@@ -37,6 +39,7 @@ export function ProvidersTable({
   rows,
   locale,
   timezone,
+  brandName,
   page,
   pageSize,
   total,
@@ -76,6 +79,9 @@ export function ProvidersTable({
               <TableHead className="text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide">
                 Estado
               </TableHead>
+              <TableHead className="text-right text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide">
+                Acciones
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -109,6 +115,14 @@ export function ProvidersTable({
                     >
                       {STATUS_LABEL[r.status] ?? r.status}
                     </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <ContactRowActions
+                      contactWaId={r.contact_wa_id}
+                      displayName={displayName}
+                      brandName={brandName}
+                      context="provider"
+                    />
                   </TableCell>
                 </TableRow>
               );

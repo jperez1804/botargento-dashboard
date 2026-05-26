@@ -76,6 +76,7 @@ export default async function ProvidersPage({ searchParams }: Props) {
         rows={rows}
         locale={tenant.locale}
         timezone={tenant.timezone}
+        brandName={tenant.name}
         page={pageNum}
         pageSize={PAGE_SIZE}
         total={total}
