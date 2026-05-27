@@ -53,8 +53,6 @@ export const architecture: VerticalConfig = {
         "guided_desarrollo_zona_handoff",
         "guided_desarrollo_desarrollar_handoff",
         "guided_desarrollo_asociarse_handoff",
-        "guided_desarrollo_comprar_handoff",
-        "guided_desarrollo_comprar_no_inventory",
       ],
     },
     {
@@ -77,12 +75,15 @@ export const architecture: VerticalConfig = {
   ],
 
   // Priority tiers from docs/plec-arquitectos/handoff-priority.md
+  // (Updated 2026-05-27 — see §5.4 changelog: architect/development/municipal
+  // promoted to T1, technical/sales bundled at T2, T3 reserved as default
+  // fallback.)
   handoffTargets: [
-    { match: "technical", label: "Técnico", priority: 1 },
-    { match: "development", label: "Desarrollos", priority: 2 },
-    { match: "architect", label: "Arquitectura", priority: 3 },
-    { match: "sales", label: "Comercial", priority: 3 },
-    { match: "municipal", label: "Gestión municipal", priority: 3 },
+    { match: "architect", label: "Arquitectura", priority: 1 },
+    { match: "development", label: "Desarrollos", priority: 1 },
+    { match: "municipal", label: "Gestión municipal", priority: 1 },
+    { match: "technical", label: "Técnico", priority: 2 },
+    { match: "sales", label: "Comercial", priority: 2 },
     { match: "purchasing", label: "Compras", priority: 4 },
     { match: "hr", label: "RRHH / Obra", priority: 4 },
   ],
