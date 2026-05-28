@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ColorPicker } from "@/components/dashboard/ColorPicker";
 import { getAppSettings } from "@/lib/queries/app-settings";
 import { requireRole } from "@/lib/role-guard";
@@ -11,27 +11,42 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-semibold leading-tight">Configuración</h1>
-        <p className="text-sm text-[var(--muted-ink)]">
-          Ajustes operativos del panel. Los cambios se aplican a todos los usuarios del tenant y
-          quedan registrados en la bitácora de auditoría.
+      {/* Page header — mirrors the Derivaciones + overview masthead pattern. */}
+      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
+          Administración
         </p>
-      </div>
-
-      <Card className="ring-1 ring-black/5">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">Color de marca</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-[var(--muted-ink)]">
-            Acento principal del panel. Se aplica al gráfico de volumen, al mapa de demanda por
-            hora, a las insignias y a los enlaces activos. La vista previa se actualiza al
-            instante; los cambios se guardan al confirmar.
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
+            Configuración
+          </h1>
+          <p className="text-[13px] text-[var(--muted-ink)]">
+            Los cambios se aplican a todo el tenant y quedan registrados en la bitácora de auditoría.
           </p>
-          <ColorPicker defaultValue={settings.primaryColor} />
-        </CardContent>
-      </Card>
+        </div>
+      </header>
+
+      <section className="space-y-3">
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">
+            Marca
+          </p>
+          <h2 className="text-[17px] leading-tight tracking-[-0.015em] text-[var(--ink)] font-semibold">
+            Color de marca
+          </h2>
+          <p className="text-[13px] text-[var(--muted-ink)] max-w-[640px] leading-snug">
+            Acento principal del panel. Se aplica al rail de navegación activo,
+            al mapa de demanda, a la primera serie de los gráficos y al botón
+            principal. La vista previa se actualiza al instante; los cambios se
+            guardan al confirmar.
+          </p>
+        </div>
+        <Card>
+          <CardContent className="px-5 py-5">
+            <ColorPicker defaultValue={settings.primaryColor} />
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
