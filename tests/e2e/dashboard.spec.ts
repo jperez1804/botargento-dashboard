@@ -35,7 +35,7 @@ test("Overview renders KPI cards + both charts + follow-up preview", async ({ pa
   // attribution scope note, which mentions "Contactos por intención" +
   // "Intención líder" inside its body copy.
   const cardTitles = page.locator('[data-slot="card-title"]');
-  await expect(cardTitles.filter({ hasText: "Volumen de mensajes" })).toBeVisible();
+  await expect(cardTitles.filter({ hasText: "Mensajes entrantes y salientes" })).toBeVisible();
   await expect(cardTitles.filter({ hasText: "Contactos por intención" })).toBeVisible();
   await expect(cardTitles.filter({ hasText: "Volumen por intención" })).toBeVisible();
   await expect(page.getByText(/Demanda por hora/)).toBeVisible();
