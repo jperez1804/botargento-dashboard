@@ -19,27 +19,31 @@ function friendlyName(target: string, defs: ReadonlyArray<HandoffTargetDef>): st
 export function HandoffSummaryCards({ rows, targets, locale }: Props) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-6 text-sm text-[var(--muted-ink)]">
+      <div className="rounded-xl border border-[var(--rule)] bg-[var(--surface)] p-6 text-sm text-[var(--muted-ink)]">
         No hay derivaciones registradas todavía.
       </div>
     );
   }
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       {rows.map((row) => (
         <Card key={row.target}>
-          <CardContent className="px-5 py-4 space-y-2">
-            <div className="text-[10px] font-medium text-[var(--muted-ink)] uppercase tracking-[0.14em] font-[var(--font-geist-mono)] truncate">
+          <CardContent className="px-5 py-4 flex flex-col gap-1.5 min-w-0">
+            {/* Same caption treatment as KpiCard — 11 px uppercase soft-ink. */}
+            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] truncate">
               {friendlyName(row.target, targets)}
             </div>
-            <div className="flex items-baseline gap-3">
-              <div className="text-[32px] leading-none font-semibold tabular-nums font-[var(--font-fraunces)] tracking-tight text-[var(--ink)]">
+            <div className="flex items-baseline gap-2">
+              <span
+                className={`text-[26px] font-semibold tabular-nums tracking-[-0.02em] leading-[1.1] ${
+                  row.count_24h > 0 ? "text-[var(--ink)]" : "text-[var(--faint-ink)]"
+                }`}
+              >
                 {formatNumber(row.count_24h, locale)}
-              </div>
-              <div className="text-xs text-[var(--muted-ink)]">en las últimas 24h</div>
-            </div>
-            <div className="text-xs text-[var(--soft-ink)] tabular-nums">
-              {formatNumber(row.count_all_time, locale)} en total
+              </span>
+              <span className="text-[12px] text-[var(--soft-ink)] tabular-nums">
+                de {formatNumber(row.count_all_time, locale)} totales
+              </span>
             </div>
           </CardContent>
         </Card>

@@ -127,14 +127,14 @@ export function ColorPicker({ defaultValue }: Props) {
                 "w-28 rounded-md border bg-transparent px-2 py-1 font-[var(--font-geist-mono)] text-sm uppercase tracking-wide outline-none",
                 isValid
                   ? "border-[var(--rule)] focus:border-[var(--client-primary)]"
-                  : "border-[var(--bad)] text-[var(--bad)]",
+                  : "border-[var(--danger)] text-[var(--danger)]",
               )}
               aria-invalid={!isValid}
             />
           </div>
         </div>
         {!isValid ? (
-          <p className="mt-2 text-xs text-[var(--bad)]">
+          <p className="mt-2 text-xs text-[var(--danger)]">
             Formato inválido — usar #rrggbb (6 dígitos hexadecimales).
           </p>
         ) : null}
