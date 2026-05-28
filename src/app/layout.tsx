@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { connection } from "next/server";
 import { env } from "@/lib/env";
 import { tenantConfig } from "@/config/tenant";
@@ -10,16 +10,6 @@ import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-// Display serif used for page mastheads, section headers, and hero KPI values.
-// Variable axes give us SOFT (curve roundness) and opsz (optical-size) so the
-// big mastheads can use the high-contrast display cut while smaller section
-// headers stay readable.
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  axes: ["SOFT", "opsz"],
-  display: "swap",
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -47,7 +37,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html
       lang={tenant.locale.split("-")[0] ?? "es"}
-      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[var(--canvas)] text-[var(--ink)]" style={brandStyle}>
         {children}
