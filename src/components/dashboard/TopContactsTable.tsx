@@ -1,20 +1,12 @@
 // Server component — table is purely presentational. Pagination is driven
 // by URL search params (read by the page, materialized as ?page=N links here).
 
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { MessageSquare } from "lucide-react";
+import { DataTable, type DataTableColumn } from "@/components/dashboard/DataTable";
 import { formatDateTime } from "@/lib/date";
 import { formatNumber } from "@/lib/format";
 import { formatAutomationLabel } from "@/lib/automation-labels";
+import { cn } from "@/lib/utils";
 import type { ContactSummary } from "@/lib/queries/contacts";
 import type { IntentDef } from "@/config/verticals/_types";
 
@@ -35,12 +27,6 @@ function intentLabel(value: string | null, intents: ReadonlyArray<IntentDef>): s
   return hit?.label ?? formatAutomationLabel(value) ?? value;
 }
 
-function intentColor(value: string | null, intents: ReadonlyArray<IntentDef>): string {
-  if (!value) return "#94a3b8";
-  const hit = intents.find((i) => i.key.toLowerCase() === value.toLowerCase());
-  return hit?.color ?? "#94a3b8";
-}
-
 export function TopContactsTable({
   rows,
   intents,
@@ -51,138 +37,103 @@ export function TopContactsTable({
   total,
   buildPageHref,
 }: Props) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = Math.min(total, page * pageSize);
-
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-6 text-sm text-[var(--muted-ink)]">
-        No hay conversaciones en este rango.
-      </div>
-    );
-  }
+  const columns: ReadonlyArray<DataTableColumn<ContactSummary>> = [
+    {
+      id: "contact",
+      header: "Contacto",
+      width: "minmax(0, 1.6fr)",
+      cell: (r) => (
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-semibold tracking-[-0.005em] text-[var(--ink)] truncate">
+            {r.displayName ?? r.contactWaId}
+          </div>
+          {r.displayName ? (
+            <div className="text-[12px] text-[var(--soft-ink)] truncate font-[var(--font-geist-mono)]">
+              {r.contactWaId}
+            </div>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: "intent",
+      header: "Última intención",
+      width: "minmax(0, 1fr)",
+      cell: (r) => {
+        const intent = intentLabel(r.lastIntent, intents);
+        return intent ? (
+          // Last-intent uses an info-toned pill — informational, not a
+          // status. Tier semantics are reserved for Derivaciones priorities.
+          <span className="inline-flex items-center gap-1.5 h-[22px] px-2 rounded-full bg-[var(--info-soft)] text-[var(--info)] text-[11.5px] font-medium">
+            <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+            {intent}
+          </span>
+        ) : (
+          <span className="text-[var(--soft-ink)]">—</span>
+        );
+      },
+    },
+    {
+      id: "messages",
+      header: "Mensajes",
+      width: "110px",
+      align: "right",
+      cell: (r) => (
+        <span className="tabular-nums text-[13.5px] text-[var(--ink)]">
+          {formatNumber(r.messageCount, locale)}
+        </span>
+      ),
+    },
+    {
+      id: "handoffs",
+      header: "Derivaciones",
+      width: "130px",
+      align: "right",
+      cell: (r) => (
+        <span
+          className={cn(
+            "tabular-nums text-[13.5px]",
+            r.handoffCount > 0 ? "text-[var(--ink)]" : "text-[var(--faint-ink)]",
+          )}
+        >
+          {formatNumber(r.handoffCount, locale)}
+        </span>
+      ),
+    },
+    {
+      id: "last",
+      header: "Último contacto",
+      width: "170px",
+      cell: (r) => (
+        <span className="tabular-nums text-[12.5px] text-[var(--muted-ink)] whitespace-nowrap">
+          {formatDateTime(r.lastSeen, locale, timezone)}
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] overflow-hidden">
-      <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide">
-              Contacto
-            </TableHead>
-            <TableHead className="text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide">
-              Última intención
-            </TableHead>
-            <TableHead className="text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide text-right">
-              Mensajes
-            </TableHead>
-            <TableHead className="text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide text-right">
-              Derivaciones
-            </TableHead>
-            <TableHead className="text-xs font-medium text-[var(--muted-ink)] uppercase tracking-wide">
-              Último contacto
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => {
-            const intent = intentLabel(row.lastIntent, intents);
-            const color = intentColor(row.lastIntent, intents);
-            return (
-              <TableRow key={row.contactWaId} className="text-[13px]">
-                <TableCell>
-                  <Link
-                    href={`/conversations/${row.contactWaId}`}
-                    className="block min-w-0 hover:text-[var(--client-primary)]"
-                  >
-                    <div className="font-medium text-[var(--ink)] truncate">
-                      {row.displayName ?? row.contactWaId}
-                    </div>
-                    {row.displayName && (
-                      <div className="text-xs text-[var(--soft-ink)] truncate">{row.contactWaId}</div>
-                    )}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  {intent ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs"
-                      style={{ background: `${color}1F`, color }}
-                    >
-                      <span
-                        className="size-1.5 rounded-full"
-                        style={{ background: color }}
-                        aria-hidden="true"
-                      />
-                      {intent}
-                    </span>
-                  ) : (
-                    <span className="text-[var(--soft-ink)]">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatNumber(row.messageCount, locale)}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "text-right tabular-nums",
-                    row.handoffCount > 0 ? "text-[var(--ink)]" : "text-[var(--soft-ink)]",
-                  )}
-                >
-                  {formatNumber(row.handoffCount, locale)}
-                </TableCell>
-                <TableCell className="tabular-nums whitespace-nowrap">
-                  {formatDateTime(row.lastSeen, locale, timezone)}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-      </div>
-      <div className="flex items-center justify-between border-t border-[var(--rule)] px-4 py-2 text-xs text-[var(--muted-ink)]">
-        <div>
-          Mostrando {formatNumber(start, locale)}–{formatNumber(end, locale)} de{" "}
-          {formatNumber(total, locale)}
-        </div>
-        <div className="flex items-center gap-1">
-          {page <= 1 ? (
-            <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--soft-ink)] opacity-50">
-              <ChevronLeft className="size-4" />
-              <span className="sr-only">Anterior</span>
-            </span>
-          ) : (
-            <Link
-              href={buildPageHref(page - 1)}
-              prefetch={false}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-[var(--canvas)] text-[var(--ink)]"
-            >
-              <ChevronLeft className="size-4" />
-              <span className="sr-only">Anterior</span>
-            </Link>
-          )}
-          <span className="px-2 self-center tabular-nums">
-            {page} / {totalPages}
-          </span>
-          {page >= totalPages ? (
-            <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--soft-ink)] opacity-50">
-              <ChevronRight className="size-4" />
-              <span className="sr-only">Siguiente</span>
-            </span>
-          ) : (
-            <Link
-              href={buildPageHref(page + 1)}
-              prefetch={false}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-[var(--canvas)] text-[var(--ink)]"
-            >
-              <ChevronRight className="size-4" />
-              <span className="sr-only">Siguiente</span>
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
+    <DataTable
+      columns={columns}
+      rows={rows}
+      rowKey={(r) => r.contactWaId}
+      rowHref={(r) => `/conversations/${r.contactWaId}`}
+      rowAriaLabel={(r) =>
+        `Abrir conversación con ${r.displayName ?? r.contactWaId}`
+      }
+      empty={{
+        icon: <MessageSquare className="size-[18px]" />,
+        title: "Sin conversaciones en este rango",
+        body: "Probá ampliar el rango de fechas o quitar la búsqueda actual.",
+      }}
+      pagination={{
+        page,
+        pageSize,
+        total,
+        buildPageHref,
+        locale,
+        rowsLabel: { singular: "contacto", plural: "contactos" },
+      }}
+    />
   );
 }

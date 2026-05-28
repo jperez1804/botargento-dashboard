@@ -56,19 +56,25 @@ export default async function ProvidersPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-[28px] font-semibold leading-tight">Proveedores</h1>
-          <p className="text-sm text-[#6b7280]">
-            Directorio de proveedores dados de alta vía WhatsApp.{" "}
-            {formatNumber(total, tenant.locale)} en total.
-          </p>
+      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
+          Directorio
+        </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
+            Proveedores
+          </h1>
+          <div className="flex items-center gap-3">
+            <p className="text-[13px] text-[var(--muted-ink)]">
+              Dados de alta vía WhatsApp · {formatNumber(total, tenant.locale)} en total
+            </p>
+            <ExportCsvButton
+              endpoint="/api/export/providers"
+              params={{ search, category, zone, status }}
+            />
+          </div>
         </div>
-        <ExportCsvButton
-          endpoint="/api/export/providers"
-          params={{ search, category, zone, status }}
-        />
-      </div>
+      </header>
 
       <ProvidersFilters categories={categories} />
 
