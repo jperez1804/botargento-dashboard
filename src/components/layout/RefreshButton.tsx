@@ -22,6 +22,7 @@ export function RefreshButton() {
       }
       disabled={pending}
       aria-label="Actualizar datos"
+      className="text-[var(--muted-ink)] hover:text-[var(--ink)]"
     >
       <RefreshCw className={pending ? "size-4 animate-spin" : "size-4"} />
       <span className="sr-only sm:not-sr-only sm:ml-2">Actualizar</span>

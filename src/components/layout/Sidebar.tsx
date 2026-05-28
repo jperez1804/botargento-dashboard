@@ -41,7 +41,7 @@ export function Sidebar({ items }: SidebarProps) {
   return (
     <nav
       aria-label="Navegación principal"
-      className="hidden md:flex w-[240px] shrink-0 flex-col gap-1 border-r border-[var(--rule)] bg-[var(--surface)] px-3 py-4"
+      className="hidden md:flex w-[232px] shrink-0 flex-col gap-px border-r border-[var(--rule)] bg-[var(--surface)] px-3 py-4"
     >
       {items.map(({ href, label, icon }) => {
         const Icon = ICON_MAP[icon];
@@ -50,15 +50,27 @@ export function Sidebar({ items }: SidebarProps) {
           <Link
             key={href}
             href={href}
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "group/nav relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+              // Operator-console nav item. Active state: brand-color 2px
+              // rail flush with the sidebar's outer left edge + bold ink
+              // text + raised canvas-2 fill. NO brand-tinted text — the
+              // rail is the single signal that this section is current.
+              "group/nav relative flex items-center gap-2.5 rounded-md px-2.5 h-8 text-[13.5px] transition-colors",
+              "focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2",
               active
-                ? "bg-[var(--client-primary)]/10 text-[var(--client-primary)] font-medium before:content-[''] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:bg-[var(--client-primary)] before:rounded-full"
-                : "text-[var(--ink)] hover:bg-[var(--canvas)]",
+                ? "bg-[var(--canvas-2)] text-[var(--ink)] font-semibold before:content-[''] before:absolute before:left-[-12px] before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-r-sm before:bg-[var(--client-primary)]"
+                : "text-[var(--muted-ink)] font-medium hover:bg-[var(--canvas-2)] hover:text-[var(--ink)]",
             )}
           >
-            <Icon className="size-4 shrink-0" aria-hidden="true" />
-            <span>{label}</span>
+            <Icon
+              className={cn(
+                "size-4 shrink-0",
+                active ? "text-[var(--ink)]" : "text-[var(--soft-ink)] group-hover/nav:text-[var(--ink)]",
+              )}
+              aria-hidden="true"
+            />
+            <span className="truncate">{label}</span>
           </Link>
         );
       })}

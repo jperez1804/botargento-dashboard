@@ -80,7 +80,7 @@ export function MobileNav({ items }: Props) {
           />
           <nav
             aria-label="Navegación móvil"
-            className="absolute left-0 top-0 bottom-0 w-[260px] bg-[var(--surface)] border-r border-[var(--rule)] p-3 flex flex-col gap-1"
+            className="absolute left-0 top-0 bottom-0 w-[260px] bg-[var(--surface)] border-r border-[var(--rule)] p-3 flex flex-col gap-px"
           >
             <div className="flex justify-end">
               <Button
@@ -100,15 +100,24 @@ export function MobileNav({ items }: Props) {
                 <Link
                   key={href}
                   href={href}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                    // Same treatment as the desktop sidebar nav item.
+                    "group/mnav relative flex items-center gap-2.5 rounded-md px-2.5 h-9 text-[13.5px] transition-colors",
+                    "focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2",
                     active
-                      ? "bg-[var(--client-primary)]/10 text-[var(--client-primary)] font-medium"
-                      : "text-[var(--ink)] hover:bg-[var(--canvas)]",
+                      ? "bg-[var(--canvas-2)] text-[var(--ink)] font-semibold before:content-[''] before:absolute before:left-[-12px] before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-r-sm before:bg-[var(--client-primary)]"
+                      : "text-[var(--muted-ink)] font-medium hover:bg-[var(--canvas-2)] hover:text-[var(--ink)]",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" aria-hidden="true" />
-                  <span>{label}</span>
+                  <Icon
+                    className={cn(
+                      "size-4 shrink-0",
+                      active ? "text-[var(--ink)]" : "text-[var(--soft-ink)] group-hover/mnav:text-[var(--ink)]",
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">{label}</span>
                 </Link>
               );
             })}
