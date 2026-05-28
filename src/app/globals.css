@@ -10,7 +10,7 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
-  --font-display: var(--font-fraunces);
+  --font-display: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -19,6 +19,7 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-chart-6: var(--chart-6);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -50,88 +51,166 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* shadcn base tokens — values aligned with the BotArgento token contract
+   * below so shadcn components inherit the operator-console palette by
+   * default. The --ink / --rule / --surface / etc. tokens are the
+   * single source of truth; what follows mirrors them into the names
+   * shadcn primitives expect. */
+  --background: oklch(0.985 0.003 90);
+  --foreground: oklch(0.22 0.014 270);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.22 0.014 270);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.22 0.014 270);
+  --primary: oklch(0.22 0.014 270);
+  --primary-foreground: oklch(0.985 0.003 90);
+  --secondary: oklch(0.96 0.003 270);
+  --secondary-foreground: oklch(0.22 0.014 270);
+  --muted: oklch(0.96 0.003 270);
+  --muted-foreground: oklch(0.45 0.010 270);
+  --accent: oklch(0.96 0.003 270);
+  --accent-foreground: oklch(0.22 0.014 270);
+  --destructive: oklch(0.58 0.18 25);
+  --border: oklch(0.92 0.005 90);
+  --input: oklch(0.86 0.006 90);
+  --ring: oklch(0.74 0.005 270);
 
-  /* ── Reserved Operations design tokens ────────────────────────────────────
-   * These supersede the hardcoded hex values that were leaking across
-   * dashboard components. Keep new feature work pointed at THESE vars rather
-   * than introducing new hex values. The brand accent (--client-primary) is
-   * injected by src/app/layout.tsx from getAppSettings() at request time.
+  /* Categorical chart palette — series 1 = tenant brand (--client-primary),
+   * series 2..6 = locked oklch sequence tuned to hold AA contrast on both
+   * --surface and dark --surface. DO NOT introduce new ad-hoc chart colors;
+   * use this sequence in rank order. */
+  --chart-1: var(--client-primary);
+  --chart-2: oklch(0.62 0.12 215);  /* teal-blue */
+  --chart-3: oklch(0.55 0.16 285);  /* indigo */
+  --chart-4: oklch(0.62 0.17 350);  /* magenta */
+  --chart-5: oklch(0.62 0.12 160);  /* green */
+  --chart-6: oklch(0.70 0.12 55);   /* amber */
+
+  --radius: 0.625rem;
+
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.22 0.014 270);
+  --sidebar-primary: oklch(0.22 0.014 270);
+  --sidebar-primary-foreground: oklch(0.985 0.003 90);
+  --sidebar-accent: oklch(0.975 0.004 90);
+  --sidebar-accent-foreground: oklch(0.22 0.014 270);
+  --sidebar-border: oklch(0.92 0.005 90);
+  --sidebar-ring: oklch(0.74 0.005 270);
+
+  /* ── BotArgento operator-console tokens ────────────────────────────────
+   * Single source of truth for surface, ink, rule, and semantic color.
+   * Values are oklch — perceptually-uniform, mixable in CSS via
+   * color-mix(). Brand accent (--client-primary) is injected inline by
+   * src/app/layout.tsx from getAppSettings() per request. THIS file
+   * declares the contract; layout.tsx supplies the live value.
    */
-  --client-primary: #3b82f6;            /* fallback only — overridden inline by layout */
-  --ink: #111827;                        /* primary text */
-  --muted-ink: #6b7280;                  /* secondary text */
-  --soft-ink: #9ca3af;                   /* tertiary captions */
-  --rule: #e5e7eb;                       /* hairline borders */
-  --surface: #ffffff;                    /* card backgrounds */
-  --canvas: #fafafa;                     /* page background */
-  --good: #059669;                       /* positive deltas */
-  --bad: #dc2626;                        /* negative deltas */
+
+  /* Tenant brand (fallback — overridden inline by layout.tsx) */
+  --client-primary: oklch(0.55 0.18 260);
+
+  /* Surfaces */
+  --canvas:        oklch(0.985 0.003 90);
+  --canvas-2:      oklch(0.975 0.004 90);   /* nested / hover surface */
+  --surface:       oklch(1 0 0);
+  --surface-2:     oklch(0.988 0.003 90);   /* table header band */
+  --rule:          oklch(0.92 0.005 90);
+  --rule-strong:   oklch(0.86 0.006 90);    /* input border, divider */
+
+  /* Ink (text) — light → dark scale */
+  --ink:           oklch(0.22 0.014 270);
+  --muted-ink:     oklch(0.45 0.010 270);
+  --soft-ink:      oklch(0.60 0.008 270);
+  --faint-ink:     oklch(0.74 0.006 270);   /* placeholder, zero-values */
+
+  /* Semantic — small chroma so they coexist with --client-primary
+   * without competing. Each pair: -soft is the chip/banner background,
+   * the base is the text/icon color. */
+  --positive:      oklch(0.58 0.13 150);
+  --positive-soft: oklch(0.95 0.04 150);
+  --warning:       oklch(0.70 0.13 75);
+  --warning-soft:  oklch(0.96 0.05 75);
+  --danger:        oklch(0.58 0.18 25);
+  --danger-soft:   oklch(0.96 0.04 25);
+  --info:          oklch(0.60 0.13 240);
+  --info-soft:     oklch(0.96 0.03 240);
+  --neutral-soft:  oklch(0.96 0.003 270);
+
+  /* Deprecated aliases — kept for one PR cycle. New code should use
+   * --positive / --danger directly. Will be removed in a follow-up. */
+  --good:          var(--positive);
+  --bad:           var(--danger);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* shadcn base tokens — dark variants aligned to BotArgento dark tokens. */
+  --background: oklch(0.155 0.006 270);
+  --foreground: oklch(0.97 0.003 270);
+  --card: oklch(0.205 0.006 270);
+  --card-foreground: oklch(0.97 0.003 270);
+  --popover: oklch(0.205 0.006 270);
+  --popover-foreground: oklch(0.97 0.003 270);
+  --primary: oklch(0.97 0.003 270);
+  --primary-foreground: oklch(0.22 0.014 270);
+  --secondary: oklch(0.27 0.006 270);
+  --secondary-foreground: oklch(0.97 0.003 270);
+  --muted: oklch(0.27 0.006 270);
+  --muted-foreground: oklch(0.74 0.005 270);
+  --accent: oklch(0.27 0.006 270);
+  --accent-foreground: oklch(0.97 0.003 270);
+  --destructive: oklch(0.72 0.18 25);
+  --border: oklch(0.30 0.008 270);
+  --input: oklch(0.40 0.009 270);
+  --ring: oklch(0.58 0.007 270);
+
+  --chart-1: var(--client-primary);
+  --chart-2: oklch(0.72 0.13 215);
+  --chart-3: oklch(0.68 0.16 285);
+  --chart-4: oklch(0.72 0.17 350);
+  --chart-5: oklch(0.74 0.13 160);
+  --chart-6: oklch(0.78 0.13 55);
+
+  --sidebar: oklch(0.205 0.006 270);
+  --sidebar-foreground: oklch(0.97 0.003 270);
+  --sidebar-primary: oklch(0.97 0.003 270);
+  --sidebar-primary-foreground: oklch(0.22 0.014 270);
+  --sidebar-accent: oklch(0.235 0.007 270);
+  --sidebar-accent-foreground: oklch(0.97 0.003 270);
+  --sidebar-border: oklch(0.30 0.008 270);
+  --sidebar-ring: oklch(0.58 0.007 270);
+
+  /* ── BotArgento operator-console tokens · dark mode ─────────────────
+   * Mirrors the :root contract. Previously absent — meaning any dark
+   * context (system-level prefers-color-scheme: dark inside iframes /
+   * embeds, or the .dark class toggled by a theme switcher) rendered
+   * with light-mode --ink on a dark background. Fixes that.
+   */
+  --canvas:        oklch(0.155 0.006 270);
+  --canvas-2:      oklch(0.185 0.006 270);
+  --surface:       oklch(0.205 0.006 270);
+  --surface-2:     oklch(0.235 0.007 270);
+  --rule:          oklch(0.30 0.008 270);
+  --rule-strong:   oklch(0.40 0.009 270);
+
+  --ink:           oklch(0.97 0.003 270);
+  --muted-ink:     oklch(0.74 0.005 270);
+  --soft-ink:      oklch(0.58 0.007 270);
+  --faint-ink:     oklch(0.42 0.008 270);
+
+  /* In dark mode, semantic foregrounds shift lighter so they read on
+   * --surface; the -soft chip backgrounds use color-mix() to derive a
+   * consistent tint of the same hue. */
+  --positive:      oklch(0.74 0.14 150);
+  --positive-soft: color-mix(in oklch, var(--positive) 18%, var(--surface));
+  --warning:       oklch(0.80 0.14 75);
+  --warning-soft:  color-mix(in oklch, var(--warning) 22%, var(--surface));
+  --danger:        oklch(0.72 0.18 25);
+  --danger-soft:   color-mix(in oklch, var(--danger) 22%, var(--surface));
+  --info:          oklch(0.74 0.13 240);
+  --info-soft:     color-mix(in oklch, var(--info) 22%, var(--surface));
+  --neutral-soft:  oklch(0.27 0.006 270);
+
+  --good:          var(--positive);
+  --bad:           var(--danger);
 }
 
 @layer base {
@@ -140,18 +219,13 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Paper-grain texture: inline SVG turbulence at ~3% opacity. ~600 bytes,
-     * no asset request. Sits beneath every page and gives the canvas a faint
-     * editorial paper grain. */
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.04 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-    background-repeat: repeat;
   }
   html {
     @apply font-sans;
   }
 }
 
-/* ── Reserved Operations: page-load reveal ────────────────────────────────
+/* ── BotArgento: page-load reveal ────────────────────────────────────────
  * Each top-level section on a page can opt-in via `data-reveal` and stagger
  * itself with `style={{ "--reveal-delay": "120ms" }}`. The reveal is one
  * orchestrated entrance — opacity + a small lift — so the page settles in
