@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -18,7 +18,26 @@ import { normalizeAutomationToken } from "@/lib/automation-labels";
 import type { IntentCount, IntentHandoffRate } from "@/lib/queries/intents";
 import type { IntentDef } from "@/config/verticals/_types";
 
-const FALLBACK_COLOR = "#94a3b8";
+// Locked categorical palette — fills are CSS variables that resolve at
+// render time, so per-tenant brand changes (chart-1 = client primary) and
+// dark mode (each chart-N has a dark variant) propagate without code
+// changes here.
+const CHART_PALETTE: ReadonlyArray<string> = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+];
+
+// Catch-all / "Otras" buckets and dynamic (unconfigured) labels render
+// in soft-ink — visually "the rest", not a competing intent. Detect by
+// the canonical key; tenants that name their catch-all differently can
+// still tag it by using one of these tokens as the intent key.
+const CATCH_ALL_KEYS = new Set(["otras", "otros", "other", "others"]);
+const OTRAS_COLOR = "var(--soft-ink)";
+
 const HANDOFF_RATE_TOLERANCE = 0.1;
 
 type Props = {
@@ -70,13 +89,22 @@ function chipToneFor(rate: number, desired: number | undefined): HandoffChipTone
   return "bad";
 }
 
-// Chip classes now use the semantic --positive / --danger / --neutral tokens.
-// Previously hardcoded hex values (#E6F4EA / #1B5E20 etc.) drifted from the
-// rest of the system and broke in dark mode.
 const CHIP_CLASSES: Record<HandoffChipTone, string> = {
   good: "bg-[var(--positive-soft)] text-[var(--positive)]",
   bad: "bg-[var(--danger-soft)] text-[var(--danger)]",
   neutral: "bg-[var(--neutral-soft)] text-[var(--muted-ink)]",
+};
+
+function isCatchAll(key: string, label: string): boolean {
+  return CATCH_ALL_KEYS.has(key.toLowerCase()) || CATCH_ALL_KEYS.has(label.toLowerCase());
+}
+
+type ChartRow = {
+  key: string;
+  label: string;
+  isDynamic: boolean;
+  count: number;
+  previousCount: number;
 };
 
 export function IntentsChart({
@@ -94,6 +122,7 @@ export function IntentsChart({
   engagementDensityNote,
 }: Props) {
   const [handoffDetailOpen, setHandoffDetailOpen] = useState(false);
+
   // Server data is already deduped into business labels. The chart only folds
   // labels that match configured vertical buckets and leaves new labels visible.
   const byKey = new Map<string, IntentDef>();
@@ -134,18 +163,18 @@ export function IntentsChart({
     }
   }
 
-  const chartData = [
+  const chartData: ReadonlyArray<ChartRow> = [
     ...intents.map((def) => ({
       key: def.key,
       label: def.label,
-      color: def.color,
+      isDynamic: false,
       count: counts.get(def.key) ?? 0,
       previousCount: previousCounts.get(def.key) ?? 0,
     })),
     ...[...dynamicLabels].map(([key, label]) => ({
       key,
       label,
-      color: FALLBACK_COLOR,
+      isDynamic: true,
       count: counts.get(key) ?? 0,
       previousCount: previousCounts.get(key) ?? 0,
     })),
@@ -153,13 +182,33 @@ export function IntentsChart({
     .filter((row) => row.count > 0)
     .sort((a, b) => b.count - a.count);
 
+  // Color assignment is by RANK, not by intent identity. The leading
+  // intent always gets chart-1 (tenant primary), even if it changes
+  // between Proyecto and Construcción week over week. Catch-all and
+  // dynamic labels short-circuit to soft-ink so they read as "the rest".
+  // IntentDef.color is intentionally ignored — kept on the type for
+  // backward compat with config files we haven't migrated yet.
+  const colorByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    let cursor = 0;
+    for (const row of chartData) {
+      if (row.isDynamic || isCatchAll(row.key, row.label)) {
+        map.set(row.key, OTRAS_COLOR);
+      } else {
+        map.set(row.key, CHART_PALETTE[cursor % CHART_PALETTE.length] ?? OTRAS_COLOR);
+        cursor++;
+      }
+    }
+    return map;
+  }, [chartData]);
+
   const total = chartData.reduce((acc, r) => acc + r.count, 0);
 
   return (
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
-        <CardTitle className="text-base font-semibold text-[var(--ink)]">{title}</CardTitle>
-        <span className="text-xs text-[var(--muted-ink)] tabular-nums">
+        <CardTitle className="text-[15px] font-semibold text-[var(--ink)]">{title}</CardTitle>
+        <span className="text-[12.5px] text-[var(--soft-ink)] tabular-nums">
           {formatNumber(total, locale)} {summarySuffix}
         </span>
       </CardHeader>
@@ -174,7 +223,7 @@ export function IntentsChart({
             <YAxis
               type="category"
               dataKey="label"
-              tick={{ fontSize: 12, fill: "var(--ink)" }}
+              tick={{ fontSize: 12.5, fill: "var(--ink)" }}
               axisLine={false}
               tickLine={false}
               width={120}
@@ -189,17 +238,18 @@ export function IntentsChart({
                 borderRadius: 8,
                 fontSize: 12,
                 color: "var(--ink)",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
               }}
             />
-            <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={24}>
+            <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={20}>
               {chartData.map((row) => (
-                <Cell key={row.key} fill={row.color || FALLBACK_COLOR} />
+                <Cell key={row.key} fill={colorByKey.get(row.key) ?? OTRAS_COLOR} />
               ))}
               <LabelList
                 dataKey="count"
                 position="right"
                 formatter={(v) => formatNumber(Number(v ?? 0), locale)}
-                style={{ fontSize: 12, fill: "var(--ink)" }}
+                style={{ fontSize: 12, fill: "var(--ink)", fontWeight: 600 }}
               />
             </Bar>
           </BarChart>
