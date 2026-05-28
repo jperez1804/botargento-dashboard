@@ -1,17 +1,16 @@
+import Link from "next/link";
+import { ChevronRight, History } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColorPicker } from "@/components/dashboard/ColorPicker";
 import { getAppSettings } from "@/lib/queries/app-settings";
 import { requireRole } from "@/lib/role-guard";
 
 export default async function SettingsPage() {
-  // requireRole redirects viewers to / and audits the denial. By the time we
-  // reach getAppSettings the caller is guaranteed to be an admin.
   await requireRole("admin");
   const settings = await getAppSettings();
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Page header — mirrors the Derivaciones + overview masthead pattern. */}
       <header className="space-y-3 border-b border-[var(--rule)] pb-5">
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
           Administración
@@ -46,6 +45,43 @@ export default async function SettingsPage() {
             <ColorPicker defaultValue={settings.primaryColor} />
           </CardContent>
         </Card>
+      </section>
+
+      {/* Audit log entry — every privileged action in /settings writes to
+        * dashboard.audit_log. Surface the link prominently so admins can
+        * trace who-changed-what without rooting around in the database. */}
+      <section className="space-y-3">
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">
+            Trazabilidad
+          </p>
+          <h2 className="text-[17px] leading-tight tracking-[-0.015em] text-[var(--ink)] font-semibold">
+            Bitácora de auditoría
+          </h2>
+          <p className="text-[13px] text-[var(--muted-ink)] max-w-[640px] leading-snug">
+            Historial de cambios administrativos: quién cambió qué y cuándo.
+          </p>
+        </div>
+        <Link
+          href="/settings/audit"
+          className="group/audit flex items-center gap-3 rounded-xl border border-[var(--rule)] bg-[var(--surface)] px-5 py-4 hover:bg-[var(--canvas-2)] transition-colors focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2"
+        >
+          <div className="size-9 rounded-lg bg-[var(--canvas-2)] text-[var(--soft-ink)] flex items-center justify-center">
+            <History className="size-[18px]" aria-hidden="true" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13.5px] font-semibold tracking-[-0.005em] text-[var(--ink)]">
+              Ver bitácora completa
+            </div>
+            <div className="text-[12.5px] text-[var(--soft-ink)]">
+              Últimos 100 eventos administrativos
+            </div>
+          </div>
+          <ChevronRight
+            className="size-[14px] text-[var(--soft-ink)] group-hover/audit:text-[var(--ink)] transition-colors"
+            aria-hidden="true"
+          />
+        </Link>
       </section>
     </div>
   );

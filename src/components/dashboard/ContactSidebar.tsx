@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle } from "lucide-react";
+import { Download, MessageCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,18 +15,11 @@ type Props = {
   lastIntentLabel: string | null;
 };
 
-// Right-rail sidebar for the conversation thread. Three stacked cards:
-// Contact (definition list), Métricas (2-up KPI tiles), Acciones (only
-// the WhatsApp deep-link in v1 — transcript export lands in a follow-up).
-//
-// Each card uses the same Caption pattern as the rest of the dashboard:
-// 11 px / 500 / uppercase / 0.08em / soft-ink, sitting 10-12 px above the
-// content.
 export function ContactSidebar({ contact, locale, timezone, lastIntentLabel }: Props) {
   const waLink = `https://wa.me/${encodeURIComponent(contact.contactWaId)}`;
+  const transcriptHref = `/api/export/transcript/${encodeURIComponent(contact.contactWaId)}`;
   return (
     <aside className="space-y-3">
-      {/* Contact card */}
       <Card>
         <CardContent className="px-5 py-4 space-y-3">
           <Caption>Contacto</Caption>
@@ -58,7 +51,6 @@ export function ContactSidebar({ contact, locale, timezone, lastIntentLabel }: P
         </CardContent>
       </Card>
 
-      {/* Metrics card */}
       <Card>
         <CardContent className="px-5 py-4 space-y-3">
           <Caption>Métricas (contacto)</Caption>
@@ -73,14 +65,12 @@ export function ContactSidebar({ contact, locale, timezone, lastIntentLabel }: P
         </CardContent>
       </Card>
 
-      {/* Actions card */}
       <Card>
         <CardContent className="px-5 py-4 space-y-3">
           <Caption>Acciones</Caption>
           <div className="flex flex-col gap-2">
             {/* base-ui Button doesn't expose asChild; render <a> with the
-                buttonVariants classNames to preserve the styled-link pattern
-                from the design spec. */}
+                buttonVariants classNames to keep the styled-link pattern. */}
             <a
               href={waLink}
               target="_blank"
@@ -89,6 +79,16 @@ export function ContactSidebar({ contact, locale, timezone, lastIntentLabel }: P
             >
               <MessageCircle className="size-4" aria-hidden="true" />
               Abrir en WhatsApp
+            </a>
+            {/* CSV download via Content-Disposition: attachment. The browser
+              * downloads on click, no JS required. */}
+            <a
+              href={transcriptHref}
+              download
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Exportar transcripción
             </a>
           </div>
         </CardContent>

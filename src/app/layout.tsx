@@ -11,6 +11,13 @@ import "./globals.css";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
+// Inline script that runs BEFORE first paint and sets the .dark class on
+// <html> based on the persisted preference (or system preference if none).
+// Prevents a flash of light content on initial load when the user has
+// previously chosen dark mode. The actual toggle lives in
+// src/components/dashboard/ThemeToggle.tsx.
+const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}`;
+
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
   const runtimeEnv = env();
@@ -24,10 +31,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
   const tenant = tenantConfig();
-
-  // Settings live in dashboard.app_settings (single row per tenant). The env
-  // value tenant.primaryColor is now only the boot fallback — once Phase B's
-  // /settings page lands, admins can change this from the UI without redeploy.
   const settings = await getAppSettings();
 
   const brandStyle: CSSProperties = {
@@ -38,7 +41,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html
       lang={tenant.locale.split("-")[0] ?? "es"}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col bg-[var(--canvas)] text-[var(--ink)]" style={brandStyle}>
         {children}
         <Toaster position="top-right" />
