@@ -2,13 +2,14 @@
 
 import { MessageCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/date";
 import { formatNumber } from "@/lib/format";
-import type { ContactRecord } from "@/lib/queries/contacts";
+import type { ContactSummary } from "@/lib/queries/contacts";
 
 type Props = {
-  contact: ContactRecord;
+  contact: ContactSummary;
   locale: string;
   timezone: string;
   lastIntentLabel: string | null;
@@ -77,12 +78,18 @@ export function ContactSidebar({ contact, locale, timezone, lastIntentLabel }: P
         <CardContent className="px-5 py-4 space-y-3">
           <Caption>Acciones</Caption>
           <div className="flex flex-col gap-2">
-            <Button asChild variant="outline" size="sm">
-              <a href={waLink} target="_blank" rel="noopener noreferrer">
-                <MessageCircle className="size-4" aria-hidden="true" />
-                Abrir en WhatsApp
-              </a>
-            </Button>
+            {/* base-ui Button doesn't expose asChild; render <a> with the
+                buttonVariants classNames to preserve the styled-link pattern
+                from the design spec. */}
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              <MessageCircle className="size-4" aria-hidden="true" />
+              Abrir en WhatsApp
+            </a>
           </div>
         </CardContent>
       </Card>
