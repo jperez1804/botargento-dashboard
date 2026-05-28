@@ -1,5 +1,8 @@
-// Server component — pure data → markup. Groups lead_log entries by day in
-// the tenant tz, then renders inbound/outbound bubbles with intent tags.
+// Server component — pure data -> markup. Groups lead_log entries by day in
+// the tenant tz, then renders inbound/outbound bubbles. The dashboard owns
+// the bot voice: customer (inbound) aligns left on surface, bot (outbound)
+// aligns right on canvas-2. No brand tint on bot bubbles — brand color is
+// reserved for the six designated surfaces (nav rail, charts, etc.).
 
 import { cn } from "@/lib/utils";
 import { formatAutomationLabel } from "@/lib/automation-labels";
@@ -27,7 +30,6 @@ function bucketByDay(
     timeZone: timezone,
   });
   const dayLabelFmt = new Intl.DateTimeFormat(locale, {
-    weekday: "long",
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -36,14 +38,10 @@ function bucketByDay(
   const buckets = new Map<string, DayBucket>();
   for (const e of entries) {
     const d = new Date(e.createdAt);
-    const dayKey = dayKeyFmt.format(d); // YYYY-MM-DD in tenant tz
+    const dayKey = dayKeyFmt.format(d);
     let bucket = buckets.get(dayKey);
     if (!bucket) {
-      bucket = {
-        dayKey,
-        dayLabel: dayLabelFmt.format(d),
-        entries: [],
-      };
+      bucket = { dayKey, dayLabel: dayLabelFmt.format(d), entries: [] };
       buckets.set(dayKey, bucket);
     }
     bucket.entries.push(e);
@@ -51,13 +49,10 @@ function bucketByDay(
   return [...buckets.values()];
 }
 
-function intentColor(value: string | null, intents: ReadonlyArray<IntentDef>): string {
-  if (!value) return "#94a3b8";
-  const hit = intents.find((i) => i.key.toLowerCase() === value.toLowerCase());
-  return hit?.color ?? "#94a3b8";
-}
-
-function intentLabel(value: string | null, intents: ReadonlyArray<IntentDef>): string | null {
+function intentLabel(
+  value: string | null,
+  intents: ReadonlyArray<IntentDef>,
+): string | null {
   if (!value) return null;
   const hit = intents.find((i) => i.key.toLowerCase() === value.toLowerCase());
   return hit?.label ?? formatAutomationLabel(value) ?? value;
@@ -66,8 +61,13 @@ function intentLabel(value: string | null, intents: ReadonlyArray<IntentDef>): s
 export function ConversationTimeline({ entries, intents, locale, timezone }: Props) {
   if (entries.length === 0) {
     return (
-      <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-6 text-sm text-[var(--muted-ink)]">
-        No hay mensajes registrados para este contacto.
+      <div className="rounded-xl border border-dashed border-[var(--rule-strong)] bg-[var(--surface)] py-10 px-6 flex flex-col items-center text-center gap-2.5">
+        <div className="text-sm font-semibold text-[var(--ink)]">
+          Sin mensajes en esta conversación
+        </div>
+        <div className="text-[12.5px] text-[var(--soft-ink)] max-w-[320px] leading-snug">
+          Aparecerán acá cuando el contacto escriba al bot.
+        </div>
       </div>
     );
   }
@@ -81,64 +81,50 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {buckets.map((bucket) => (
-        <section key={bucket.dayKey} className="space-y-3">
-          <div className="sticky top-0 z-10 -mx-1 px-1 py-1 bg-[var(--canvas)]/85 backdrop-blur">
-            <div className="text-xs font-medium uppercase tracking-wide text-[var(--muted-ink)]">
-              {bucket.dayLabel}
-            </div>
-          </div>
-
-          <ol className="space-y-2">
+        <section key={bucket.dayKey}>
+          <DayDivider label={bucket.dayLabel} />
+          <ol className="space-y-1.5">
             {bucket.entries.map((e) => {
               const isInbound = e.direction === "inbound";
               const intent = intentLabel(e.intent, intents);
-              const color = intentColor(e.intent, intents);
+              const flowTag = !isInbound && e.route
+                ? `${intent ? intent.toLowerCase() + " · " : ""}${e.route}`
+                : null;
               return (
                 <li
                   key={e.id}
-                  className={cn("flex w-full", isInbound ? "justify-start" : "justify-end")}
+                  className={cn(
+                    "flex w-full",
+                    isInbound ? "justify-start" : "justify-end",
+                  )}
                 >
                   <div
                     className={cn(
-                      "max-w-[80%] rounded-lg px-3 py-2 text-sm",
+                      "max-w-[78%] min-w-[60px] px-3 py-2 border text-[13.5px] leading-snug text-[var(--ink)]",
+                      // Customer (left): surface bg, top-left corner squared
+                      // to read as a "tail" pointing at the customer.
+                      // Bot (right): canvas-2 bg, top-right corner squared.
+                      // The fill diff is subtle but reads instantly at full
+                      // conversation density.
                       isInbound
-                        ? "bg-[var(--surface)] border border-[var(--rule)]"
-                        : "bg-[var(--client-primary)]/5 border border-[var(--client-primary)]/20",
+                        ? "bg-[var(--surface)] border-[var(--rule)] rounded-xl rounded-tl-sm"
+                        : "bg-[var(--canvas-2)] border-[var(--rule)] rounded-xl rounded-tr-sm",
                     )}
                   >
-                    <div className="flex items-center gap-2 mb-1 text-[11px]">
-                      <span
-                        className={cn(
-                          "font-medium",
-                          isInbound ? "text-[var(--ink)]" : "text-[var(--client-primary)]",
-                        )}
-                      >
-                        {isInbound ? "Cliente" : "Bot"}
-                      </span>
-                      <span className="text-[var(--soft-ink)] tabular-nums">
-                        {timeFmt.format(new Date(e.createdAt))}
-                      </span>
-                      {intent && (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px]"
-                          style={{ background: `${color}1F`, color }}
-                        >
-                          <span
-                            className="size-1 rounded-full"
-                            style={{ background: color }}
-                            aria-hidden="true"
-                          />
-                          {intent}
-                        </span>
-                      )}
-                      {e.route && (
-                        <span className="text-[10px] text-[var(--soft-ink)]">· {e.route}</span>
+                    {flowTag ? (
+                      <div className="text-[10px] tracking-[0.08em] uppercase font-medium text-[var(--soft-ink)] font-[var(--font-geist-mono)] mb-1">
+                        {flowTag}
+                      </div>
+                    ) : null}
+                    <div className="whitespace-pre-wrap">
+                      {e.messageText ?? (
+                        <span className="text-[var(--soft-ink)] italic">(sin texto)</span>
                       )}
                     </div>
-                    <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--ink)]">
-                      {e.messageText ?? <span className="text-[var(--soft-ink)]">(sin texto)</span>}
+                    <div className="text-[11px] text-[var(--soft-ink)] tabular-nums mt-1 text-right">
+                      {timeFmt.format(new Date(e.createdAt))}
                     </div>
                   </div>
                 </li>
@@ -147,6 +133,21 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
           </ol>
         </section>
       ))}
+    </div>
+  );
+}
+
+// Centered day separator. Hairlines on either side + a neutral pill
+// holding the locale-formatted day. Not sticky — the thread reads as a
+// continuous timeline, not a series of sticky sections.
+function DayDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 py-4">
+      <div className="flex-1 h-px bg-[var(--rule)]" />
+      <span className="inline-flex items-center h-[20px] px-2.5 rounded-full bg-[var(--neutral-soft)] text-[var(--muted-ink)] text-[11px] font-medium tracking-[-0.005em]">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-[var(--rule)]" />
     </div>
   );
 }
