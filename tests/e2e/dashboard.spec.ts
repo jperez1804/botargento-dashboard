@@ -46,14 +46,18 @@ test("Overview renders KPI cards + both charts + follow-up preview", async ({ pa
 
 test("Conversations list filters and paginates", async ({ page }) => {
   await page.goto("/conversations");
-  await page.waitForSelector("table tbody tr");
-  const initial = await page.locator("tbody tr").count();
+  // PR 12 migrated TopContactsTable from shadcn <Table> to the shared
+  // DataTable (CSS grid + row-as-Link). Each row is an <a> with
+  // aria-label "Abrir conversación con ...".
+  await page.waitForSelector('a[aria-label^="Abrir conversación"]');
+  const rowLinks = page.locator('a[aria-label^="Abrir conversación"]');
+  const initial = await rowLinks.count();
   expect(initial).toBeGreaterThan(0);
 
   await page.fill("#contact-search", "Lucía");
   await page.waitForFunction(() => new URL(location.href).searchParams.get("q") === "Lucía");
   await page.waitForLoadState("networkidle");
-  expect(await page.locator("tbody tr").count()).toBe(1);
+  expect(await rowLinks.count()).toBe(1);
 });
 
 test("Handoffs page excludes error rows", async ({ page }) => {
@@ -108,7 +112,9 @@ test("Window selector updates URL state and masthead subline", async ({ page }) 
 
 test("CSV export downloads a correctly-formatted file", async ({ page }) => {
   await page.goto("/conversations");
-  await page.waitForSelector("table tbody tr");
+  // Same DataTable migration as the filter test above — wait for any row
+  // link to ensure the page has hydrated before clicking Exportar CSV.
+  await page.waitForSelector('a[aria-label^="Abrir conversación"]');
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: /Exportar CSV/ }).click();
