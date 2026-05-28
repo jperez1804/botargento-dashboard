@@ -49,14 +49,16 @@ export function WindowToggle({ value, config }: Props) {
               disabled={isPending}
               onClick={() => setWindow(opt.value)}
               className={cn(
-                // Pill — subtle raise on active. ink-text + surface-bg +
-                // 1px rule ring. Inactive options use muted-ink + hover to
-                // ink. Avoid the heavy "ink button" treatment that made
-                // the active option look like a primary CTA.
+                // Pill — surface fill + rule-strong ring + a touch of
+                // actual elevation (3 px blur shadow) so the active
+                // option reads clearly as raised. Previously the hairline
+                // ring + 0-blur shadow leaned on the canvas-2 vs surface
+                // lightness diff alone (~0.025 L), which lands below the
+                // perception threshold on most displays.
                 "px-2.5 h-7 rounded-md transition-colors text-[13px]",
                 "focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2",
                 active
-                  ? "bg-[var(--surface)] text-[var(--ink)] font-semibold ring-1 ring-[var(--rule)] shadow-[0_1px_0_rgba(0,0,0,0.03)]"
+                  ? "bg-[var(--surface)] text-[var(--ink)] font-semibold ring-1 ring-[var(--rule-strong)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
                   : "text-[var(--muted-ink)] font-medium hover:text-[var(--ink)]",
                 isPending && "opacity-60",
               )}
