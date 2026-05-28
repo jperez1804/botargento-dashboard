@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -9,31 +9,43 @@ import { cn } from "@/lib/utils";
 // avoiding a flash of unstyled light content on subsequent loads. This
 // component reads + flips the class on click and persists the choice in
 // localStorage.
+//
+// Uses useSyncExternalStore (rather than useEffect + useState) so the
+// hydration boundary is handled by React: the server renders with the
+// neutral "light" snapshot and the client immediately reads the actual
+// classList value once mounted — no cascading setState, no FOUC, no
+// lint complaints.
 
 type Theme = "light" | "dark";
 
 const STORAGE_KEY = "theme";
 
-function readTheme(): Theme {
-  if (typeof document === "undefined") return "light";
+// Subscriber list so toggle() can tell every mounted ThemeToggle to
+// re-read its snapshot. We only mutate classList from one place
+// (toggle), so we control when to notify.
+const listeners = new Set<() => void>();
+function subscribe(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+function notify(): void {
+  for (const cb of listeners) cb();
+}
+
+function getClientSnapshot(): Theme {
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+function getServerSnapshot(): Theme {
+  return "light";
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("light");
-  // Tracks whether we've hydrated. Until then we render the toggle in a
-  // neutral state to avoid a button-flip on first paint when the inline
-  // script has set .dark but React initially renders without it.
-  const [hydrated, setHydrated] = useState(false);
+  const theme = useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    setTheme(readTheme());
-    setHydrated(true);
-  }, []);
-
-  function toggle() {
+  function toggle(): void {
     const next: Theme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
     const root = document.documentElement;
     if (next === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
@@ -43,9 +55,10 @@ export function ThemeToggle() {
       // Private-mode / Storage-disabled — toggle still works for the
       // current session, just doesn't persist.
     }
+    notify();
   }
 
-  const isDark = hydrated && theme === "dark";
+  const isDark = theme === "dark";
   return (
     <button
       type="button"
