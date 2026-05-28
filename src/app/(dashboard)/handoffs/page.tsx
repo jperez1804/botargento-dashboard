@@ -20,26 +20,44 @@ export default async function HandoffsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-semibold leading-tight">Derivaciones</h1>
-        <p className="text-sm text-[#6b7280]">
-          Pedidos de contacto con el equipo humano.{" "}
-          {formatNumber(total, tenant.locale)} en total.
+      {/* Page header — sans Display weight, mono kicker, hairline rule below.
+       * Mirrors the masthead pattern on the overview page. */}
+      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
+          Operación
         </p>
-      </div>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
+            Derivaciones
+          </h1>
+          <p className="text-[13px] text-[var(--muted-ink)]">
+            Pedidos de contacto con el equipo humano · {formatNumber(total, tenant.locale)} en total
+          </p>
+        </div>
+      </header>
 
-      <HandoffSummaryCards
-        rows={summary}
-        targets={vertical.handoffTargets}
-        locale={tenant.locale}
-      />
+      <section className="space-y-2.5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">
+          Pedidos por destino · últimas 24h
+        </p>
+        <HandoffSummaryCards
+          rows={summary}
+          targets={vertical.handoffTargets}
+          locale={tenant.locale}
+        />
+      </section>
 
-      <HandoffsTable
-        data={rows}
-        targets={vertical.handoffTargets}
-        locale={tenant.locale}
-        timezone={tenant.timezone}
-      />
+      <section className="space-y-2.5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">
+          Cola de derivaciones
+        </p>
+        <HandoffsTable
+          data={rows}
+          targets={vertical.handoffTargets}
+          locale={tenant.locale}
+          timezone={tenant.timezone}
+        />
+      </section>
     </div>
   );
 }
