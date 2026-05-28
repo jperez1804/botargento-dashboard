@@ -129,9 +129,9 @@ export default async function OverviewPage({
 
   return (
     <div className="space-y-8">
-      {/* Editorial masthead — Fraunces h1, mono kicker line above, hairline rule
-          below. Carries the "Reserved Operations" gravitas without competing
-          with the tenant accent. */}
+      {/* Page masthead — sans Display weight, mono kicker line above, hairline
+          rule below. The editorial Fraunces serif is gone product-wide; type
+          hierarchy now comes from weight + size, not face. */}
       <header
         data-reveal
         style={{ ["--reveal-delay" as string]: "0ms" }}
@@ -145,7 +145,7 @@ export default async function OverviewPage({
           />
         </div>
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="font-[var(--font-fraunces)] text-[44px] leading-[1.05] tracking-tight text-[var(--ink)] font-semibold">
+          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
             Operaciones del período
           </h1>
           <p className="text-sm text-[var(--muted-ink)]">{comparisonSubline}</p>
@@ -160,7 +160,7 @@ export default async function OverviewPage({
       <div
         data-reveal
         style={{ ["--reveal-delay" as string]: "80ms" }}
-        className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
       >
         {vertical.kpis.map((kpi) => (
           <KpiCard
@@ -182,7 +182,7 @@ export default async function OverviewPage({
       <div
         data-reveal
         style={{ ["--reveal-delay" as string]: "160ms" }}
-        className="grid gap-4 grid-cols-1 lg:grid-cols-2"
+        className="grid gap-3 grid-cols-1 lg:grid-cols-2"
       >
         <KpiCard
           label="Resueltas por el bot"
@@ -229,7 +229,7 @@ export default async function OverviewPage({
             meta={leadingIntentMeta}
           />
         ) : null}
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
           <div className="space-y-3">
             <IntentsChart
               data={intentCounts}
@@ -275,7 +275,7 @@ export default async function OverviewPage({
         className="space-y-3"
       >
         <SectionHeading kicker="Operativo">Eficiencia de los flujos</SectionHeading>
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
           <IntentCompletionStrip
             rows={completionRates}
             locale={tenant.locale}
@@ -315,9 +315,9 @@ export default async function OverviewPage({
   );
 }
 
-// Section heading: mono kicker label up top + Fraunces title below. Used as
-// the header for each block on the overview to keep the editorial rhythm
-// consistent without re-implementing the markup five times.
+// Section heading: mono kicker label up top + sans-serif title below. The
+// editorial Fraunces face is gone product-wide; section H2s now match the
+// rest of the type hierarchy via weight + size.
 function SectionHeading({
   kicker,
   children,
@@ -327,10 +327,10 @@ function SectionHeading({
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--muted-ink)] font-[var(--font-geist-mono)]">
+      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
         {kicker}
       </p>
-      <h2 className="font-[var(--font-fraunces)] text-[22px] leading-tight tracking-tight text-[var(--ink)] font-medium">
+      <h2 className="text-[17px] leading-tight tracking-[-0.015em] text-[var(--ink)] font-semibold">
         {children}
       </h2>
     </div>

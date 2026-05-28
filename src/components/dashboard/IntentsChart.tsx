@@ -70,10 +70,13 @@ function chipToneFor(rate: number, desired: number | undefined): HandoffChipTone
   return "bad";
 }
 
+// Chip classes now use the semantic --positive / --danger / --neutral tokens.
+// Previously hardcoded hex values (#E6F4EA / #1B5E20 etc.) drifted from the
+// rest of the system and broke in dark mode.
 const CHIP_CLASSES: Record<HandoffChipTone, string> = {
-  good: "bg-[#E6F4EA] text-[#1B5E20]",
-  bad: "bg-[#F4CCCC] text-[#8A1A1A]",
-  neutral: "bg-[var(--canvas)] text-[var(--muted-ink)]",
+  good: "bg-[var(--positive-soft)] text-[var(--positive)]",
+  bad: "bg-[var(--danger-soft)] text-[var(--danger)]",
+  neutral: "bg-[var(--neutral-soft)] text-[var(--muted-ink)]",
 };
 
 export function IntentsChart({
@@ -177,13 +180,13 @@ export function IntentsChart({
               width={120}
             />
             <Tooltip
-              cursor={{ fill: "var(--canvas)" }}
+              cursor={{ fill: "var(--canvas-2)" }}
               formatter={(value) => [formatNumber(Number(value), locale), tooltipLabel]}
               labelFormatter={(label) => String(label)}
               contentStyle={{
                 background: "var(--surface)",
-                border: "1px solid var(--rule)",
-                borderRadius: 6,
+                border: "1px solid var(--rule-strong)",
+                borderRadius: 8,
                 fontSize: 12,
                 color: "var(--ink)",
               }}
@@ -216,8 +219,8 @@ export function IntentsChart({
                 delta.direction === "flat"
                   ? "text-[var(--muted-ink)]"
                   : delta.direction === "down"
-                    ? "text-[var(--bad)]"
-                    : "text-[var(--good)]";
+                    ? "text-[var(--danger)]"
+                    : "text-[var(--positive)]";
               const text =
                 delta.direction === "new"
                   ? "Nuevo"
@@ -227,7 +230,7 @@ export function IntentsChart({
               return (
                 <span
                   key={row.key}
-                  className={`inline-flex items-center gap-1 rounded-md bg-[var(--canvas)] px-1.5 py-0.5 text-[11px] ${color}`}
+                  className={`inline-flex items-center gap-1 rounded-md bg-[var(--canvas-2)] px-1.5 py-0.5 text-[11px] ${color}`}
                   title={`${row.label}: período actual ${row.count} · anterior ${row.previousCount}`}
                 >
                   <span className="font-medium text-[var(--ink)]">{row.label}</span>
@@ -252,7 +255,7 @@ export function IntentsChart({
                 return (
                   <span
                     key={row.key}
-                    className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas)] px-1.5 py-0.5 text-[11px]"
+                    className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas-2)] px-1.5 py-0.5 text-[11px]"
                     title={`${row.label}: ${formatNumber(row.count, locale)} interacciones / ${formatNumber(Math.round(row.count / density.perContact), locale)} contactos`}
                   >
                     <span className="font-medium text-[var(--ink)]">{row.label}</span>
