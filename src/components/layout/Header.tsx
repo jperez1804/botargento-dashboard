@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { TenantBadge } from "./TenantBadge";
 import { RefreshButton } from "./RefreshButton";
 import { MobileNav } from "./MobileNav";
+import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import type { NavItemDef } from "@/config/verticals/_types";
 
 type HeaderProps = {
@@ -18,14 +19,13 @@ async function handleSignOut() {
 
 export function Header({ userEmail, navItems }: HeaderProps) {
   return (
-    // Page top bar. 52 px tall to match the chrome spec. surface bg + 1px
-    // rule below. Tenant identity left, utility actions + sign-out right.
     <header className="h-13 shrink-0 border-b border-[var(--rule)] bg-[var(--surface)] flex items-center justify-between gap-4 px-4">
       <div className="flex items-center gap-2.5 min-w-0">
         <MobileNav items={navItems} />
         <TenantBadge />
       </div>
       <div className="flex items-center gap-1.5">
+        <ThemeToggle />
         <RefreshButton />
         {userEmail && (
           <span className="hidden sm:inline text-[12.5px] text-[var(--muted-ink)] max-w-[200px] truncate px-1">
