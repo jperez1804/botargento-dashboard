@@ -58,11 +58,15 @@ test("Conversations list filters and paginates", async ({ page }) => {
 
 test("Handoffs page excludes error rows", async ({ page }) => {
   await page.goto("/handoffs");
-  await page.waitForSelector("table tbody tr");
-  const tableHtml = (await page.locator("tbody").innerText()).toLowerCase();
-  expect(tableHtml).not.toContain("etimedout");
-  expect(tableHtml).not.toContain("error");
-  expect(await page.locator("tbody tr").count()).toBe(12);
+  // PR 6 rebuilt HandoffsTable as a CSS grid: each row is a <Link> with
+  // aria-label "Abrir conversación con ...". The old `table tbody tr` markup
+  // no longer exists.
+  await page.waitForSelector('a[aria-label^="Abrir conversación"]');
+  const rowLinks = page.locator('a[aria-label^="Abrir conversación"]');
+  const rowsText = (await rowLinks.allInnerTexts()).join("\n").toLowerCase();
+  expect(rowsText).not.toContain("etimedout");
+  expect(rowsText).not.toContain("error");
+  expect(await rowLinks.count()).toBe(12);
 });
 
 test("Follow-up page renders all three priority badges", async ({ page }) => {
