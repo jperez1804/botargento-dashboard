@@ -34,8 +34,6 @@ export default async function ConversationDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb top bar — pure navigation. Contact name lives in the
-       * thread H1 below, not duplicated here. */}
       <nav
         aria-label="Migas de pan"
         className="flex flex-wrap items-center gap-3 text-[13px]"
@@ -55,10 +53,18 @@ export default async function ConversationDetailPage({ params }: Props) {
         </span>
       </nav>
 
-      {/* Two-column layout — thread on the left, contact metadata on the right.
-       * Below lg, the rail stacks above the thread for natural mobile flow. */}
+      {/* Two-column layout — thread on the LEFT (wide), contact rail on the
+       * RIGHT (narrow). On mobile (single column) the rail stacks ABOVE the
+       * thread so operators see the contact context first.
+       *
+       * Bug history: previous version set `order-2 lg:order-1` on the
+       * <section> but no order on <ContactSidebar>, leaving it at the
+       * default order-0. On desktop that placed the sidebar in column 1
+       * (1fr, wide) and the thread in column 2 (300px, narrow) — exactly
+       * inverted from the mock. Both children now declare explicit orders
+       * for both breakpoints to make the grid placement unambiguous. */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1fr_300px]">
-        <section className="min-w-0 space-y-4 lg:order-1 order-2">
+        <section className="min-w-0 space-y-4 order-2 lg:order-1">
           <header className="space-y-1.5">
             <h1 className="text-[24px] font-semibold tracking-[-0.02em] leading-[1.15] text-[var(--ink)]">
               {contactName}
@@ -78,12 +84,14 @@ export default async function ConversationDetailPage({ params }: Props) {
           />
         </section>
 
-        <ContactSidebar
-          contact={contact}
-          locale={tenant.locale}
-          timezone={tenant.timezone}
-          lastIntentLabel={lastIntentLabel}
-        />
+        <div className="order-1 lg:order-2">
+          <ContactSidebar
+            contact={contact}
+            locale={tenant.locale}
+            timezone={tenant.timezone}
+            lastIntentLabel={lastIntentLabel}
+          />
+        </div>
       </div>
     </div>
   );
