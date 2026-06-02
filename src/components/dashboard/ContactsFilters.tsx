@@ -61,13 +61,13 @@ export function ContactsFilters() {
   const clearable = search || from || to;
 
   return (
-    <div className="rounded-md border border-[#e5e7eb] bg-white p-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
+    <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
       <div className="space-y-1.5">
-        <Label htmlFor="contact-search" className="text-xs text-[#6b7280]">
+        <Label htmlFor="contact-search" className="text-xs text-[var(--muted-ink)]">
           Buscar por nombre o teléfono
         </Label>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-[var(--soft-ink)]" />
           <Input
             id="contact-search"
             value={search}
@@ -78,11 +78,11 @@ export function ContactsFilters() {
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="contact-from" className="text-xs text-[#6b7280]">Desde</Label>
+        <Label htmlFor="contact-from" className="text-xs text-[var(--muted-ink)]">Desde</Label>
         <Input id="contact-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="contact-to" className="text-xs text-[#6b7280]">Hasta</Label>
+        <Label htmlFor="contact-to" className="text-xs text-[var(--muted-ink)]">Hasta</Label>
         <Input id="contact-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div>
@@ -102,7 +102,7 @@ export function ContactsFilters() {
             <X className="size-4 mr-1" /> Limpiar
           </Button>
         ) : (
-          <span className="block text-xs text-[#9ca3af] text-center">
+          <span className="block text-xs text-[var(--soft-ink)] text-center">
             {pending ? "Buscando…" : ""}
           </span>
         )}

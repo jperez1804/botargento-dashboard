@@ -79,13 +79,13 @@ export function ProvidersFilters({ categories }: Props) {
   const clearable = search || category || zone || status;
 
   return (
-    <div className="rounded-md border border-[#e5e7eb] bg-white p-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto_auto] md:items-end">
+    <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto_auto] md:items-end">
       <div className="space-y-1.5">
-        <Label htmlFor="prov-search" className="text-xs text-[#6b7280]">
+        <Label htmlFor="prov-search" className="text-xs text-[var(--muted-ink)]">
           Buscar por empresa, contacto o email
         </Label>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-[var(--soft-ink)]" />
           <Input
             id="prov-search"
             value={search}
@@ -96,7 +96,7 @@ export function ProvidersFilters({ categories }: Props) {
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="prov-category" className="text-xs text-[#6b7280]">
+        <Label htmlFor="prov-category" className="text-xs text-[var(--muted-ink)]">
           Rubro
         </Label>
         <select
@@ -112,7 +112,7 @@ export function ProvidersFilters({ categories }: Props) {
         </select>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="prov-zone" className="text-xs text-[#6b7280]">Zona</Label>
+        <Label htmlFor="prov-zone" className="text-xs text-[var(--muted-ink)]">Zona</Label>
         <Input
           id="prov-zone"
           value={zone}
@@ -121,7 +121,7 @@ export function ProvidersFilters({ categories }: Props) {
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="prov-status" className="text-xs text-[#6b7280]">Estado</Label>
+        <Label htmlFor="prov-status" className="text-xs text-[var(--muted-ink)]">Estado</Label>
         <select
           id="prov-status"
           value={status}
@@ -151,7 +151,7 @@ export function ProvidersFilters({ categories }: Props) {
             <X className="size-4 mr-1" /> Limpiar
           </Button>
         ) : (
-          <span className="block text-xs text-[#9ca3af] text-center">
+          <span className="block text-xs text-[var(--soft-ink)] text-center">
             {pending ? "Buscando…" : ""}
           </span>
         )}
