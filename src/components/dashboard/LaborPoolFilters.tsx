@@ -90,13 +90,13 @@ export function LaborPoolFilters({ specialties }: Props) {
   const clearable = search || specialty || zone || mode || status;
 
   return (
-    <div className="rounded-md border border-[#e5e7eb] bg-white p-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto_auto_auto] md:items-end">
+    <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] p-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto_auto_auto] md:items-end">
       <div className="space-y-1.5">
-        <Label htmlFor="lp-search" className="text-xs text-[#6b7280]">
+        <Label htmlFor="lp-search" className="text-xs text-[var(--muted-ink)]">
           Buscar por nombre
         </Label>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-[var(--soft-ink)]" />
           <Input
             id="lp-search"
             value={search}
@@ -107,7 +107,7 @@ export function LaborPoolFilters({ specialties }: Props) {
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="lp-specialty" className="text-xs text-[#6b7280]">
+        <Label htmlFor="lp-specialty" className="text-xs text-[var(--muted-ink)]">
           Especialidad
         </Label>
         <select
@@ -123,7 +123,7 @@ export function LaborPoolFilters({ specialties }: Props) {
         </select>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="lp-zone" className="text-xs text-[#6b7280]">Zona</Label>
+        <Label htmlFor="lp-zone" className="text-xs text-[var(--muted-ink)]">Zona</Label>
         <Input
           id="lp-zone"
           value={zone}
@@ -132,7 +132,7 @@ export function LaborPoolFilters({ specialties }: Props) {
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="lp-mode" className="text-xs text-[#6b7280]">Modalidad</Label>
+        <Label htmlFor="lp-mode" className="text-xs text-[var(--muted-ink)]">Modalidad</Label>
         <select
           id="lp-mode"
           value={mode}
@@ -145,7 +145,7 @@ export function LaborPoolFilters({ specialties }: Props) {
         </select>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="lp-status" className="text-xs text-[#6b7280]">Estado</Label>
+        <Label htmlFor="lp-status" className="text-xs text-[var(--muted-ink)]">Estado</Label>
         <select
           id="lp-status"
           value={status}
@@ -176,7 +176,7 @@ export function LaborPoolFilters({ specialties }: Props) {
             <X className="size-4 mr-1" /> Limpiar
           </Button>
         ) : (
-          <span className="block text-xs text-[#9ca3af] text-center">
+          <span className="block text-xs text-[var(--soft-ink)] text-center">
             {pending ? "Buscando…" : ""}
           </span>
         )}
