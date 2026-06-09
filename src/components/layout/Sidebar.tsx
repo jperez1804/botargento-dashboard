@@ -8,6 +8,7 @@ import {
   HardHat,
   LayoutDashboard,
   ListTodo,
+  Megaphone,
   MessageSquare,
   Settings,
   Truck,
@@ -24,6 +25,7 @@ const ICON_MAP: Record<NavIconKey, IconComponent> = {
   "follow-up": ListTodo,
   providers: Truck,
   "labor-pool": HardHat,
+  campaigns: Megaphone,
   settings: Settings,
 };
 

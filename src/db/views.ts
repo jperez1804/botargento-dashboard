@@ -444,3 +444,128 @@ export async function listLaborSpecialties(): Promise<string[]> {
   `;
   return rows.map((r) => String(r.specialty));
 }
+
+// ---------------------------------------------------------------------------
+// Outbound campaigns (outreach.v_*) — read-only, feature-gated behind
+// features.campaignsTab. Only tenants with the outreach.* schema have these
+// views; the campaigns page is the sole caller, so other tenants never hit them.
+// ---------------------------------------------------------------------------
+
+export type CampaignStatsRow = {
+  campaign_id: number;
+  name: string;
+  vertical: string;
+  template_name: string;
+  status: string;
+  daily_cap: number;
+  total_recipients: number;
+  pending: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  replied: number;
+  failed: number;
+  opted_out: number;
+  sent_today: number;
+  reply_rate: number;
+  opt_out_rate: number;
+  last_send_at: string | null;
+};
+
+export type OutreachOverview = {
+  total_recipients: number;
+  total_sent: number;
+  total_replied: number;
+  total_opted_out: number;
+  sent_today: number;
+  reply_rate: number;
+  suppressed: number;
+};
+
+export type CampaignDailyRow = {
+  day: string;
+  campaign_id: number;
+  sent_count: number;
+};
+
+export type QualityCurrent = {
+  quality_rating: string | null;
+  messaging_limit_tier: string | null;
+  last_event: string | null;
+  last_updated: string | null;
+};
+
+export async function selectCampaignStats(): Promise<CampaignStatsRow[]> {
+  const rows = await pg<Record<string, unknown>[]>`
+    SELECT campaign_id, name, vertical, template_name, status, daily_cap,
+           total_recipients, pending, sent, delivered, read, replied, failed,
+           opted_out, sent_today, reply_rate, opt_out_rate, last_send_at
+    FROM outreach.v_campaign_stats
+  `;
+  return rows.map((r) => ({
+    campaign_id: toNum(r.campaign_id),
+    name: String(r.name ?? ""),
+    vertical: String(r.vertical ?? ""),
+    template_name: String(r.template_name ?? ""),
+    status: String(r.status ?? ""),
+    daily_cap: toNum(r.daily_cap),
+    total_recipients: toNum(r.total_recipients),
+    pending: toNum(r.pending),
+    sent: toNum(r.sent),
+    delivered: toNum(r.delivered),
+    read: toNum(r.read),
+    replied: toNum(r.replied),
+    failed: toNum(r.failed),
+    opted_out: toNum(r.opted_out),
+    sent_today: toNum(r.sent_today),
+    reply_rate: Number(r.reply_rate ?? 0),
+    opt_out_rate: Number(r.opt_out_rate ?? 0),
+    last_send_at: nullableStr(r.last_send_at),
+  }));
+}
+
+export async function getOutreachOverview(): Promise<OutreachOverview> {
+  const rows = await pg<Record<string, unknown>[]>`
+    SELECT total_recipients, total_sent, total_replied, total_opted_out,
+           sent_today, reply_rate, suppressed
+    FROM outreach.v_outreach_overview
+  `;
+  const r = rows[0] ?? {};
+  return {
+    total_recipients: toNum(r.total_recipients),
+    total_sent: toNum(r.total_sent),
+    total_replied: toNum(r.total_replied),
+    total_opted_out: toNum(r.total_opted_out),
+    sent_today: toNum(r.sent_today),
+    reply_rate: Number(r.reply_rate ?? 0),
+    suppressed: toNum(r.suppressed),
+  };
+}
+
+export async function selectCampaignDaily(days: number): Promise<CampaignDailyRow[]> {
+  const rows = await pg<Record<string, unknown>[]>`
+    SELECT send_date AS day, campaign_id, sent_count
+    FROM outreach.v_campaign_daily
+    WHERE send_date >= CURRENT_DATE - ${days}::int
+    ORDER BY day ASC
+  `;
+  return rows.map((r) => ({
+    day: String(r.day),
+    campaign_id: toNum(r.campaign_id),
+    sent_count: toNum(r.sent_count),
+  }));
+}
+
+export async function getQualityCurrent(): Promise<QualityCurrent> {
+  const rows = await pg<Record<string, unknown>[]>`
+    SELECT quality_rating, messaging_limit_tier, last_event, last_updated
+    FROM outreach.v_quality_current
+  `;
+  const r = rows[0] ?? {};
+  return {
+    quality_rating: nullableStr(r.quality_rating),
+    messaging_limit_tier: nullableStr(r.messaging_limit_tier),
+    last_event: nullableStr(r.last_event),
+    last_updated: nullableStr(r.last_updated),
+  };
+}

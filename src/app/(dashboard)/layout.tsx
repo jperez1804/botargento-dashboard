@@ -23,6 +23,12 @@ const LABOR_POOL_NAV_ITEM: NavItemDef = {
   icon: "labor-pool",
 };
 
+const CAMPAIGNS_NAV_ITEM: NavItemDef = {
+  href: "/campaigns",
+  label: "Campañas",
+  icon: "campaigns",
+};
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // The /proxy.ts guard already redirects unauthenticated requests, so this
   // session() call is a safe source of truth for user-facing chrome.
@@ -36,6 +42,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const featureItems: NavItemDef[] = [
     ...(vertical.features?.providersTab ? [PROVIDERS_NAV_ITEM] : []),
     ...(vertical.features?.laborPoolTab ? [LABOR_POOL_NAV_ITEM] : []),
+    ...(vertical.features?.campaignsTab ? [CAMPAIGNS_NAV_ITEM] : []),
   ];
   const navItems: ReadonlyArray<NavItemDef> =
     sessionRole?.role === "admin"

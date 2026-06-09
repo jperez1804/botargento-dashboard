@@ -9,6 +9,7 @@ export type NavIconKey =
   | "follow-up"
   | "providers"
   | "labor-pool"
+  | "campaigns"
   | "settings";
 
 export type NavItemDef = {
@@ -106,6 +107,9 @@ export type WindowConfig = {
 export type VerticalFeatures = {
   providersTab?: boolean;
   laborPoolTab?: boolean;
+  // Read-only outbound campaign observability (/campaigns). Reads outreach.v_*
+  // views; only verticals with an outreach.* schema (e.g. outbound-sales) enable it.
+  campaignsTab?: boolean;
 };
 
 export type VerticalConfig = {

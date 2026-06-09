@@ -186,6 +186,8 @@ if [[ ! -f "$MIGRATIONS_DIR/0000_init.sql" ]]; then
     -o "$MIGRATIONS_DIR/0001_escalation_type.sql"
   curl -fsSL "$RAW_BASE_URL/migrations/0002_app_settings.sql" \
     -o "$MIGRATIONS_DIR/0002_app_settings.sql"
+  curl -fsSL "$RAW_BASE_URL/migrations/0003_outreach_grants.sql" \
+    -o "$MIGRATIONS_DIR/0003_outreach_grants.sql"
 fi
 
 DASHBOARD_APP_PASSWORD=$(openssl rand -hex 24)
@@ -213,6 +215,14 @@ docker exec -i "$N8N_POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
        -v ON_ERROR_STOP=1 \
   < "$MIGRATIONS_DIR/0002_app_settings.sql"
+
+# Outbound-sales tenants only: grant dashboard_app SELECT on outreach.* (no-op
+# elsewhere — the migration is guarded by IF EXISTS schema 'outreach').
+echo "→ Applying migrations/0003_outreach_grants.sql…"
+docker exec -i "$N8N_POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+       -v ON_ERROR_STOP=1 \
+  < "$MIGRATIONS_DIR/0003_outreach_grants.sql"
 
 # Re-seed app_settings.primary_color from the operator's input so the row
 # matches what they typed at the top, not the migration's placeholder.
@@ -251,7 +261,7 @@ ALTER TABLE IF EXISTS dashboard.__migrations OWNER TO dashboard_app;
 ALTER SEQUENCE IF EXISTS dashboard.audit_log_id_seq OWNER TO dashboard_app;
 
 INSERT INTO dashboard.__migrations (filename)
-VALUES ('0000_init.sql'), ('0001_escalation_type.sql'), ('0002_app_settings.sql')
+VALUES ('0000_init.sql'), ('0001_escalation_type.sql'), ('0002_app_settings.sql'), ('0003_outreach_grants.sql')
 ON CONFLICT (filename) DO NOTHING;
 
 ALTER TABLE IF EXISTS dashboard.app_settings OWNER TO dashboard_app;
