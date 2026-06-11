@@ -110,6 +110,10 @@ export type VerticalFeatures = {
   // Read-only outbound campaign observability (/campaigns). Reads outreach.v_*
   // views; only verticals with an outreach.* schema (e.g. outbound-sales) enable it.
   campaignsTab?: boolean;
+  // The Panel "Resueltas por el bot" (self-resolution) KPI. Default-on; set false
+  // for verticals where a handoff IS the goal (outbound-sales), so the metric
+  // doesn't read backwards.
+  botResolutionKpi?: boolean;
 };
 
 export type VerticalConfig = {

@@ -179,21 +179,25 @@ export default async function OverviewPage({
           live here, but it depends on `?touch=` so it now lives inside the
           Composición de la demanda section, next to the selector that drives
           its value. */}
-      <div
-        data-reveal
-        style={{ ["--reveal-delay" as string]: "160ms" }}
-        className="grid gap-3 grid-cols-1 lg:grid-cols-2"
-      >
-        <KpiCard
-          label="Resueltas por el bot"
-          value={selfResolution.rate}
-          previousValue={selfResolutionPrevious.rate}
-          format="percent"
-          higherIsBetter={true}
-          locale={tenant.locale}
-          valueCaption={`${formatNumber(selfResolution.contactsSelfResolved, tenant.locale)} de ${formatNumber(selfResolution.contactsTotal, tenant.locale)} contactos`}
-        />
-      </div>
+      {/* Hidden for verticals where bot self-resolution is not the goal (e.g.
+          outbound-sales, where a handoff IS the win). Default-on. */}
+      {vertical.features?.botResolutionKpi !== false && (
+        <div
+          data-reveal
+          style={{ ["--reveal-delay" as string]: "160ms" }}
+          className="grid gap-3 grid-cols-1 lg:grid-cols-2"
+        >
+          <KpiCard
+            label="Resueltas por el bot"
+            value={selfResolution.rate}
+            previousValue={selfResolutionPrevious.rate}
+            format="percent"
+            higherIsBetter={true}
+            locale={tenant.locale}
+            valueCaption={`${formatNumber(selfResolution.contactsSelfResolved, tenant.locale)} de ${formatNumber(selfResolution.contactsTotal, tenant.locale)} contactos`}
+          />
+        </div>
+      )}
 
       {/* Daily volume — full-width, kicker caption above. */}
       <section

@@ -82,5 +82,8 @@ export const outboundSales: VerticalConfig = {
 
   features: {
     campaignsTab: true,
+    // A handoff (demo) is the goal here, so "Resueltas por el bot" reads backwards
+    // — hide it on the Panel.
+    botResolutionKpi: false,
   },
 };
