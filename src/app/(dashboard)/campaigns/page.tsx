@@ -39,7 +39,7 @@ export default async function CampaignsPage() {
     { label: "Enviados", value: formatNumber(overview.total_sent, tenant.locale) },
     { label: "Tasa de respuesta", value: formatPercent(overview.reply_rate, tenant.locale) },
     { label: "Respondieron", value: formatNumber(overview.total_replied, tenant.locale) },
-    { label: "Opt-out", value: formatNumber(overview.total_opted_out, tenant.locale) },
+    { label: "Bajas", value: formatNumber(overview.total_opted_out, tenant.locale) },
     { label: "Suprimidos", value: formatNumber(overview.suppressed, tenant.locale) },
   ];
 

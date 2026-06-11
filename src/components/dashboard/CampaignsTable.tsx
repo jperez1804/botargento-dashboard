@@ -28,7 +28,7 @@ export function CampaignsTable({ rows, locale }: Props) {
       <table className="w-full border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-[var(--rule)] bg-[var(--canvas)] text-left">
-            {["Campaña", "Estado", "Prospectos", "Enviados", "Respondió", "Opt-out", "Resp. %", "Hoy / Cap"].map(
+            {["Campaña", "Estado", "Prospectos", "Enviados", "Respondió", "Bajas", "Resp. %", "Hoy / Cap"].map(
               (h) => (
                 <th
                   key={h}
