@@ -12,7 +12,11 @@ import { getConversationControl, getWindowState } from "@/lib/queries/inbox";
 import { tenantConfig } from "@/config/tenant";
 import { verticalConfig } from "@/config/verticals";
 import { ConversationTimeline } from "@/components/dashboard/ConversationTimeline";
-import { InboxControls } from "@/components/dashboard/InboxControls";
+import {
+  InboxControlBar,
+  InboxComposer,
+  ScrollToLatest,
+} from "@/components/dashboard/InboxControls";
 
 export const dynamic = "force-dynamic";
 
@@ -64,11 +68,13 @@ export default async function InboxConversationPage({ params }: Props) {
         ) : null}
       </header>
 
-      <InboxControls
+      {/* WhatsApp-style layout: control bar as chat header, thread in the
+       * middle, composer sticky at the bottom next to the newest messages,
+       * with the view pinned to the latest entry. */}
+      <InboxControlBar
         waId={contact.contactWaId}
         mode={control.mode}
         takenBy={control.takenBy}
-        inWindow={windowState.inWindow}
       />
 
       <ConversationTimeline
@@ -76,6 +82,14 @@ export default async function InboxConversationPage({ params }: Props) {
         intents={vertical.intents}
         locale={tenant.locale}
         timezone={tenant.timezone}
+      />
+
+      <ScrollToLatest entriesCount={entries.length} />
+
+      <InboxComposer
+        waId={contact.contactWaId}
+        mode={control.mode}
+        inWindow={windowState.inWindow}
       />
     </div>
   );

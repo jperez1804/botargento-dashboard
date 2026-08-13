@@ -1,24 +1,18 @@
 "use client";
 
-// Client half of the two-way inbox: the Tomar/Devolver toggle + the reply
-// composer. All writes go through /api/inbox/* (which delegates to the n8n
-// webhook) — this component never touches the DB. v1 refresh model: explicit
-// router.refresh() after every action + a 30s background poll.
+// Client half of the two-way inbox, split WhatsApp-style: InboxControlBar
+// (mode + Tomar/Devolver toggle) renders ABOVE the thread as a chat header;
+// InboxComposer renders BELOW it, sticky at the viewport bottom, next to the
+// newest messages; ScrollToLatest keeps the view pinned to the latest entry.
+// All writes go through /api/inbox/* (which delegates to the n8n webhook) —
+// these components never touch the DB. v1 refresh model: router.refresh()
+// after every action + a 30s background poll.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Hand, Send, Undo2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-type Props = {
-  waId: string;
-  mode: "bot" | "human";
-  takenBy: string;
-  inWindow: boolean;
-};
-
-type Busy = "none" | "toggle" | "send";
 
 const ERROR_LABELS: Record<string, string> = {
   "fuera de ventana (el contacto no escribio en las ultimas 24h)":
@@ -27,77 +21,65 @@ const ERROR_LABELS: Record<string, string> = {
   webhook_unreachable: "No se pudo contactar al motor (n8n). Reintentá.",
 };
 
-export function InboxControls({ waId, mode, takenBy, inWindow }: Props) {
-  const router = useRouter();
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState<Busy>("none");
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+async function postInbox(
+  path: string,
+  body: Record<string, unknown>,
+  setError: (v: string | null) => void,
+): Promise<boolean> {
+  setError(null);
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let message = `Error ${res.status}`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (data.error) message = ERROR_LABELS[data.error] ?? data.error;
+    } catch {
+      // keep the status fallback
+    }
+    setError(message);
+    return false;
+  }
+  return true;
+}
 
+// ---------------------------------------------------------------------------
+// Control bar — chat header: current mode + takeover toggle + bot warning.
+// ---------------------------------------------------------------------------
+
+type ControlBarProps = {
+  waId: string;
+  mode: "bot" | "human";
+  takenBy: string;
+};
+
+export function InboxControlBar({ waId, mode, takenBy }: ControlBarProps) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const isHuman = mode === "human";
 
   // Background poll so inbound replies appear without manual reloads (v1:
-  // polling, not SSE). 30s keeps the tenant DB load negligible.
+  // polling, not SSE). Lives here (single instance per page), not in the
+  // composer, so it survives composer disabled states.
   useEffect(() => {
     const t = setInterval(() => router.refresh(), 30_000);
     return () => clearInterval(t);
   }, [router]);
 
-  async function post(path: string, body: Record<string, unknown>): Promise<boolean> {
-    setError(null);
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      let message = `Error ${res.status}`;
-      try {
-        const data = (await res.json()) as { error?: string };
-        if (data.error) message = ERROR_LABELS[data.error] ?? data.error;
-      } catch {
-        // keep the status fallback
-      }
-      setError(message);
-      return false;
-    }
-    return true;
-  }
-
   async function handleToggle() {
-    setBusy("toggle");
-    setNotice(null);
+    setBusy(true);
     const action = isHuman ? "release" : "takeover";
-    const ok = await post(`/api/inbox/${action}`, { contactWaId: waId });
-    if (ok) {
-      setNotice(
-        action === "takeover"
-          ? "Conversación tomada — el bot está en pausa para este contacto."
-          : "Conversación devuelta — el bot volvió a atender.",
-      );
-      router.refresh();
-    }
-    setBusy("none");
-  }
-
-  async function handleSend() {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    setBusy("send");
-    setNotice(null);
-    const ok = await post("/api/inbox/send", { contactWaId: waId, text: trimmed });
-    if (ok) {
-      setText("");
-      router.refresh();
-      textareaRef.current?.focus();
-    }
-    setBusy("none");
+    const ok = await postInbox(`/api/inbox/${action}`, { contactWaId: waId }, setError);
+    if (ok) router.refresh();
+    setBusy(false);
   }
 
   return (
-    <div className="space-y-3">
-      {/* Control strip: current mode + toggle */}
+    <div className="space-y-2">
       <div
         className={cn(
           "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3",
@@ -120,7 +102,7 @@ export function InboxControls({ waId, mode, takenBy, inWindow }: Props) {
           type="button"
           variant={isHuman ? "outline" : "default"}
           size="sm"
-          disabled={busy !== "none"}
+          disabled={busy}
           onClick={handleToggle}
         >
           {isHuman ? (
@@ -137,26 +119,63 @@ export function InboxControls({ waId, mode, takenBy, inWindow }: Props) {
         </Button>
       </div>
 
-      {/* Bot-active warning when composing without takeover — signaling only,
-       * the manual choice is honored (no auto-takeover). */}
-      {!isHuman ? (
-        <div className="flex items-start gap-2 rounded-lg border border-[var(--rule)] bg-[var(--canvas-2)] px-3 py-2 text-[12.5px] text-[var(--muted-ink)]">
-          <TriangleAlert className="size-4 shrink-0 mt-0.5 text-amber-500" aria-hidden="true" />
-          <span>
-            El bot sigue activo en esta conversación: si enviás un mensaje sin tomarla,
-            el bot puede responder en paralelo.
-          </span>
+      {error ? (
+        <div role="alert" className="rounded-lg border border-red-300/60 bg-red-500/10 px-3 py-2 text-[12.5px] text-[var(--ink)]">
+          {error}
         </div>
       ) : null}
+    </div>
+  );
+}
 
-      {/* Composer */}
-      <div className="rounded-xl border border-[var(--rule)] bg-[var(--surface)] p-3 space-y-2">
+// ---------------------------------------------------------------------------
+// Composer — sticky at the viewport bottom, right under the newest messages.
+// ---------------------------------------------------------------------------
+
+type ComposerProps = {
+  waId: string;
+  mode: "bot" | "human";
+  inWindow: boolean;
+};
+
+export function InboxComposer({ waId, mode, inWindow }: ComposerProps) {
+  const router = useRouter();
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isHuman = mode === "human";
+
+  async function handleSend() {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    const ok = await postInbox("/api/inbox/send", { contactWaId: waId, text: trimmed }, setError);
+    if (ok) {
+      setText("");
+      router.refresh();
+      textareaRef.current?.focus();
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div className="sticky bottom-0 -mx-1 px-1 pb-2 pt-3 bg-[var(--canvas)]">
+      <div className="rounded-xl border border-[var(--rule)] bg-[var(--surface)] p-3 space-y-2 shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.25)]">
+        {/* Bot-active warning while composing without takeover — signaling
+         * only, the manual choice is honored (no auto-takeover). */}
+        {!isHuman ? (
+          <div className="flex items-start gap-2 text-[12px] text-[var(--muted-ink)]">
+            <TriangleAlert className="size-3.5 shrink-0 mt-0.5 text-amber-500" aria-hidden="true" />
+            <span>El bot sigue activo: si enviás sin tomar la conversación, puede responder en paralelo.</span>
+          </div>
+        ) : null}
         <textarea
           ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          disabled={!inWindow || busy === "send"}
-          rows={3}
+          disabled={!inWindow || busy}
+          rows={2}
           maxLength={4000}
           placeholder={
             inWindow
@@ -183,25 +202,39 @@ export function InboxControls({ waId, mode, takenBy, inWindow }: Props) {
           <Button
             type="button"
             size="sm"
-            disabled={!inWindow || busy !== "none" || !text.trim()}
+            disabled={!inWindow || busy || !text.trim()}
             onClick={handleSend}
           >
             <Send className="size-4" aria-hidden="true" />
-            {busy === "send" ? "Enviando…" : "Enviar"}
+            {busy ? "Enviando…" : "Enviar"}
           </Button>
         </div>
+        {error ? (
+          <div role="alert" className="rounded-lg border border-red-300/60 bg-red-500/10 px-3 py-2 text-[12.5px] text-[var(--ink)]">
+            {error}
+          </div>
+        ) : null}
       </div>
-
-      {error ? (
-        <div role="alert" className="rounded-lg border border-red-300/60 bg-red-500/10 px-3 py-2 text-[12.5px] text-[var(--ink)]">
-          {error}
-        </div>
-      ) : null}
-      {notice ? (
-        <div role="status" className="rounded-lg border border-[var(--rule)] bg-[var(--canvas-2)] px-3 py-2 text-[12.5px] text-[var(--muted-ink)]">
-          {notice}
-        </div>
-      ) : null}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Scroll pin — jumps to the newest message on load and whenever the entry
+// count changes (send, poll refresh). Instant on first paint, smooth after.
+// ---------------------------------------------------------------------------
+
+export function ScrollToLatest({ entriesCount }: { entriesCount: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    ref.current?.scrollIntoView({
+      behavior: firstRender.current ? "instant" : "smooth",
+      block: "end",
+    });
+    firstRender.current = false;
+  }, [entriesCount]);
+
+  return <div ref={ref} aria-hidden="true" />;
 }
