@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { verticalConfig } from "@/config/verticals";
 import { getSessionRole } from "@/lib/role-guard";
+import { inboxEnabled } from "@/lib/inbox";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import type { NavItemDef } from "@/config/verticals/_types";
@@ -29,6 +30,12 @@ const CAMPAIGNS_NAV_ITEM: NavItemDef = {
   icon: "campaigns",
 };
 
+const INBOX_NAV_ITEM: NavItemDef = {
+  href: "/inbox",
+  label: "Inbox",
+  icon: "inbox",
+};
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // The /proxy.ts guard already redirects unauthenticated requests, so this
   // session() call is a safe source of truth for user-facing chrome.
@@ -44,9 +51,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ...(vertical.features?.laborPoolTab ? [LABOR_POOL_NAV_ITEM] : []),
     ...(vertical.features?.campaignsTab ? [CAMPAIGNS_NAV_ITEM] : []),
   ];
+  // Inbox is admin-only AND tenant-gated (vertical capability + webhook env) —
+  // viewers and non-inbox tenants never see the tab.
+  const adminFeatureItems: NavItemDef[] = inboxEnabled() ? [INBOX_NAV_ITEM] : [];
   const navItems: ReadonlyArray<NavItemDef> =
     sessionRole?.role === "admin"
-      ? [...vertical.nav, ...featureItems, SETTINGS_NAV_ITEM]
+      ? [...vertical.nav, ...featureItems, ...adminFeatureItems, SETTINGS_NAV_ITEM]
       : [...vertical.nav, ...featureItems];
 
   return (

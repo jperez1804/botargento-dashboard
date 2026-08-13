@@ -23,6 +23,11 @@ const schema = z.object({
   // Vertical selection (used by Step 7)
   VERTICAL: z.string().min(1).default("real-estate"),
 
+  // Two-way inbox (optional — only tenants whose n8n has the inbox webhook set
+  // these; absence disables the /inbox tab even when the vertical allows it).
+  N8N_INBOX_WEBHOOK_URL: z.string().url().optional(),
+  N8N_INBOX_WEBHOOK_TOKEN: z.string().min(16).optional(),
+
   // Runtime
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

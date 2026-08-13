@@ -85,5 +85,9 @@ export const outboundSales: VerticalConfig = {
     // A handoff (demo) is the goal here, so "Resueltas por el bot" reads backwards
     // — hide it on the Panel.
     botResolutionKpi: false,
+    // Capability only — the tab activates per tenant via N8N_INBOX_WEBHOOK_URL/
+    // TOKEN in dashboard.env (currently only the ventas tenant has the n8n
+    // inbox webhook deployed).
+    inboxTab: true,
   },
 };

@@ -27,6 +27,9 @@ export type LeadLogEntry = {
   route: string | null;
   messageText: string | null;
   createdAt: string;
+  // '' = bot/legacy, 'human' = agent-sent via the two-way inbox. Renders as a
+  // third bubble style in ConversationTimeline.
+  sentBy: string;
 };
 
 function mapContact(r: Record<string, unknown>): ContactSummary {
@@ -85,8 +88,12 @@ export async function getContact(waId: string): Promise<ContactSummary | null> {
 }
 
 export async function getConversation(waId: string): Promise<LeadLogEntry[]> {
+  // COALESCE guards tenants whose schema predates the two-way inbox ALTER
+  // (lead_log.sent_by) — the column ships with the inbox schema, but this
+  // query runs for every tenant.
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT id, direction, intent, route, text_body AS message_text, log_timestamp AS created_at
+    SELECT id, direction, intent, route, text_body AS message_text, log_timestamp AS created_at,
+           COALESCE(to_jsonb(automation.lead_log) ->> 'sent_by', '') AS sent_by
     FROM automation.lead_log
     WHERE contact_wa_id = ${waId}
     ORDER BY log_timestamp ASC, id ASC
@@ -100,6 +107,7 @@ export async function getConversation(waId: string): Promise<LeadLogEntry[]> {
       route: r.route === null ? null : String(r.route),
       messageText: r.message_text === null ? null : String(r.message_text),
       createdAt: new Date(r.created_at as string | Date).toISOString(),
+      sentBy: String(r.sent_by ?? ""),
     };
   });
 }

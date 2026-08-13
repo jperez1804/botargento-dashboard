@@ -10,6 +10,7 @@ import {
   ListTodo,
   Megaphone,
   MessageSquare,
+  MessageSquareReply,
   Settings,
   Truck,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const ICON_MAP: Record<NavIconKey, IconComponent> = {
   providers: Truck,
   "labor-pool": HardHat,
   campaigns: Megaphone,
+  inbox: MessageSquareReply,
   settings: Settings,
 };
 

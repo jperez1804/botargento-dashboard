@@ -88,8 +88,9 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
           <ol className="space-y-1.5">
             {bucket.entries.map((e) => {
               const isInbound = e.direction === "inbound";
+              const isAgent = !isInbound && e.sentBy === "human";
               const intent = intentLabel(e.intent, intents);
-              const flowTag = !isInbound && e.route
+              const flowTag = !isInbound && !isAgent && e.route
                 ? `${intent ? intent.toLowerCase() + " · " : ""}${e.route}`
                 : null;
               return (
@@ -106,13 +107,22 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
                       // Customer (left): surface bg, top-left corner squared
                       // to read as a "tail" pointing at the customer.
                       // Bot (right): canvas-2 bg, top-right corner squared.
-                      // The fill diff is subtle but reads instantly at full
-                      // conversation density.
+                      // Agent (right, sent_by='human' via the two-way inbox):
+                      // same geometry as the bot but a brand-tinted border +
+                      // an AGENTE tag — a human reply must be visually
+                      // distinct from the bot at a glance.
                       isInbound
                         ? "bg-[var(--surface)] border-[var(--rule)] rounded-xl rounded-tl-sm"
-                        : "bg-[var(--canvas-2)] border-[var(--rule)] rounded-xl rounded-tr-sm",
+                        : isAgent
+                          ? "bg-[var(--canvas-2)] border-[color-mix(in_oklch,var(--client-primary)_55%,var(--rule))] rounded-xl rounded-tr-sm"
+                          : "bg-[var(--canvas-2)] border-[var(--rule)] rounded-xl rounded-tr-sm",
                     )}
                   >
+                    {isAgent ? (
+                      <div className="text-[10px] tracking-[0.08em] uppercase font-semibold text-[color-mix(in_oklch,var(--client-primary)_80%,var(--ink))] font-[var(--font-geist-mono)] mb-1">
+                        Agente
+                      </div>
+                    ) : null}
                     {flowTag ? (
                       <div className="text-[10px] tracking-[0.08em] uppercase font-medium text-[var(--soft-ink)] font-[var(--font-geist-mono)] mb-1">
                         {flowTag}

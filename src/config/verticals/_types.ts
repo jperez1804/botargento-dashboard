@@ -10,6 +10,7 @@ export type NavIconKey =
   | "providers"
   | "labor-pool"
   | "campaigns"
+  | "inbox"
   | "settings";
 
 export type NavItemDef = {
@@ -114,6 +115,12 @@ export type VerticalFeatures = {
   // for verticals where a handoff IS the goal (outbound-sales), so the metric
   // doesn't read backwards.
   botResolutionKpi?: boolean;
+  // Two-way inbox (/inbox): reply by hand + pause the bot per conversation.
+  // The vertical flag is only the capability; actual per-tenant activation
+  // additionally requires N8N_INBOX_WEBHOOK_URL/TOKEN in the tenant env (see
+  // inboxEnabled() in lib/inbox) — tenants without the n8n inbox webhook never
+  // render the tab even on this vertical.
+  inboxTab?: boolean;
 };
 
 export type VerticalConfig = {
