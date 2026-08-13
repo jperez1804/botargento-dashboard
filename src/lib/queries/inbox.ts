@@ -29,6 +29,27 @@ export async function getConversationControl(waId: string): Promise<Conversation
   };
 }
 
+export type HumanControlledRow = {
+  contactWaId: string;
+  takenBy: string;
+};
+
+/**
+ * All currently human-controlled conversations — drives the Tomada/Bot badge
+ * on the /inbox list (one query for the whole list, not one per row).
+ */
+export async function listHumanControlled(): Promise<HumanControlledRow[]> {
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT contact_wa_id, taken_by
+    FROM automation.v_conversation_control
+    WHERE is_human_controlled = true
+  `;
+  return rows.map((r) => ({
+    contactWaId: String(r.contact_wa_id),
+    takenBy: String(r.taken_by ?? ""),
+  }));
+}
+
 export type WindowState = {
   lastInboundAt: string | null;
   inWindow: boolean;
