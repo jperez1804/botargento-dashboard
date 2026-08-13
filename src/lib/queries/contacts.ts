@@ -88,13 +88,13 @@ export async function getContact(waId: string): Promise<ContactSummary | null> {
 }
 
 export async function getConversation(waId: string): Promise<LeadLogEntry[]> {
-  // COALESCE guards tenants whose schema predates the two-way inbox ALTER
-  // (lead_log.sent_by) — the column ships with the inbox schema, but this
-  // query runs for every tenant.
+  // The to_jsonb(ll) ->> 'sent_by' indirection guards tenants whose schema
+  // predates the two-way inbox ALTER (lead_log.sent_by) — a direct column
+  // reference would 42703 on them; this query runs for every tenant.
   const rows = await sql<Record<string, unknown>[]>`
     SELECT id, direction, intent, route, text_body AS message_text, log_timestamp AS created_at,
-           COALESCE(to_jsonb(automation.lead_log) ->> 'sent_by', '') AS sent_by
-    FROM automation.lead_log
+           COALESCE(to_jsonb(ll) ->> 'sent_by', '') AS sent_by
+    FROM automation.lead_log AS ll
     WHERE contact_wa_id = ${waId}
     ORDER BY log_timestamp ASC, id ASC
   `;
