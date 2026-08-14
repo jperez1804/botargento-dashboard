@@ -128,7 +128,7 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
                         {flowTag}
                       </div>
                     ) : null}
-                    <div className="whitespace-pre-wrap">
+                    <div className="whitespace-pre-wrap break-words">
                       {e.messageText ?? (
                         <span className="text-[var(--soft-ink)] italic">(sin texto)</span>
                       )}

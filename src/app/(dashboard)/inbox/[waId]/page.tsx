@@ -15,7 +15,7 @@ import { ConversationTimeline } from "@/components/dashboard/ConversationTimelin
 import {
   InboxControlBar,
   InboxComposer,
-  ScrollToLatest,
+  InboxThread,
 } from "@/components/dashboard/InboxControls";
 
 export const dynamic = "force-dynamic";
@@ -42,8 +42,12 @@ export default async function InboxConversationPage({ params }: Props) {
   const contactName = contact.displayName ?? contact.contactWaId;
 
   return (
-    <div className="space-y-6">
-      <nav aria-label="Migas de pan" className="flex flex-wrap items-center gap-3 text-[13px]">
+    /* Real chat layout: the page itself never scrolls — the column is bound
+     * to the viewport, only the THREAD scrolls inside its own container, and
+     * the control bar + composer stay visible no matter what. This is what
+     * keeps the composer on screen across send/poll refreshes. */
+    <div className="flex flex-col gap-3 h-[calc(100dvh-150px)] min-h-[420px]">
+      <nav aria-label="Migas de pan" className="flex flex-wrap items-center gap-3 text-[13px] shrink-0">
         <Link
           href="/inbox"
           className="inline-flex items-center gap-1.5 text-[var(--muted-ink)] hover:text-[var(--ink)] hover:underline underline-offset-[3px] rounded focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2"
@@ -54,43 +58,40 @@ export default async function InboxConversationPage({ params }: Props) {
         <span aria-hidden="true" className="text-[var(--rule-strong)]">
           /
         </span>
-        <span className="text-[var(--ink)] font-medium truncate min-w-0">{contactName}</span>
+        <span className="text-[var(--ink)] font-semibold truncate min-w-0">{contactName}</span>
+        {contact.displayName ? (
+          <span className="text-[12px] text-[var(--soft-ink)] font-[var(--font-geist-mono)] tabular-nums">
+            {contact.contactWaId}
+          </span>
+        ) : null}
       </nav>
 
-      <header className="space-y-1.5">
-        <h1 className="text-[24px] font-semibold tracking-[-0.02em] leading-[1.15] text-[var(--ink)]">
-          {contactName}
-        </h1>
-        {contact.displayName ? (
-          <div className="text-[12.5px] text-[var(--soft-ink)] font-[var(--font-geist-mono)] tabular-nums">
-            {contact.contactWaId}
-          </div>
-        ) : null}
-      </header>
+      <div className="shrink-0">
+        <InboxControlBar
+          waId={contact.contactWaId}
+          mode={control.mode}
+          takenBy={control.takenBy}
+        />
+      </div>
 
-      {/* WhatsApp-style layout: control bar as chat header, thread in the
-       * middle, composer sticky at the bottom next to the newest messages,
-       * with the view pinned to the latest entry. */}
-      <InboxControlBar
-        waId={contact.contactWaId}
-        mode={control.mode}
-        takenBy={control.takenBy}
-      />
+      {/* The only scrollable region — WhatsApp scroll semantics (follow when
+       * at the bottom, unread pill when reading history) live in InboxThread. */}
+      <InboxThread entriesCount={entries.length}>
+        <ConversationTimeline
+          entries={entries}
+          intents={vertical.intents}
+          locale={tenant.locale}
+          timezone={tenant.timezone}
+        />
+      </InboxThread>
 
-      <ConversationTimeline
-        entries={entries}
-        intents={vertical.intents}
-        locale={tenant.locale}
-        timezone={tenant.timezone}
-      />
-
-      <ScrollToLatest entriesCount={entries.length} />
-
-      <InboxComposer
-        waId={contact.contactWaId}
-        mode={control.mode}
-        inWindow={windowState.inWindow}
-      />
+      <div className="shrink-0">
+        <InboxComposer
+          waId={contact.contactWaId}
+          mode={control.mode}
+          inWindow={windowState.inWindow}
+        />
+      </div>
     </div>
   );
 }

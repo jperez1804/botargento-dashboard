@@ -8,11 +8,15 @@
 // these components never touch the DB. v1 refresh model: router.refresh()
 // after every action + a 30s background poll.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Hand, Send, Undo2, TriangleAlert } from "lucide-react";
+import { ChevronDown, Hand, Send, Undo2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+// Fired by the composer after a successful send so the thread force-scrolls
+// to the new message even if the operator was reading history.
+const FORCE_SCROLL_EVENT = "inbox:force-scroll";
 
 const ERROR_LABELS: Record<string, string> = {
   "fuera de ventana (el contacto no escribio en las ultimas 24h)":
@@ -154,14 +158,15 @@ export function InboxComposer({ waId, mode, inWindow }: ComposerProps) {
     if (ok) {
       setText("");
       router.refresh();
+      window.dispatchEvent(new Event(FORCE_SCROLL_EVENT));
       textareaRef.current?.focus();
     }
     setBusy(false);
   }
 
   return (
-    <div className="sticky bottom-0 -mx-1 px-1 pb-2 pt-3 bg-[var(--canvas)]">
-      <div className="rounded-xl border border-[var(--rule)] bg-[var(--surface)] p-3 space-y-2 shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.25)]">
+    <div>
+      <div className="rounded-xl border border-[var(--rule)] bg-[var(--surface)] p-3 space-y-2">
         {/* Bot-active warning while composing without takeover — signaling
          * only, the manual choice is honored (no auto-takeover). */}
         {!isHuman ? (
@@ -172,6 +177,7 @@ export function InboxComposer({ waId, mode, inWindow }: ComposerProps) {
         ) : null}
         <textarea
           ref={textareaRef}
+          aria-label="Respuesta al contacto"
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={!inWindow || busy}
@@ -220,21 +226,93 @@ export function InboxComposer({ waId, mode, inWindow }: ComposerProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Scroll pin — jumps to the newest message on load and whenever the entry
-// count changes (send, poll refresh). Instant on first paint, smooth after.
+// Thread — the only scrollable region, WhatsApp-style scroll semantics:
+//   · pinned to the newest message while you're at (or near) the bottom
+//   · if you're reading history and new messages land, the view does NOT
+//     jump — a "mensajes nuevos" pill appears; clicking it (or scrolling
+//     down yourself) catches up and dismisses it
+//   · your own sends always jump to the bottom (FORCE_SCROLL_EVENT)
+// Children are the server-rendered ConversationTimeline.
 // ---------------------------------------------------------------------------
 
-export function ScrollToLatest({ entriesCount }: { entriesCount: number }) {
-  const ref = useRef<HTMLDivElement>(null);
+const NEAR_BOTTOM_PX = 120;
+
+export function InboxThread({
+  entriesCount,
+  children,
+}: {
+  entriesCount: number;
+  children: React.ReactNode;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const nearBottomRef = useRef(true);
+  const prevCountRef = useRef(entriesCount);
   const firstRender = useRef(true);
+  const [unread, setUnread] = useState(0);
 
+  const scrollToBottom = useCallback((smooth: boolean) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth && !reduced ? "smooth" : "instant" });
+    setUnread(0);
+  }, []);
+
+  // New entries: follow if near the bottom, otherwise accumulate the pill.
   useEffect(() => {
-    ref.current?.scrollIntoView({
-      behavior: firstRender.current ? "instant" : "smooth",
-      block: "end",
-    });
-    firstRender.current = false;
-  }, [entriesCount]);
+    const delta = entriesCount - prevCountRef.current;
+    prevCountRef.current = entriesCount;
+    if (firstRender.current) {
+      firstRender.current = false;
+      scrollToBottom(false);
+      return;
+    }
+    if (delta <= 0) return;
+    if (nearBottomRef.current) scrollToBottom(true);
+    else setUnread((n) => n + delta);
+  }, [entriesCount, scrollToBottom]);
 
-  return <div ref={ref} aria-hidden="true" />;
+  // Own sends always catch up.
+  useEffect(() => {
+    const onForce = () => scrollToBottom(true);
+    window.addEventListener(FORCE_SCROLL_EVENT, onForce);
+    return () => window.removeEventListener(FORCE_SCROLL_EVENT, onForce);
+  }, [scrollToBottom]);
+
+  return (
+    <div className="relative flex-1 min-h-0">
+      <div
+        ref={containerRef}
+        className="h-full overflow-y-auto overscroll-contain pr-1"
+        onScroll={() => {
+          const el = containerRef.current;
+          if (!el) return;
+          const nearBottom =
+            el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
+          nearBottomRef.current = nearBottom;
+          if (nearBottom) setUnread(0);
+        }}
+      >
+        {children}
+      </div>
+
+      {unread > 0 ? (
+        <button
+          type="button"
+          role="status"
+          aria-live="polite"
+          onClick={() => scrollToBottom(true)}
+          className={cn(
+            "absolute bottom-3 left-1/2 -translate-x-1/2 cursor-pointer touch-manipulation",
+            "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium",
+            "bg-[var(--ink)] text-[var(--canvas)] shadow-lg",
+            "hover:opacity-90 focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2",
+          )}
+        >
+          <ChevronDown className="size-3.5" aria-hidden="true" />
+          {unread === 1 ? "1 mensaje nuevo" : `${unread} mensajes nuevos`}
+        </button>
+      ) : null}
+    </div>
+  );
 }
