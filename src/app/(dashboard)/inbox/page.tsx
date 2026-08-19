@@ -8,8 +8,9 @@ import { Bot, Hand } from "lucide-react";
 import { requireRole } from "@/lib/role-guard";
 import { inboxEnabled } from "@/lib/inbox";
 import { listContacts } from "@/lib/queries/contacts";
-import { listHumanControlled } from "@/lib/queries/inbox";
+import { getUnreadCounts, listHumanControlled } from "@/lib/queries/inbox";
 import { tenantConfig } from "@/config/tenant";
+import { InboxListPoller } from "@/components/dashboard/InboxControls";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,10 @@ export default async function InboxPage() {
   await requireRole("admin");
 
   const tenant = tenantConfig();
-  const [contacts, humanControlled] = await Promise.all([
-    listContacts({ limit: 50 }),
+  const contacts = await listContacts({ limit: 50 });
+  const [humanControlled, unread] = await Promise.all([
     listHumanControlled(),
+    getUnreadCounts(contacts.map((c) => c.contactWaId)),
   ]);
   const takenBy = new Map(humanControlled.map((h) => [h.contactWaId, h.takenBy]));
 
@@ -35,6 +37,7 @@ export default async function InboxPage() {
 
   return (
     <div className="space-y-6">
+      <InboxListPoller />
       <header className="space-y-1.5">
         <h1 className="text-[24px] font-semibold tracking-[-0.02em] leading-[1.15] text-[var(--ink)]">
           Inbox
@@ -58,7 +61,13 @@ export default async function InboxPage() {
                 className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-[var(--canvas-2)] focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:-outline-offset-2"
               >
                 <div className="min-w-0">
-                  <div className="text-[13.5px] font-medium text-[var(--ink)] truncate">
+                  <div
+                    className={
+                      (unread.get(c.contactWaId) ?? 0) > 0
+                        ? "text-[13.5px] font-bold text-[var(--ink)] truncate"
+                        : "text-[13.5px] font-medium text-[var(--ink)] truncate"
+                    }
+                  >
                     {c.displayName ?? c.contactWaId}
                   </div>
                   <div className="text-[12px] text-[var(--soft-ink)] font-[var(--font-geist-mono)] tabular-nums">
@@ -66,6 +75,14 @@ export default async function InboxPage() {
                   </div>
                 </div>
                 <div className="shrink-0 flex items-center gap-3">
+                  {(unread.get(c.contactWaId) ?? 0) > 0 ? (
+                    <span
+                      aria-label={`${unread.get(c.contactWaId)} mensajes sin leer`}
+                      className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-[var(--client-primary)] text-[color-mix(in_oklch,var(--client-primary)_18%,black)] text-[11.5px] font-bold tabular-nums"
+                    >
+                      {unread.get(c.contactWaId)}
+                    </span>
+                  ) : null}
                   {takenBy.has(c.contactWaId) ? (
                     <span
                       title={`A cargo de ${takenBy.get(c.contactWaId) || "un agente"}`}

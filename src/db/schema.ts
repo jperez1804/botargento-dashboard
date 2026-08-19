@@ -1,6 +1,15 @@
-import { pgSchema, text, timestamp, bigserial, jsonb, smallint } from "drizzle-orm/pg-core";
+import { pgSchema, text, timestamp, bigserial, bigint, jsonb, smallint } from "drizzle-orm/pg-core";
 
 export const dashboardSchema = pgSchema("dashboard");
+
+// Two-way inbox read tracking (see migrations/0004_inbox_read_state.sql).
+// Dashboard-side state: opening /inbox/[waId] advances last_read_log_id.
+export const inboxReadState = dashboardSchema.table("inbox_read_state", {
+  contactWaId: text("contact_wa_id").primaryKey(),
+  lastReadLogId: bigint("last_read_log_id", { mode: "number" }).notNull().default(0),
+  readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
+  readBy: text("read_by").notNull().default(""),
+});
 
 export const allowedEmails = dashboardSchema.table("allowed_emails", {
   email: text("email").primaryKey(),

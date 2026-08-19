@@ -226,6 +226,20 @@ export function InboxComposer({ waId, mode, inWindow }: ComposerProps) {
 }
 
 // ---------------------------------------------------------------------------
+// List poller — keeps the /inbox list (badges, unread counts, recency) fresh
+// without manual reloads. Invisible; 30s cadence like the thread poll.
+// ---------------------------------------------------------------------------
+
+export function InboxListPoller() {
+  const router = useRouter();
+  useEffect(() => {
+    const t = setInterval(() => router.refresh(), 30_000);
+    return () => clearInterval(t);
+  }, [router]);
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Thread — the only scrollable region, WhatsApp-style scroll semantics:
 //   · pinned to the newest message while you're at (or near) the bottom
 //   · if you're reading history and new messages land, the view does NOT

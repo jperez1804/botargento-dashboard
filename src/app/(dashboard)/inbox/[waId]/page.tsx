@@ -8,7 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/role-guard";
 import { inboxEnabled } from "@/lib/inbox";
 import { getContact, getConversation } from "@/lib/queries/contacts";
-import { getConversationControl, getWindowState } from "@/lib/queries/inbox";
+import { getConversationControl, getWindowState, markConversationRead } from "@/lib/queries/inbox";
 import { tenantConfig } from "@/config/tenant";
 import { verticalConfig } from "@/config/verticals";
 import { ConversationTimeline } from "@/components/dashboard/ConversationTimeline";
@@ -26,7 +26,7 @@ type Props = {
 
 export default async function InboxConversationPage({ params }: Props) {
   if (!inboxEnabled()) notFound();
-  await requireRole("admin");
+  const session = await requireRole("admin");
 
   const { waId } = await params;
   const [contact, entries, control, windowState] = await Promise.all([
@@ -36,6 +36,11 @@ export default async function InboxConversationPage({ params }: Props) {
     getWindowState(waId),
   ]);
   if (!contact) notFound();
+
+  // WhatsApp semantics: opening the thread marks it read (advances the
+  // dashboard-side watermark to the newest entry — writes dashboard.* only).
+  const lastEntryId = entries.at(-1)?.id ?? 0;
+  await markConversationRead(waId, lastEntryId, session.email);
 
   const tenant = tenantConfig();
   const vertical = verticalConfig();

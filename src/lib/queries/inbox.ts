@@ -50,6 +50,47 @@ export async function listHumanControlled(): Promise<HumanControlledRow[]> {
   }));
 }
 
+/**
+ * Unread counts for a set of contacts, in ONE query: inbound lead_log rows
+ * above each contact's dashboard.inbox_read_state.last_read_log_id (contacts
+ * with no row count everything inbound). Cross-schema read is fine:
+ * dashboard_app owns dashboard.* and has SELECT on automation.*.
+ */
+export async function getUnreadCounts(waIds: string[]): Promise<Map<string, number>> {
+  if (waIds.length === 0) return new Map();
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT l.contact_wa_id, COUNT(*)::int AS unread
+    FROM automation.lead_log l
+    LEFT JOIN dashboard.inbox_read_state r ON r.contact_wa_id = l.contact_wa_id
+    WHERE l.direction = 'inbound'
+      AND l.contact_wa_id = ANY(${waIds})
+      AND l.id > COALESCE(r.last_read_log_id, 0)
+    GROUP BY l.contact_wa_id
+  `;
+  return new Map(rows.map((r) => [String(r.contact_wa_id), Number(r.unread ?? 0)]));
+}
+
+/**
+ * Advances the read watermark for a conversation (WhatsApp semantics: opening
+ * the thread marks it read). GREATEST() keeps it monotonic under races.
+ * Writes dashboard.* only — the automation invariant holds.
+ */
+export async function markConversationRead(
+  waId: string,
+  upToLogId: number,
+  email: string,
+): Promise<void> {
+  if (!Number.isFinite(upToLogId) || upToLogId <= 0) return;
+  await sql`
+    INSERT INTO dashboard.inbox_read_state (contact_wa_id, last_read_log_id, read_at, read_by)
+    VALUES (${waId}, ${upToLogId}, NOW(), ${email})
+    ON CONFLICT (contact_wa_id) DO UPDATE
+    SET last_read_log_id = GREATEST(dashboard.inbox_read_state.last_read_log_id, EXCLUDED.last_read_log_id),
+        read_at = NOW(),
+        read_by = EXCLUDED.read_by
+  `;
+}
+
 export type WindowState = {
   lastInboundAt: string | null;
   inWindow: boolean;
