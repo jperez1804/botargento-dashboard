@@ -29,45 +29,110 @@ export async function getConversationControl(waId: string): Promise<Conversation
   };
 }
 
-export type HumanControlledRow = {
+// Single-select quick filters of the /inbox list. 'window' = the 24h reply
+// window is still open (the contact wrote in the last 24 hours).
+export type InboxFilter = "all" | "unread" | "taken" | "handoff" | "window";
+
+export const INBOX_FILTERS: readonly InboxFilter[] = [
+  "all",
+  "unread",
+  "taken",
+  "handoff",
+  "window",
+] as const;
+
+export type InboxConversation = {
   contactWaId: string;
+  displayName: string | null;
+  lastSeen: string;
+  messageCount: number;
+  unread: number;
+  mode: "bot" | "human";
   takenBy: string;
+  inWindow: boolean;
+  handoffCount: number;
 };
 
 /**
- * All currently human-controlled conversations — drives the Tomada/Bot badge
- * on the /inbox list (one query for the whole list, not one per row).
+ * The /inbox list in ONE query: contact summary + unread watermark + takeover
+ * state + 24h-window flag, filtered server-side. Cross-schema reads are fine
+ * (dashboard_app owns dashboard.* and has SELECT on automation.*); nothing
+ * here writes.
  */
-export async function listHumanControlled(): Promise<HumanControlledRow[]> {
+export async function listInboxConversations(opts: {
+  filter?: InboxFilter;
+  q?: string;
+  limit?: number;
+}): Promise<InboxConversation[]> {
+  const { filter = "all", q, limit = 50 } = opts;
+  const term = q ? `%${q}%` : null;
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT contact_wa_id, taken_by
-    FROM automation.v_conversation_control
-    WHERE is_human_controlled = true
+    SELECT * FROM (
+      SELECT
+        c.contact_wa_id,
+        c.display_name,
+        c.last_seen,
+        c.total_messages AS message_count,
+        c.handoff_count,
+        COALESCE(cc.mode, 'bot') AS mode,
+        COALESCE(cc.taken_by, '') AS taken_by,
+        COALESCE(cc.is_human_controlled, false) AS is_human_controlled,
+        (
+          SELECT COUNT(*)::int
+          FROM automation.lead_log l
+          LEFT JOIN dashboard.inbox_read_state r ON r.contact_wa_id = c.contact_wa_id
+          WHERE l.contact_wa_id = c.contact_wa_id
+            AND l.direction = 'inbound'
+            AND l.id > COALESCE(r.last_read_log_id, 0)
+        ) AS unread,
+        EXISTS (
+          SELECT 1 FROM automation.lead_log li
+          WHERE li.contact_wa_id = c.contact_wa_id
+            AND li.direction = 'inbound'
+            AND li.log_timestamp >= NOW() - INTERVAL '24 hours'
+        ) AS in_window
+      FROM automation.v_contact_summary c
+      LEFT JOIN automation.v_conversation_control cc ON cc.contact_wa_id = c.contact_wa_id
+      WHERE 1=1
+        ${term ? sql`AND (c.display_name ILIKE ${term} OR c.contact_wa_id ILIKE ${term})` : sql``}
+    ) t
+    WHERE 1=1
+      ${filter === "unread" ? sql`AND t.unread > 0` : sql``}
+      ${filter === "taken" ? sql`AND t.is_human_controlled` : sql``}
+      ${filter === "handoff" ? sql`AND t.handoff_count > 0` : sql``}
+      ${filter === "window" ? sql`AND t.in_window` : sql``}
+    ORDER BY t.last_seen DESC
+    LIMIT ${limit}
   `;
   return rows.map((r) => ({
     contactWaId: String(r.contact_wa_id),
+    displayName: r.display_name === null ? null : String(r.display_name),
+    lastSeen: new Date(r.last_seen as string | Date).toISOString(),
+    messageCount: Number(r.message_count ?? 0),
+    unread: Number(r.unread ?? 0),
+    mode: String(r.mode) === "human" ? "human" : "bot",
     takenBy: String(r.taken_by ?? ""),
+    inWindow: r.in_window === true,
+    handoffCount: Number(r.handoff_count ?? 0),
   }));
 }
 
 /**
- * Unread counts for a set of contacts, in ONE query: inbound lead_log rows
- * above each contact's dashboard.inbox_read_state.last_read_log_id (contacts
- * with no row count everything inbound). Cross-schema read is fine:
- * dashboard_app owns dashboard.* and has SELECT on automation.*.
+ * Total conversations with unread messages — the "Sin leer" chip counter,
+ * independent of the active filter/search.
  */
-export async function getUnreadCounts(waIds: string[]): Promise<Map<string, number>> {
-  if (waIds.length === 0) return new Map();
+export async function countUnreadConversations(): Promise<number> {
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT l.contact_wa_id, COUNT(*)::int AS unread
-    FROM automation.lead_log l
-    LEFT JOIN dashboard.inbox_read_state r ON r.contact_wa_id = l.contact_wa_id
-    WHERE l.direction = 'inbound'
-      AND l.contact_wa_id = ANY(${waIds})
-      AND l.id > COALESCE(r.last_read_log_id, 0)
-    GROUP BY l.contact_wa_id
+    SELECT COUNT(*)::int AS n FROM (
+      SELECT l.contact_wa_id
+      FROM automation.lead_log l
+      LEFT JOIN dashboard.inbox_read_state r ON r.contact_wa_id = l.contact_wa_id
+      WHERE l.direction = 'inbound'
+        AND l.id > COALESCE(r.last_read_log_id, 0)
+      GROUP BY l.contact_wa_id
+    ) t
   `;
-  return new Map(rows.map((r) => [String(r.contact_wa_id), Number(r.unread ?? 0)]));
+  return Number(rows[0]?.n ?? 0);
 }
 
 /**
