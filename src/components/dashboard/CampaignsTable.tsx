@@ -124,6 +124,14 @@ export function CampaignsTable({ rows, locale, actionsEnabled = false }: Props) 
                   >
                     {st.label}
                   </span>
+                  {r.status === "active" && r.pending === 0 ? (
+                    <div
+                      className="mt-1 font-[var(--font-geist-mono)] text-[10px] uppercase tracking-[0.06em] text-[var(--soft-ink)]"
+                      title="No quedan pendientes; se puede finalizar o sumar prospectos"
+                    >
+                      Pool completo
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <CampaignProgressBar value={campaignProgress(r)} locale={locale} />
@@ -155,7 +163,11 @@ export function CampaignsTable({ rows, locale, actionsEnabled = false }: Props) 
                 </td>
                 {actionsEnabled ? (
                   <td className="px-3 py-2.5">
-                    <CampaignRowActions campaignId={r.campaign_id} status={r.status} />
+                    <CampaignRowActions
+                      campaignId={r.campaign_id}
+                      status={r.status}
+                      pending={r.pending}
+                    />
                   </td>
                 ) : null}
               </tr>

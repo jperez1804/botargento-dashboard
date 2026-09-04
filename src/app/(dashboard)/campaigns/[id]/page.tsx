@@ -105,7 +105,11 @@ export default async function CampaignDetailPage({ params }: Props) {
             </p>
           </div>
           {actionsEnabled ? (
-            <CampaignRowActions campaignId={c.campaign_id} status={c.status} />
+            <CampaignRowActions
+              campaignId={c.campaign_id}
+              status={c.status}
+              pending={c.pending}
+            />
           ) : null}
         </div>
         <CampaignProgressBar

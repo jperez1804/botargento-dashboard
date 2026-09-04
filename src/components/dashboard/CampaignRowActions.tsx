@@ -72,9 +72,12 @@ const ACTION_BY_KEY: Record<string, PendingAction> = {
 type Props = {
   campaignId: number;
   status: string;
+  /** Pending recipients — with 0 the runner has nothing to send, so pausing
+   *  an active campaign is a no-op and the button is hidden. */
+  pending?: number;
 };
 
-export function CampaignRowActions({ campaignId, status }: Props) {
+export function CampaignRowActions({ campaignId, status, pending }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -105,7 +108,8 @@ export function CampaignRowActions({ campaignId, status }: Props) {
   }
 
   const available: { key: string; label: string; icon: ReactNode }[] = [];
-  if (status === "active") {
+  const poolExhausted = pending !== undefined && pending === 0;
+  if (status === "active" && !poolExhausted) {
     available.push({ key: "pause", label: "Pausar", icon: <Pause className="size-3.5" aria-hidden /> });
   }
   if (status === "paused" || status === "draft") {
