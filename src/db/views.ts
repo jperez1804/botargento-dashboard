@@ -569,3 +569,35 @@ export async function getQualityCurrent(): Promise<QualityCurrent> {
     last_updated: nullableStr(r.last_updated),
   };
 }
+
+export type CampaignRecipientRow = {
+  wa_id: string;
+  business_name: string;
+  contact_name: string;
+  status: string;
+  last_send_at: string | null;
+  touch_count: number;
+};
+
+// Latest recipients of one campaign (detail page). Reads the dedicated view —
+// same convention as the rest of this section: views, never base tables.
+export async function selectCampaignRecipients(
+  campaignId: number,
+  limit = 30,
+): Promise<CampaignRecipientRow[]> {
+  const rows = await pg<Record<string, unknown>[]>`
+    SELECT wa_id, business_name, contact_name, status, last_send_at, touch_count
+    FROM outreach.v_campaign_recipients
+    WHERE campaign_id = ${campaignId}
+    ORDER BY last_send_at DESC NULLS LAST, wa_id
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => ({
+    wa_id: String(r.wa_id ?? ""),
+    business_name: String(r.business_name ?? ""),
+    contact_name: String(r.contact_name ?? ""),
+    status: String(r.status ?? ""),
+    last_send_at: nullableStr(r.last_send_at),
+    touch_count: toNum(r.touch_count),
+  }));
+}

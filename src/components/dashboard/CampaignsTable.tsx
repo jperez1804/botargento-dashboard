@@ -1,5 +1,10 @@
+import Link from "next/link";
 import type { CampaignStatsRow } from "@/db/views";
 import { formatNumber, formatPercent } from "@/lib/format";
+import {
+  CampaignCapEditor,
+  CampaignRowActions,
+} from "@/components/dashboard/CampaignRowActions";
 
 // Domain-semantic status palette (not brand).
 const STATUS_PALETTE: Record<string, { bg: string; fg: string; label: string }> = {
@@ -9,12 +14,52 @@ const STATUS_PALETTE: Record<string, { bg: string; fg: string; label: string }> 
   done: { bg: "#EAEAEA", fg: "#333333", label: "Finalizada" },
 };
 
+// Share of the pool already sent (every non-pending row was attempted).
+export const campaignProgress = (r: CampaignStatsRow): number =>
+  r.total_recipients > 0 ? (r.total_recipients - r.pending) / r.total_recipients : 0;
+
+export function CampaignProgressBar({
+  value,
+  locale,
+  className = "",
+}: {
+  value: number;
+  locale: string;
+  className?: string;
+}) {
+  const pct = Math.max(0, Math.min(1, value));
+  return (
+    <div className={`flex items-center gap-2 ${className}`}>
+      <div
+        role="progressbar"
+        aria-valuenow={Math.round(pct * 100)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Progreso de envío"
+        className="h-1.5 w-full min-w-16 max-w-28 overflow-hidden rounded-full bg-[var(--canvas-2)]"
+      >
+        <div
+          className="h-full rounded-full transition-[width] duration-300"
+          style={{
+            width: `${pct * 100}%`,
+            backgroundColor: pct >= 1 ? "#1B5E20" : "var(--client-primary)",
+          }}
+        />
+      </div>
+      <span className="font-[var(--font-geist-mono)] text-[11px] tabular-nums text-[var(--muted-ink)]">
+        {formatPercent(pct, locale, 0)}
+      </span>
+    </div>
+  );
+}
+
 type Props = {
   rows: CampaignStatsRow[];
   locale: string;
+  actionsEnabled?: boolean;
 };
 
-export function CampaignsTable({ rows, locale }: Props) {
+export function CampaignsTable({ rows, locale, actionsEnabled = false }: Props) {
   if (rows.length === 0) {
     return (
       <div className="rounded-md border border-[var(--rule)] bg-[var(--surface)] px-4 py-8 text-center text-[13px] text-[var(--muted-ink)]">
@@ -23,21 +68,32 @@ export function CampaignsTable({ rows, locale }: Props) {
     );
   }
 
+  const headers = [
+    "Campaña",
+    "Estado",
+    "Progreso",
+    "Prospectos",
+    "Enviados",
+    "Respondió",
+    "Bajas",
+    "Resp. %",
+    "Hoy / Cap",
+    ...(actionsEnabled ? ["Acciones"] : []),
+  ];
+
   return (
     <div className="overflow-x-auto rounded-md border border-[var(--rule)]">
       <table className="w-full border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-[var(--rule)] bg-[var(--canvas)] text-left">
-            {["Campaña", "Estado", "Prospectos", "Enviados", "Respondió", "Bajas", "Resp. %", "Hoy / Cap"].map(
-              (h) => (
-                <th
-                  key={h}
-                  className="px-3 py-2 font-[var(--font-geist-mono)] text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--soft-ink)]"
-                >
-                  {h}
-                </th>
-              ),
-            )}
+            {headers.map((h) => (
+              <th
+                key={h}
+                className="px-3 py-2 font-[var(--font-geist-mono)] text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--soft-ink)]"
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -51,7 +107,12 @@ export function CampaignsTable({ rows, locale }: Props) {
             return (
               <tr key={r.campaign_id} className="border-b border-[var(--rule)] last:border-0">
                 <td className="px-3 py-2.5">
-                  <div className="font-medium text-[var(--ink)]">{r.name}</div>
+                  <Link
+                    href={`/campaigns/${r.campaign_id}`}
+                    className="font-medium text-[var(--ink)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)]"
+                  >
+                    {r.name}
+                  </Link>
                   <div className="font-[var(--font-geist-mono)] text-[11px] text-[var(--soft-ink)]">
                     {r.template_name}
                   </div>
@@ -63,6 +124,9 @@ export function CampaignsTable({ rows, locale }: Props) {
                   >
                     {st.label}
                   </span>
+                </td>
+                <td className="px-3 py-2.5">
+                  <CampaignProgressBar value={campaignProgress(r)} locale={locale} />
                 </td>
                 <td className="px-3 py-2.5 font-[var(--font-geist-mono)] tabular-nums text-[var(--ink)]">
                   {formatNumber(r.total_recipients, locale)}
@@ -81,9 +145,19 @@ export function CampaignsTable({ rows, locale }: Props) {
                 </td>
                 <td className="px-3 py-2.5 font-[var(--font-geist-mono)] tabular-nums">
                   <span style={{ color: overCap ? "#8A4B00" : "var(--muted-ink)" }}>
-                    {formatNumber(r.sent_today, locale)} / {formatNumber(r.daily_cap, locale)}
+                    {formatNumber(r.sent_today, locale)} /{" "}
+                    {actionsEnabled ? (
+                      <CampaignCapEditor campaignId={r.campaign_id} dailyCap={r.daily_cap} />
+                    ) : (
+                      formatNumber(r.daily_cap, locale)
+                    )}
                   </span>
                 </td>
+                {actionsEnabled ? (
+                  <td className="px-3 py-2.5">
+                    <CampaignRowActions campaignId={r.campaign_id} status={r.status} />
+                  </td>
+                ) : null}
               </tr>
             );
           })}

@@ -10,7 +10,11 @@ import {
 import { QualityBadge } from "@/components/dashboard/QualityBadge";
 import { CampaignsTable } from "@/components/dashboard/CampaignsTable";
 import { CampaignsDailyChart } from "@/components/dashboard/CampaignsDailyChart";
+import { CampaignsPoller } from "@/components/dashboard/CampaignRowActions";
+import { campaignActionsEnabled } from "@/lib/campaigns";
 import { formatNumber, formatPercent } from "@/lib/format";
+
+export const dynamic = "force-dynamic";
 
 const DAILY_WINDOW = 28;
 
@@ -45,6 +49,7 @@ export default async function CampaignsPage() {
 
   return (
     <div className="space-y-6">
+      <CampaignsPoller />
       <header className="space-y-3 border-b border-[var(--rule)] pb-5">
         <p className="font-[var(--font-geist-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">
           Outbound
@@ -82,7 +87,11 @@ export default async function CampaignsPage() {
         ))}
       </section>
 
-      <CampaignsTable rows={campaigns} locale={tenant.locale} />
+      <CampaignsTable
+        rows={campaigns}
+        locale={tenant.locale}
+        actionsEnabled={campaignActionsEnabled()}
+      />
 
       <CampaignsDailyChart data={chartData} locale={tenant.locale} />
     </div>

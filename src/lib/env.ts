@@ -28,6 +28,12 @@ const schema = z.object({
   N8N_INBOX_WEBHOOK_URL: z.string().url().optional(),
   N8N_INBOX_WEBHOOK_TOKEN: z.string().min(16).optional(),
 
+  // Campaign actions (optional — same tenant-gating idea as the inbox pair:
+  // only tenants whose n8n has the campaign-actions webhook set these; absence
+  // keeps /campaigns read-only even when the vertical allows the tab).
+  N8N_CAMPAIGN_WEBHOOK_URL: z.string().url().optional(),
+  N8N_CAMPAIGN_WEBHOOK_TOKEN: z.string().min(16).optional(),
+
   // Runtime
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
