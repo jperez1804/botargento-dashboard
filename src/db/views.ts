@@ -458,6 +458,8 @@ export type CampaignStatsRow = {
   template_name: string;
   status: string;
   daily_cap: number;
+  send_hour_start: number;
+  send_hour_end: number;
   total_recipients: number;
   pending: number;
   sent: number;
@@ -496,11 +498,15 @@ export type QualityCurrent = {
 };
 
 export async function selectCampaignStats(): Promise<CampaignStatsRow[]> {
+  // send_hour_* live on the campaigns table, not the stats view — join rather
+  // than altering the view (dashboard_app already has SELECT on outreach.*).
   const rows = await pg<Record<string, unknown>[]>`
-    SELECT campaign_id, name, vertical, template_name, status, daily_cap,
-           total_recipients, pending, sent, delivered, read, replied, failed,
-           opted_out, sent_today, reply_rate, opt_out_rate, last_send_at
-    FROM outreach.v_campaign_stats
+    SELECT v.campaign_id, v.name, v.vertical, v.template_name, v.status, v.daily_cap,
+           c.send_hour_start, c.send_hour_end,
+           v.total_recipients, v.pending, v.sent, v.delivered, v.read, v.replied, v.failed,
+           v.opted_out, v.sent_today, v.reply_rate, v.opt_out_rate, v.last_send_at
+    FROM outreach.v_campaign_stats v
+    JOIN outreach.campaigns c ON c.id = v.campaign_id
   `;
   return rows.map((r) => ({
     campaign_id: toNum(r.campaign_id),
@@ -509,6 +515,8 @@ export async function selectCampaignStats(): Promise<CampaignStatsRow[]> {
     template_name: String(r.template_name ?? ""),
     status: String(r.status ?? ""),
     daily_cap: toNum(r.daily_cap),
+    send_hour_start: toNum(r.send_hour_start),
+    send_hour_end: toNum(r.send_hour_end),
     total_recipients: toNum(r.total_recipients),
     pending: toNum(r.pending),
     sent: toNum(r.sent),

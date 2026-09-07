@@ -14,6 +14,17 @@ const STATUS_PALETTE: Record<string, { bg: string; fg: string; label: string }> 
   done: { bg: "#EAEAEA", fg: "#333333", label: "Finalizada" },
 };
 
+// The campaign runner gates sends by AR-local hour (send_hour_start <= h <
+// send_hour_end) and business days only — surfaced here so it's visible why a
+// campaign isn't sending right now.
+const SEND_TIMEZONE_LABEL = "Hora Argentina (GMT-3)";
+const SEND_DAYS_LABEL = "Lu–Vi";
+
+export function formatSendWindow(start: number, end: number): string {
+  if (start <= 0 && end >= 24) return "Todo el día";
+  return `${start}–${end} h`;
+}
+
 // Share of the pool already sent (every non-pending row was attempted).
 export const campaignProgress = (r: CampaignStatsRow): number =>
   r.total_recipients > 0 ? (r.total_recipients - r.pending) / r.total_recipients : 0;
@@ -77,6 +88,7 @@ export function CampaignsTable({ rows, locale, actionsEnabled = false }: Props) 
     "Respondió",
     "Bajas",
     "Resp. %",
+    "Ventana",
     "Hoy / Cap",
     ...(actionsEnabled ? ["Acciones"] : []),
   ];
@@ -150,6 +162,17 @@ export function CampaignsTable({ rows, locale, actionsEnabled = false }: Props) 
                 </td>
                 <td className="px-3 py-2.5 font-[var(--font-geist-mono)] tabular-nums text-[var(--ink)]">
                   {formatPercent(r.reply_rate, locale)}
+                </td>
+                <td
+                  className="px-3 py-2.5"
+                  title={`Envía de ${r.send_hour_start}:00 a ${r.send_hour_end}:00, ${SEND_DAYS_LABEL} · ${SEND_TIMEZONE_LABEL}`}
+                >
+                  <span className="font-[var(--font-geist-mono)] tabular-nums text-[var(--ink)]">
+                    {formatSendWindow(r.send_hour_start, r.send_hour_end)}
+                  </span>
+                  <div className="font-[var(--font-geist-mono)] text-[10px] uppercase tracking-[0.06em] text-[var(--soft-ink)]">
+                    {SEND_DAYS_LABEL} · GMT-3
+                  </div>
                 </td>
                 <td className="px-3 py-2.5 font-[var(--font-geist-mono)] tabular-nums">
                   <span style={{ color: overCap ? "#8A4B00" : "var(--muted-ink)" }}>

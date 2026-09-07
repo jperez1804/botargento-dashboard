@@ -16,6 +16,7 @@ import {
   CampaignProgressBar,
   campaignProgress,
   CampaignsTable,
+  formatSendWindow,
 } from "@/components/dashboard/CampaignsTable";
 import {
   CampaignRowActions,
@@ -101,7 +102,9 @@ export default async function CampaignDetailPage({ params }: Props) {
               {c.name}
             </h1>
             <p className="font-[var(--font-geist-mono)] text-[12px] text-[var(--soft-ink)]">
-              {c.template_name} · {c.vertical}
+              {c.template_name} · {c.vertical} · Envíos:{" "}
+              {formatSendWindow(c.send_hour_start, c.send_hour_end)} · Lu–Vi · Hora Argentina
+              (GMT-3)
             </p>
           </div>
           {actionsEnabled ? (
