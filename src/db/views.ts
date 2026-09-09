@@ -460,6 +460,7 @@ export type CampaignStatsRow = {
   daily_cap: number;
   send_hour_start: number;
   send_hour_end: number;
+  handoffs: number;
   total_recipients: number;
   pending: number;
   sent: number;
@@ -500,13 +501,25 @@ export type QualityCurrent = {
 export async function selectCampaignStats(): Promise<CampaignStatsRow[]> {
   // send_hour_* live on the campaigns table, not the stats view — join rather
   // than altering the view (dashboard_app already has SELECT on outreach.*).
+  // Handoffs: distinct contacts in automation.lead_log with handoff=true,
+  // attributed to campaigns that actually messaged them (last_send_at set) —
+  // a contact present in several campaigns counts once per contacted campaign.
   const rows = await pg<Record<string, unknown>[]>`
     SELECT v.campaign_id, v.name, v.vertical, v.template_name, v.status, v.daily_cap,
            c.send_hour_start, c.send_hour_end,
+           COALESCE(ho.handoffs, 0) AS handoffs,
            v.total_recipients, v.pending, v.sent, v.delivered, v.read, v.replied, v.failed,
            v.opted_out, v.sent_today, v.reply_rate, v.opt_out_rate, v.last_send_at
     FROM outreach.v_campaign_stats v
     JOIN outreach.campaigns c ON c.id = v.campaign_id
+    LEFT JOIN (
+      SELECT r.campaign_id, COUNT(DISTINCT h.contact_wa_id) AS handoffs
+      FROM outreach.recipients r
+      JOIN automation.lead_log h
+        ON h.contact_wa_id = r.wa_id AND h.handoff = true
+      WHERE r.last_send_at IS NOT NULL
+      GROUP BY r.campaign_id
+    ) ho ON ho.campaign_id = v.campaign_id
   `;
   return rows.map((r) => ({
     campaign_id: toNum(r.campaign_id),
@@ -517,6 +530,7 @@ export async function selectCampaignStats(): Promise<CampaignStatsRow[]> {
     daily_cap: toNum(r.daily_cap),
     send_hour_start: toNum(r.send_hour_start),
     send_hour_end: toNum(r.send_hour_end),
+    handoffs: toNum(r.handoffs),
     total_recipients: toNum(r.total_recipients),
     pending: toNum(r.pending),
     sent: toNum(r.sent),

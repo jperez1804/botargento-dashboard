@@ -80,6 +80,7 @@ export default async function CampaignDetailPage({ params }: Props) {
     { label: "Prospectos", value: formatNumber(c.total_recipients, tenant.locale) },
     { label: "Pendientes", value: formatNumber(c.pending, tenant.locale) },
     { label: "Respondieron", value: formatNumber(c.replied, tenant.locale) },
+    { label: "Handoffs", value: formatNumber(c.handoffs, tenant.locale) },
     { label: "Tasa de respuesta", value: formatPercent(c.reply_rate, tenant.locale) },
     { label: "Bajas", value: formatNumber(c.opted_out, tenant.locale) },
     { label: "Hoy / Cap", value: `${formatNumber(c.sent_today, tenant.locale)} / ${formatNumber(c.daily_cap, tenant.locale)}` },
@@ -122,7 +123,7 @@ export default async function CampaignDetailPage({ params }: Props) {
         />
       </header>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         {tiles.map((t) => (
           <div
             key={t.label}

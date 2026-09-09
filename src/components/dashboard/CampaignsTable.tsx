@@ -86,6 +86,7 @@ export function CampaignsTable({ rows, locale, actionsEnabled = false }: Props) 
     "Prospectos",
     "Enviados",
     "Respondió",
+    "Handoffs",
     "Bajas",
     "Resp. %",
     "Ventana",
@@ -156,6 +157,17 @@ export function CampaignsTable({ rows, locale, actionsEnabled = false }: Props) 
                 </td>
                 <td className="px-3 py-2.5 font-[var(--font-geist-mono)] tabular-nums text-[var(--ink)]">
                   {formatNumber(r.replied, locale)}
+                </td>
+                <td
+                  className="px-3 py-2.5 font-[var(--font-geist-mono)] tabular-nums"
+                  title="Prospectos contactados que pidieron la demo/promo (el bot avisó por email)"
+                >
+                  <span
+                    style={{ color: r.handoffs > 0 ? "#1B5E20" : "var(--muted-ink)" }}
+                    className={r.handoffs > 0 ? "font-semibold" : undefined}
+                  >
+                    {formatNumber(r.handoffs, locale)}
+                  </span>
                 </td>
                 <td className="px-3 py-2.5 font-[var(--font-geist-mono)] tabular-nums text-[var(--muted-ink)]">
                   {formatNumber(r.opted_out, locale)}
