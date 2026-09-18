@@ -124,4 +124,10 @@ export const realEstate: VerticalConfig = {
     ],
     comparisonTemplate: "Comparado con los {N} días anteriores.",
   },
+
+  features: {
+    // Capability only — the /inbox tab activates per tenant via N8N_INBOX_WEBHOOK_URL/
+    // TOKEN in dashboard.env (currently only client1 has the n8n inbox webhook).
+    inboxTab: true,
+  },
 };
