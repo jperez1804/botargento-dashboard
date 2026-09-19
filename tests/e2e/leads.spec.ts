@@ -76,14 +76,15 @@ test("Leads list derives stages, hides lost leads and filters by owner", async (
   await expect(page.getByText(F.overdue.name)).toBeVisible();
 });
 
-test("Board moves a lead with 'Mover a…' and audits the change", async ({ page }) => {
+test("Board moves a lead from the ⋯ menu and audits the change", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
   await expect(page.locator("[data-board-column]")).toHaveCount(7);
 
   const card = page.locator(`[data-lead-card="${F.contacted.wa_id}"]`);
   await expect(page.locator('[data-board-column="contactado"]')).toContainText(F.contacted.name);
-  await card.getByTestId("lead-move").selectOption("visita");
+  await card.getByTestId("lead-menu").click();
+  await page.getByRole("menuitem", { name: "Visita", exact: true }).click();
   await expect(page.locator('[data-board-column="visita"]')).toContainText(F.contacted.name);
 
   await expect
@@ -103,6 +104,30 @@ test("Board moves a lead with 'Mover a…' and audits the change", async ({ page
     to: "visita",
     ok: true,
   });
+});
+
+test("Board assigns an owner from the avatar menu", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board");
+
+  const card = page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`);
+  await card.getByTestId("lead-assign").click();
+  await page.getByRole("menuitem", { name: "Ana Asesora" }).click();
+  // The avatar now carries her initials instead of the unassigned placeholder.
+  await expect(card.getByTestId("lead-assign")).toContainText("AA");
+
+  await expect
+    .poll(() =>
+      withSql(async (sql) => {
+        const rows = await sql`SELECT owner_email FROM dashboard.lead_state WHERE contact_wa_id = ${F.atRisk.wa_id}`;
+        return rows[0]?.owner_email ?? null;
+      }),
+    )
+    .toBe(ASESOR);
+  const audit = await withSql(
+    (sql) => sql`SELECT metadata FROM dashboard.audit_log WHERE action = 'lead_assign' ORDER BY id DESC LIMIT 1`,
+  );
+  expect(audit[0]?.metadata).toMatchObject({ contact_wa_id: F.atRisk.wa_id, to: ASESOR, ok: true });
 });
 
 test("Lead card: take the lead, log a call and schedule a reminder", async ({ page }) => {
@@ -160,6 +185,16 @@ test("Asesor manages leads but cannot touch Settings or someone else's lead", as
   await page.goto(`/conversations/${F.reserva.wa_id}`);
   await expect(page.getByTestId("lead-stage-select")).toBeVisible();
 
+  // On the board: can claim an unassigned lead, but a colleague's lead shows
+  // a plain avatar with no assign menu (mirrors the API's not_owner rule).
+  await page.goto("/leads?view=board");
+  await expect(
+    page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`).getByTestId("lead-assign"),
+  ).toBeVisible();
+  await expect(
+    page.locator(`[data-lead-card="${F.visita.wa_id}"]`).getByTestId("lead-assign"),
+  ).toHaveCount(0);
+
   const res = await page.request.post("/api/leads/assign", {
     data: { contactWaId: F.visita.wa_id, ownerEmail: "me" },
   });
@@ -174,6 +209,11 @@ test("Viewer reads leads without controls and the API refuses writes", async ({ 
   await loginAsDevViaLog(page, LOG_PATH, VIEWER);
   await page.goto("/leads");
   await expect(leadRows(page).first()).toBeVisible();
+
+  await page.goto("/leads?view=board");
+  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`)).toBeVisible();
+  await expect(page.getByTestId("lead-menu")).toHaveCount(0);
+  await expect(page.getByTestId("lead-assign")).toHaveCount(0);
 
   await page.goto(`/conversations/${F.visita.wa_id}`);
   await expect(page.getByTestId("lead-crm-card")).toContainText("Visita");

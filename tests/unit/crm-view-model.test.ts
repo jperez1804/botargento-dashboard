@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { realEstate } from "@/config/verticals/real-estate";
-import { buildLeadView, fillTemplate } from "@/lib/crm/view-model";
+import { buildLeadView, fillTemplate, formatRelative } from "@/lib/crm/view-model";
 import type { EffectiveLead } from "@/lib/crm/effective-stage";
 
 const config = realEstate.crm!;
@@ -25,6 +25,24 @@ function lead(overrides: Partial<EffectiveLead> = {}): EffectiveLead {
 describe("fillTemplate", () => {
   it("substitutes known keys and leaves unknown ones", () => {
     expect(fillTemplate("{n} leads · {x}", { n: 3 })).toBe("3 leads · {x}");
+  });
+});
+
+describe("formatRelative", () => {
+  const now = new Date("2026-09-19T15:00:00Z");
+  const ago = (days: number) => new Date(now.getTime() - days * 86_400_000);
+
+  it("says hoy / ayer / hace N días for the recent past", () => {
+    expect(formatRelative(ago(0), now, "es-AR")).toBe("hoy");
+    expect(formatRelative(ago(1), now, "es-AR")).toBe("ayer");
+    expect(formatRelative(ago(3), now, "es-AR")).toBe("hace 3 días");
+    expect(formatRelative(ago(29), now, "es-AR")).toBe("hace 29 días");
+  });
+
+  it("switches to months past 30 days", () => {
+    expect(formatRelative(ago(45), now, "es-AR")).toBe("hace 1 mes");
+    expect(formatRelative(ago(75), now, "es-AR")).toBe("hace 2 meses");
+    expect(formatRelative(ago(400), now, "es-AR")).toBe("hace 1 año");
   });
 });
 
