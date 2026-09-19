@@ -53,7 +53,9 @@ export function LeadCardMenu({
         data-testid={isAssign ? "lead-assign" : "lead-menu"}
         aria-label={`${isAssign ? labels.ownerLabel : labels.moveTo} — ${card.displayName}`}
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-md text-[var(--soft-ink)] transition-colors",
+          // Tailwind v4 preflight leaves buttons at cursor:default; the repo's
+          // Button sets cursor-pointer explicitly and these triggers must too.
+          "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--soft-ink)] transition-colors",
           "focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-1",
           "disabled:pointer-events-none disabled:opacity-50",
           isAssign

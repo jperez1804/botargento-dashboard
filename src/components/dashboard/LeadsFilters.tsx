@@ -6,7 +6,7 @@
 
 import { useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LayoutList, Search, SquareKanban } from "lucide-react";
+import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LEAD_FIELD_CLASS } from "@/components/dashboard/lead-field-class";
 import type { CrmLabels } from "@/config/verticals/_types";
@@ -108,33 +108,6 @@ export function LeadsFilters({ labels, stages, owners, current, showOwnerFilter,
           </select>
         ) : null}
 
-        <div
-          role="group"
-          aria-label={`${labels.viewList} / ${labels.viewBoard}`}
-          className="ml-auto inline-flex rounded-lg border border-[var(--rule)] bg-[var(--canvas-2)] p-0.5"
-        >
-          {(["list", "board"] as const).map((v) => {
-            const Icon = v === "list" ? LayoutList : SquareKanban;
-            const active = current.view === v;
-            return (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={active}
-                onClick={() => navigate({ view: v === "list" ? null : v })}
-                className={cn(
-                  "inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12.5px] font-medium cursor-pointer transition-colors",
-                  active
-                    ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
-                    : "text-[var(--muted-ink)] hover:text-[var(--ink)]",
-                )}
-              >
-                <Icon className="size-3.5" aria-hidden />
-                {v === "list" ? labels.viewList : labels.viewBoard}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {current.view === "list" ? (
