@@ -12,6 +12,7 @@ import {
   MessageSquare,
   MessageSquareReply,
   Settings,
+  SquareKanban,
   Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const ICON_MAP: Record<NavIconKey, IconComponent> = {
   "labor-pool": HardHat,
   campaigns: Megaphone,
   inbox: MessageSquareReply,
+  leads: SquareKanban,
   settings: Settings,
 };
 

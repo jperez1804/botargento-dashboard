@@ -54,6 +54,7 @@ vi.mock("@/lib/logger", () => ({
 
 let getSessionRole: typeof import("@/lib/role-guard").getSessionRole;
 let requireRole: typeof import("@/lib/role-guard").requireRole;
+let requireRoleApi: typeof import("@/lib/role-guard").requireRoleApi;
 
 beforeEach(async () => {
   auditCalls.length = 0;
@@ -63,6 +64,7 @@ beforeEach(async () => {
   const mod = await import("@/lib/role-guard");
   getSessionRole = mod.getSessionRole;
   requireRole = mod.requireRole;
+  requireRoleApi = mod.requireRoleApi;
 });
 
 afterEach(() => {
@@ -88,13 +90,76 @@ describe("getSessionRole", () => {
     expect(result).toEqual({ email: "admin@cliente.com", role: "admin" });
   });
 
-  it("returns viewer role for any non-admin row value", async () => {
+  it("returns viewer role for any unknown row value", async () => {
     stubSession = { user: { email: "viewer@cliente.com" } };
     stubAllowedRows = [{ role: "viewer" }];
     expect((await getSessionRole())?.role).toBe("viewer");
 
     stubAllowedRows = [{ role: "something_else" }];
     expect((await getSessionRole())?.role).toBe("viewer");
+  });
+
+  it("returns asesor role for an asesor row", async () => {
+    stubSession = { user: { email: "asesor@cliente.com" } };
+    stubAllowedRows = [{ role: "asesor" }];
+    expect((await getSessionRole())?.role).toBe("asesor");
+  });
+});
+
+describe("requireRole ranking (viewer < asesor < admin)", () => {
+  it("lets an asesor through requireRole('asesor') without auditing", async () => {
+    stubSession = { user: { email: "asesor@cliente.com" } };
+    stubAllowedRows = [{ role: "asesor" }];
+    expect((await requireRole("asesor")).role).toBe("asesor");
+    expect(auditCalls).toHaveLength(0);
+  });
+
+  it("lets an admin through requireRole('asesor')", async () => {
+    stubSession = { user: { email: "admin@cliente.com" } };
+    stubAllowedRows = [{ role: "admin" }];
+    expect((await requireRole("asesor")).role).toBe("admin");
+  });
+
+  it("blocks an asesor from admin surfaces and audits it", async () => {
+    stubSession = { user: { email: "asesor@cliente.com" } };
+    stubAllowedRows = [{ role: "asesor" }];
+    await expect(requireRole("admin")).rejects.toThrow(/NEXT_REDIRECT:\//);
+    expect(auditCalls[0]?.values).toMatchObject({
+      action: "role_denied",
+      metadata: { required: "admin", actual: "asesor" },
+    });
+  });
+
+  it("blocks a viewer from asesor surfaces", async () => {
+    stubSession = { user: { email: "viewer@cliente.com" } };
+    stubAllowedRows = [{ role: "viewer" }];
+    await expect(requireRole("asesor")).rejects.toThrow(/NEXT_REDIRECT:\//);
+  });
+});
+
+describe("requireRoleApi", () => {
+  it("answers 401 without a session and never redirects", async () => {
+    stubSession = null;
+    const result = await requireRoleApi("asesor");
+    expect(result.response?.status).toBe(401);
+    expect(redirectCalls).toEqual([]);
+  });
+
+  it("answers 403 and audits when the role is too low", async () => {
+    stubSession = { user: { email: "viewer@cliente.com" } };
+    stubAllowedRows = [{ role: "viewer" }];
+    const result = await requireRoleApi("asesor");
+    expect(result.response?.status).toBe(403);
+    expect(redirectCalls).toEqual([]);
+    expect(auditCalls).toHaveLength(1);
+  });
+
+  it("returns the session when the role is enough", async () => {
+    stubSession = { user: { email: "asesor@cliente.com" } };
+    stubAllowedRows = [{ role: "asesor" }];
+    const result = await requireRoleApi("asesor");
+    expect(result.response).toBeUndefined();
+    expect(result.session).toEqual({ email: "asesor@cliente.com", role: "asesor" });
   });
 });
 
