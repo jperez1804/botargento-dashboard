@@ -3,10 +3,17 @@ import { getFollowUpQueue } from "@/lib/queries/follow-up";
 import { tenantConfig } from "@/config/tenant";
 import { formatNumber } from "@/lib/format";
 import { FollowUpQueue } from "@/components/dashboard/FollowUpQueue";
+import { RemindersList, type ReminderRow } from "@/components/dashboard/RemindersList";
+import { crmConfig } from "@/lib/crm/enabled";
+import { buildLeadView } from "@/lib/crm/view-model";
+import { getSessionRole } from "@/lib/role-guard";
+import { listLeads } from "@/lib/queries/leads";
+import { listTeam, memberLabel } from "@/lib/queries/team";
 
 export default async function FollowUpPage() {
-  const rows = await getFollowUpQueue();
+  const crm = crmConfig();
   const tenant = tenantConfig();
+  const [rows, reminders] = await Promise.all([getFollowUpQueue(), loadReminders(crm, tenant)]);
 
   const high = rows.filter((r) => r.priority === "high").length;
   const medium = rows.filter((r) => r.priority === "medium").length;
@@ -36,6 +43,10 @@ export default async function FollowUpPage() {
         </div>
       </header>
 
+      {crm ? (
+        <RemindersList rows={reminders} labels={crm.labels} title={crm.labels.remindersTitle} />
+      ) : null}
+
       <FollowUpQueue rows={rows} locale={tenant.locale} timezone={tenant.timezone} />
 
       <p className="text-[12px] text-[var(--soft-ink)]">
@@ -50,6 +61,36 @@ export default async function FollowUpPage() {
       </p>
     </div>
   );
+}
+
+/**
+ * Open reminders that need attention now: overdue, or due inside the warning
+ * window. An admin sees the whole team's; anyone else only their own leads.
+ */
+async function loadReminders(
+  crm: ReturnType<typeof crmConfig>,
+  tenant: ReturnType<typeof tenantConfig>,
+): Promise<ReminderRow[]> {
+  if (!crm) return [];
+  const session = await getSessionRole();
+  if (!session) return [];
+  const [result, team] = await Promise.all([
+    listLeads(
+      crm,
+      { owner: session.role === "admin" ? undefined : session.email, includeLost: true },
+      new Date(),
+    ),
+    listTeam(),
+  ]);
+  const labelFor = (email: string | null) => memberLabel(team, email);
+  return result.rows
+    .filter((r) => r.lead.reminder?.status === "overdue" || r.lead.reminder?.status === "upcoming")
+    .sort((a, b) => (a.lead.reminder?.at.getTime() ?? 0) - (b.lead.reminder?.at.getTime() ?? 0))
+    .map((r) => ({
+      waId: r.contactWaId,
+      displayName: r.displayName,
+      view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone),
+    }));
 }
 
 function TierTag({

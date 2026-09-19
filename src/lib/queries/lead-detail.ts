@@ -16,6 +16,20 @@ export type LeadEvent = {
   metadata: Record<string, unknown>;
 };
 
+// jsonb may arrive parsed or as text depending on the parsers installed on the
+// shared client (drizzle adjusts them); accept both.
+function asObject(v: unknown): Record<string, unknown> {
+  if (typeof v === "string") {
+    try {
+      const parsed: unknown = JSON.parse(v);
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+  return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
+}
+
 export async function listLeadEvents(waId: string, limit = 50): Promise<LeadEvent[]> {
   const rows = await sql<Record<string, unknown>[]>`
     SELECT id, kind, body, occurred_at, created_by, metadata
@@ -30,7 +44,7 @@ export async function listLeadEvents(waId: string, limit = 50): Promise<LeadEven
     body: String(r.body ?? ""),
     occurredAt: new Date(r.occurred_at as string | Date),
     createdBy: String(r.created_by ?? ""),
-    metadata: (r.metadata ?? {}) as Record<string, unknown>,
+    metadata: asObject(r.metadata),
   }));
 }
 
@@ -78,8 +92,8 @@ export async function getLeadQualification(
   ]);
 
   const sources = {
-    escalation: escalationRows[0]?.data ?? {},
-    snapshot: snapshotRows[0]?.data ?? {},
+    escalation: asObject(escalationRows[0]?.data),
+    snapshot: asObject(snapshotRows[0]?.data),
   };
 
   const items: QualificationItem[] = [];

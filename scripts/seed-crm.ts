@@ -28,22 +28,70 @@ export const CRM_FIXTURES = {
   contacted: { wa_id: "5491155504007", name: "Julieta Morales" },
 } as const;
 
-export async function seedCrm(sql: Sql): Promise<void> {
-  const now = Date.now();
-  const ago = (days: number, hours = 0) => new Date(now - days * DAY - hours * 3_600_000);
-  const ahead = (days: number) => new Date(now + days * DAY);
-  const f = CRM_FIXTURES;
+const ago = (days: number, hours = 0) => new Date(Date.now() - days * DAY - hours * 3_600_000);
+const ahead = (days: number) => new Date(Date.now() + days * DAY);
 
+/**
+ * Resets the dashboard-side CRM state (team directory, lead_state,
+ * lead_events) to the fixture baseline. Idempotent — the e2e calls it before
+ * every CRM test so one test's moves don't leak into the next.
+ */
+export async function seedCrmState(sql: Sql): Promise<void> {
+  const f = CRM_FIXTURES;
   await sql`TRUNCATE dashboard.lead_events RESTART IDENTITY`;
   await sql`TRUNCATE dashboard.lead_state`;
   await sql`TRUNCATE dashboard.team_members`;
 
+  await sql`
+    INSERT INTO dashboard.allowed_emails (email, role, created_by)
+    VALUES ('asesor@cliente.com', 'asesor', 'seed')
+    ON CONFLICT (email) DO UPDATE SET role = 'asesor'
+  `;
   await sql`
     INSERT INTO dashboard.team_members (email, display_name, whatsapp_number, updated_by)
     VALUES
       ('dev@botargento.com.ar', 'Dev Admin',   '5491100000001', 'seed'),
       ('asesor@cliente.com',    'Ana Asesora', '5491100000002', 'seed')
   `;
+
+  await sql`
+    INSERT INTO dashboard.lead_state
+      (contact_wa_id, stage, stage_changed_at, stage_changed_by,
+       owner_email, owner_assigned_at, owner_assigned_by,
+       next_action_at, next_action_note, next_action_set_by)
+    VALUES
+      (${f.visita.wa_id}, 'visita', ${ago(1)}, 'dev@botargento.com.ar',
+       'dev@botargento.com.ar', ${ago(2)}, 'dev@botargento.com.ar', NULL, '', ''),
+      (${f.reserva.wa_id}, 'reserva', ${ago(1)}, 'asesor@cliente.com',
+       'asesor@cliente.com', ${ago(3)}, 'asesor@cliente.com', NULL, '', ''),
+      (${f.overdue.wa_id}, NULL, NULL, '',
+       'dev@botargento.com.ar', ${ago(4)}, 'dev@botargento.com.ar',
+       ${ago(1)}, 'Llamar para coordinar la visita', 'dev@botargento.com.ar'),
+      (${f.upcoming.wa_id}, NULL, NULL, '',
+       'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com',
+       ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com')
+  `;
+
+  const events = [
+    { contact_wa_id: f.visita.wa_id, kind: "note", body: "Busca 2 ambientes con balcón, hasta USD 150.000", occurred_at: ago(2), created_by: "dev@botargento.com.ar" },
+    { contact_wa_id: f.visita.wa_id, kind: "call", body: "Coordinamos visita para el sábado", occurred_at: ago(1, 2), created_by: "dev@botargento.com.ar" },
+    { contact_wa_id: f.visita.wa_id, kind: "stage_change", body: "", occurred_at: ago(1), created_by: "dev@botargento.com.ar" },
+    { contact_wa_id: f.reserva.wa_id, kind: "stage_change", body: "", occurred_at: ago(1), created_by: "asesor@cliente.com" },
+  ];
+  await sql`
+    INSERT INTO dashboard.lead_events ${sql(
+      events,
+      "contact_wa_id",
+      "kind",
+      "body",
+      "occurred_at",
+      "created_by",
+    )}
+  `;
+}
+
+export async function seedCrm(sql: Sql): Promise<void> {
+  const f = CRM_FIXTURES;
 
   const inbound = (c: { wa_id: string; name: string }, at: Date, text: string) => ({
     contact_wa_id: c.wa_id,
@@ -83,40 +131,7 @@ export async function seedCrm(sql: Sql): Promise<void> {
     )}
   `;
 
-  await sql`
-    INSERT INTO dashboard.lead_state
-      (contact_wa_id, stage, stage_changed_at, stage_changed_by,
-       owner_email, owner_assigned_at, owner_assigned_by,
-       next_action_at, next_action_note, next_action_set_by)
-    VALUES
-      (${f.visita.wa_id}, 'visita', ${ago(1)}, 'dev@botargento.com.ar',
-       'dev@botargento.com.ar', ${ago(2)}, 'dev@botargento.com.ar', NULL, '', ''),
-      (${f.reserva.wa_id}, 'reserva', ${ago(1)}, 'asesor@cliente.com',
-       'asesor@cliente.com', ${ago(3)}, 'asesor@cliente.com', NULL, '', ''),
-      (${f.overdue.wa_id}, NULL, NULL, '',
-       'dev@botargento.com.ar', ${ago(4)}, 'dev@botargento.com.ar',
-       ${ago(1)}, 'Llamar para coordinar la visita', 'dev@botargento.com.ar'),
-      (${f.upcoming.wa_id}, NULL, NULL, '',
-       'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com',
-       ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com')
-  `;
-
-  const events = [
-    { contact_wa_id: f.visita.wa_id, kind: "note", body: "Busca 2 ambientes con balcón, hasta USD 150.000", occurred_at: ago(2), created_by: "dev@botargento.com.ar" },
-    { contact_wa_id: f.visita.wa_id, kind: "call", body: "Coordinamos visita para el sábado", occurred_at: ago(1, 2), created_by: "dev@botargento.com.ar" },
-    { contact_wa_id: f.visita.wa_id, kind: "stage_change", body: "", occurred_at: ago(1), created_by: "dev@botargento.com.ar" },
-    { contact_wa_id: f.reserva.wa_id, kind: "stage_change", body: "", occurred_at: ago(1), created_by: "asesor@cliente.com" },
-  ];
-  await sql`
-    INSERT INTO dashboard.lead_events ${sql(
-      events,
-      "contact_wa_id",
-      "kind",
-      "body",
-      "occurred_at",
-      "created_by",
-    )}
-  `;
+  await seedCrmState(sql);
 
   // Qualification data on the most recent business handoff (see header).
   const recent = await sql<{ contact_wa_id: string }[]>`
@@ -147,6 +162,6 @@ export async function seedCrm(sql: Sql): Promise<void> {
   }
 
   console.log(
-    `  ✓ CRM fixtures: ${logRows.length} lead_log rows, 4 lead_state rows, ${events.length} lead_events, 2 team members`,
+    `  ✓ CRM fixtures: ${logRows.length} lead_log rows + lead_state / lead_events / team baseline`,
   );
 }

@@ -10,6 +10,8 @@ import { inboxEnabled, callInboxWebhook, type InboxAction } from "@/lib/inbox";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
 import { logger } from "@/lib/logger";
+import { crmEnabled } from "@/lib/crm/enabled";
+import { recordHumanContact } from "@/lib/queries/lead-writes";
 
 const SendBody = z.object({
   contactWaId: z.string().regex(/^[0-9]{8,15}$/, "contactWaId must be 8-15 digits"),
@@ -74,6 +76,20 @@ export function makeInboxHandler(action: InboxAction) {
           { error: result.error ?? "webhook_failed" },
           { status: result.status >= 400 ? result.status : 502 },
         );
+      }
+
+      // CRM: a human replying or taking over marks the lead "contactado" and
+      // restarts its inactivity clock. Best-effort — never fails the send.
+      if (crmEnabled() && action !== "release") {
+        try {
+          await recordHumanContact(
+            body.contactWaId,
+            session.email,
+            action === "send" ? "inbox_send" : "inbox_takeover",
+          );
+        } catch (err) {
+          logger.warn({ err, action }, "CRM contact event failed");
+        }
       }
 
       return NextResponse.json({

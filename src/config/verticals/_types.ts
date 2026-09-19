@@ -189,18 +189,24 @@ export type CrmLabels = {
   addActivity: string;
   activityPlaceholder: string;
   activityTitle: string;
+  remindersTitle: string;
   qualificationTitle: string;
   emptyLeads: string;
   emptyActivity: string;
   emptyColumn: string;
+  save: string;
+  cancel: string;
   saved: string;
+  whenLabel: string;
   // Templates: {date}, {reason}, {n}, {days} are substituted at render time.
   autoStageHint: string;
   lostSinceTemplate: string;
   atRiskTemplate: string;
   daysInactiveTemplate: string;
   bannerAtRiskTemplate: string;
+  bannerAtRiskOne: string;
   bannerOverdueTemplate: string;
+  bannerOverdueOne: string;
   reminderOverdueTemplate: string;
   reminderUpcomingTemplate: string;
   lostReasonLabel: string;

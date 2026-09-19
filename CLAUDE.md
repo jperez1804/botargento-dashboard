@@ -115,20 +115,38 @@ configured in `src/config/verticals/*.ts`.
 
 ## Roles
 
-`dashboard.allowed_emails.role` ∈ `{viewer, admin}`. Any allowlisted email is
-a viewer by default; admins are promoted explicitly (the provisioner prompts
-for a first admin during a fresh install, existing tenants run an `UPDATE`).
+`dashboard.allowed_emails.role` ∈ `{viewer, asesor, admin}` (ranked in that
+order). Any allowlisted email is a viewer by default; admins manage people and
+roles from **Configuración › Equipo** (`/settings/team`), or the provisioner
+prompts for a first admin during a fresh install.
 
-- **Viewer**: read-only access to all dashboard pages.
-- **Admin**: viewer + write access to tenant-scoped settings (currently
-  `/settings` → `--client-primary`). Privileged routes call
-  `requireRole("admin")` from `src/lib/role-guard.ts`, which redirects
-  viewers to `/` and emits a `role_denied` audit row.
+- **Viewer**: read-only access to all dashboard pages (including `/leads` and
+  the CRM card, without controls).
+- **Asesor**: viewer + manages leads (stage, owner, activities, reminders) on
+  verticals with `features.crmTab`. Can reassign only unassigned leads and
+  their own. No Settings, no admin inbox.
+- **Admin**: everything — Settings (color, Equipo, audit log), inbox,
+  campaign actions, and reassigning any lead.
 
-The first time a privileged surface gets added, it should `await
-requireRole("admin")` at the top of its Server Component or route handler —
-the proxy + `auth()` already enforce that *some* allowlisted email is signed
-in, so role-guard only adds the role check on top.
+Pages call `requireRole(min)` from `src/lib/role-guard.ts` (redirects to `/`
+and emits a `role_denied` audit row). **Route handlers call
+`requireRoleApi(min)` instead**: it answers 401/403 JSON rather than a redirect
+that `fetch()` would silently follow and read as a 200.
+
+## CRM-lite (`features.crmTab` + `crm` block on the vertical)
+
+- State lives in `dashboard.lead_state` (current: manual stage, owner, next
+  step), `dashboard.lead_events` (append-only history) and
+  `dashboard.team_members` (display name + WhatsApp per email) —
+  `migrations/0005_crm_leads.sql`.
+- Automatic stages (nuevo / contactado / calificado / perdido por baja o 30
+  días sin actividad) are **derived at read time** by
+  `src/lib/crm/effective-stage.ts` and never persisted. That pure function is
+  the single source of the stage rules; its unit test is the spec.
+- Raw `sql` writes share the client with drizzle, which replaces postgres.js's
+  json/timestamp serializers with identity functions: pass JSON as
+  `${JSON.stringify(x)}::jsonb` and dates as ISO strings, never `sql.json()` or
+  a `Date` (see `src/lib/queries/lead-writes.ts`).
 
 ## Environment Variables
 
