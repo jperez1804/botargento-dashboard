@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ChevronRight, History } from "lucide-react";
+import { ChevronRight, History, Users } from "lucide-react";
+import { TEAM_LABELS } from "@/config/team-labels";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColorPicker } from "@/components/dashboard/ColorPicker";
 import { getAppSettings } from "@/lib/queries/app-settings";
@@ -45,6 +46,35 @@ export default async function SettingsPage() {
             <ColorPicker defaultValue={settings.primaryColor} />
           </CardContent>
         </Card>
+      </section>
+
+      <section className="space-y-3">
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">
+            {TEAM_LABELS.kicker}
+          </p>
+          <h2 className="text-[17px] leading-tight tracking-[-0.015em] text-[var(--ink)] font-semibold">
+            {TEAM_LABELS.settingsCardTitle}
+          </h2>
+        </div>
+        <Link
+          href="/settings/team"
+          className="group/team flex items-center gap-3 rounded-xl border border-[var(--rule)] bg-[var(--surface)] px-5 py-4 hover:bg-[var(--canvas-2)] transition-colors focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2"
+        >
+          <div className="size-9 rounded-lg bg-[var(--canvas-2)] text-[var(--soft-ink)] flex items-center justify-center">
+            <Users className="size-[18px]" aria-hidden="true" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13.5px] font-semibold tracking-[-0.005em] text-[var(--ink)]">
+              {TEAM_LABELS.title}
+            </div>
+            <div className="text-[12.5px] text-[var(--soft-ink)]">{TEAM_LABELS.settingsCardBody}</div>
+          </div>
+          <ChevronRight
+            className="size-[14px] text-[var(--soft-ink)] group-hover/team:text-[var(--ink)] transition-colors"
+            aria-hidden="true"
+          />
+        </Link>
       </section>
 
       {/* Audit log entry — every privileged action in /settings writes to

@@ -7,6 +7,11 @@
 
 import { sql } from "@/db/client";
 
+// escalation_type values that are n8n runtime errors, not customer handoffs.
+// Shared with the CRM (lib/queries/leads) so "calificado" means exactly what
+// the Handoffs page counts.
+export const NON_BUSINESS_ESCALATION_TYPES = ["workflow_error", "error"];
+
 export type HandoffSummaryRow = {
   target: string;
   count_all_time: number;
@@ -54,7 +59,7 @@ export async function listBusinessHandoffs(opts: {
       NULLIF(reason, '') AS reason,
       escalation_timestamp AS created_at
     FROM automation.escalations
-    WHERE escalation_type NOT IN ('workflow_error', 'error')
+    WHERE escalation_type NOT IN ${sql(NON_BUSINESS_ESCALATION_TYPES)}
     ORDER BY escalation_timestamp DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -72,7 +77,7 @@ export async function countBusinessHandoffs(): Promise<number> {
   const rows = await sql<Record<string, unknown>[]>`
     SELECT COUNT(*)::int AS n
     FROM automation.escalations
-    WHERE escalation_type NOT IN ('workflow_error', 'error')
+    WHERE escalation_type NOT IN ${sql(NON_BUSINESS_ESCALATION_TYPES)}
   `;
   return Number(rows[0]?.n ?? 0);
 }

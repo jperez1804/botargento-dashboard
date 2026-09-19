@@ -13,6 +13,7 @@ import {
   MessageSquare,
   MessageSquareReply,
   Settings,
+  SquareKanban,
   Truck,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
@@ -29,6 +30,7 @@ const ICON_MAP: Record<NavIconKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   "labor-pool": HardHat,
   campaigns: Megaphone,
   inbox: MessageSquareReply,
+  leads: SquareKanban,
   settings: Settings,
 };
 

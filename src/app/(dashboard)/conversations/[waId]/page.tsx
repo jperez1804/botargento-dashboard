@@ -8,6 +8,15 @@ import { ConversationTimeline } from "@/components/dashboard/ConversationTimelin
 import { ContactSidebar } from "@/components/dashboard/ContactSidebar";
 import { formatAutomationLabel } from "@/lib/automation-labels";
 import type { IntentDef } from "@/config/verticals/_types";
+import { crmConfig } from "@/lib/crm/enabled";
+import { buildLeadView } from "@/lib/crm/view-model";
+import { getSessionRole, hasRole } from "@/lib/role-guard";
+import { getLead } from "@/lib/queries/leads";
+import { getLeadQualification, listLeadEvents } from "@/lib/queries/lead-detail";
+import { listTeam, memberLabel } from "@/lib/queries/team";
+import { LeadCrmCard } from "@/components/dashboard/LeadCrmCard";
+import { LeadActivityFeed } from "@/components/dashboard/LeadActivityFeed";
+import { LeadQualificationCard } from "@/components/dashboard/LeadQualificationCard";
 
 type Props = {
   params: Promise<{ waId: string }>;
@@ -24,13 +33,34 @@ function resolveLastIntent(
 
 export default async function ConversationDetailPage({ params }: Props) {
   const { waId } = await params;
-  const [contact, entries] = await Promise.all([getContact(waId), getConversation(waId)]);
+  const crm = crmConfig();
+  const now = new Date();
+  const [contact, entries, session, crmData] = await Promise.all([
+    getContact(waId),
+    getConversation(waId),
+    getSessionRole(),
+    crm
+      ? Promise.all([
+          getLead(crm, waId, now),
+          listLeadEvents(waId),
+          getLeadQualification(crm, waId),
+          listTeam(),
+        ])
+      : Promise.resolve(null),
+  ]);
   if (!contact) notFound();
 
   const tenant = tenantConfig();
   const vertical = verticalConfig();
   const lastIntentLabel = resolveLastIntent(contact.lastIntent, vertical.intents);
   const contactName = contact.displayName ?? contact.contactWaId;
+
+  const [lead, events, qualification, team] = crmData ?? [null, [], [], []];
+  const labelFor = (email: string | null) => memberLabel(team, email);
+  const canEdit = session ? hasRole(session, "asesor") : false;
+  const members = team
+    .filter((m) => m.role !== "viewer" && m.active)
+    .map((m) => ({ email: m.email, label: m.displayName || m.email }));
 
   return (
     <div className="space-y-6">
@@ -84,7 +114,34 @@ export default async function ConversationDetailPage({ params }: Props) {
           />
         </section>
 
-        <div className="order-1 lg:order-2">
+        <div className="order-1 lg:order-2 space-y-3">
+          {crm && lead && session ? (
+            <>
+              <LeadCrmCard
+                waId={waId}
+                view={buildLeadView(lead.lead, crm, labelFor, tenant.locale, tenant.timezone)}
+                config={crm}
+                members={members}
+                sessionEmail={session.email}
+                isAdmin={session.role === "admin"}
+                canEdit={canEdit}
+              />
+              <LeadActivityFeed
+                waId={waId}
+                events={events}
+                config={crm}
+                memberLabel={labelFor}
+                canEdit={canEdit}
+                locale={tenant.locale}
+                timezone={tenant.timezone}
+              />
+              <LeadQualificationCard
+                title={crm.labels.qualificationTitle}
+                items={qualification}
+                locale={tenant.locale}
+              />
+            </>
+          ) : null}
           <ContactSidebar
             contact={contact}
             locale={tenant.locale}

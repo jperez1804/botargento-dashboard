@@ -1,4 +1,13 @@
-import { pgSchema, text, timestamp, bigserial, bigint, jsonb, smallint } from "drizzle-orm/pg-core";
+import {
+  pgSchema,
+  text,
+  timestamp,
+  bigserial,
+  bigint,
+  jsonb,
+  smallint,
+  boolean,
+} from "drizzle-orm/pg-core";
 
 export const dashboardSchema = pgSchema("dashboard");
 
@@ -41,4 +50,46 @@ export const appSettings = dashboardSchema.table("app_settings", {
   primaryColor: text("primary_color").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by").notNull(),
+});
+
+// CRM-lite (see migrations/0005_crm_leads.sql). Reads go through raw `sql` in
+// src/lib/queries/leads.ts like the rest of the app; these definitions exist
+// for typed inserts.
+export const teamMembers = dashboardSchema.table("team_members", {
+  email: text("email").primaryKey(),
+  displayName: text("display_name").notNull().default(""),
+  whatsappNumber: text("whatsapp_number").notNull().default(""),
+  notifyWhatsapp: boolean("notify_whatsapp").notNull().default(true),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text("updated_by").notNull().default(""),
+});
+
+export const leadState = dashboardSchema.table("lead_state", {
+  contactWaId: text("contact_wa_id").primaryKey(),
+  stage: text("stage"),
+  stageChangedAt: timestamp("stage_changed_at", { withTimezone: true }),
+  stageChangedBy: text("stage_changed_by").notNull().default(""),
+  lostReason: text("lost_reason").notNull().default(""),
+  ownerEmail: text("owner_email"),
+  ownerAssignedAt: timestamp("owner_assigned_at", { withTimezone: true }),
+  ownerAssignedBy: text("owner_assigned_by").notNull().default(""),
+  nextActionAt: timestamp("next_action_at", { withTimezone: true }),
+  nextActionNote: text("next_action_note").notNull().default(""),
+  nextActionSetBy: text("next_action_set_by").notNull().default(""),
+  nextActionNotifiedAt: timestamp("next_action_notified_at", { withTimezone: true }),
+  nextActionDoneAt: timestamp("next_action_done_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const leadEvents = dashboardSchema.table("lead_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  contactWaId: text("contact_wa_id").notNull(),
+  kind: text("kind").notNull(),
+  body: text("body").notNull().default(""),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text("created_by").notNull().default(""),
+  metadata: jsonb("metadata").notNull().default({}),
 });

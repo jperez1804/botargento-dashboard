@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS automation.lead_log (
   intent          TEXT NOT NULL DEFAULT '',
   handoff         BOOLEAN NOT NULL DEFAULT FALSE,
   handoff_reason  TEXT NOT NULL DEFAULT '',
+  -- '' = bot / legacy, 'human' = sent by an agent from the two-way inbox.
+  sent_by         TEXT NOT NULL DEFAULT '',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -43,7 +45,31 @@ CREATE TABLE IF NOT EXISTS automation.escalations (
   intent                 TEXT NOT NULL DEFAULT '',
   handoff_target         TEXT NOT NULL DEFAULT '',
   preferred_contact_slot TEXT NOT NULL DEFAULT '',
+  -- Qualification columns the bot fills on a handoff (read by the CRM card).
+  target_zone            TEXT NOT NULL DEFAULT '',
+  budget_amount          NUMERIC NULL,
+  budget_currency        TEXT NOT NULL DEFAULT '',
+  property_type          TEXT NOT NULL DEFAULT '',
+  bedrooms               INTEGER NULL,
+  payment_mode           TEXT NOT NULL DEFAULT '',
+  purchase_timing        TEXT NOT NULL DEFAULT '',
+  matched_listing_urls   TEXT NOT NULL DEFAULT '',
+  transcript_summary     TEXT NOT NULL DEFAULT '',
+  latest_user_message    TEXT NOT NULL DEFAULT '',
   created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS automation.session_memory (
+  contact_wa_id               TEXT PRIMARY KEY,
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  profile_name                TEXT NOT NULL DEFAULT '',
+  lead_name                   TEXT NOT NULL DEFAULT '',
+  qualification_snapshot_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  last_turns_json             JSONB NOT NULL DEFAULT '[]'::jsonb,
+  session_summary             TEXT NOT NULL DEFAULT '',
+  last_message_id             TEXT NOT NULL DEFAULT '',
+  last_route                  TEXT NOT NULL DEFAULT '',
+  last_confidence             DOUBLE PRECISION NULL
 );
 
 CREATE INDEX IF NOT EXISTS ix_escalations_timestamp

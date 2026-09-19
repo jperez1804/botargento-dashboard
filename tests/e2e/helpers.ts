@@ -45,20 +45,25 @@ function readPendingToken(): string | null {
   return null; // Fallback: see emitLatestLogToken below.
 }
 
-/** Override default loginAsDev via this helper that uses log scanning. */
-export async function loginAsDevViaLog(page: Page, logPath: string) {
+/**
+ * Override default loginAsDev via this helper that uses log scanning. Pass
+ * another allowlisted email to log in with a different role (e.g. the seeded
+ * asesor@cliente.com); only links issued for that email are considered.
+ */
+export async function loginAsDevViaLog(page: Page, logPath: string, email = ALLOWED_EMAIL) {
   await page.goto("/login");
-  await page.fill('input[name="email"]', ALLOWED_EMAIL);
+  await page.fill('input[name="email"]', email);
   await page.click('button[type="submit"]');
   await page.waitForURL(/(login\?sent|verify-request)/);
 
   const fs = await import("node:fs");
+  const emailParam = `email=${encodeURIComponent(email)}`;
   for (let i = 0; i < 30; i++) {
     if (fs.existsSync(logPath)) {
       const log = fs.readFileSync(logPath, "utf8");
       const links = [
         ...log.matchAll(/http:\/\/localhost:3000\/api\/auth\/callback\/resend\?[^\s]+/g),
-      ];
+      ].filter((m) => m[0].includes(emailParam));
       const last = links[links.length - 1]?.[0];
       if (last) {
         await page.goto(last);

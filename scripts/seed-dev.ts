@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { seedCrm } from "./seed-crm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -111,11 +112,12 @@ async function seedAllowlist() {
     INSERT INTO dashboard.allowed_emails (email, role, created_by)
     VALUES
       ('dev@botargento.com.ar',     'admin',  'seed'),
+      ('asesor@cliente.com',        'asesor', 'seed'),
       ('owner@cliente.com',         'viewer', 'seed'),
       ('jonatanperez1804@gmail.com','viewer', 'seed')
     ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role
   `;
-  console.log("  ✓ allowlist seeded (dev@ promoted to admin)");
+  console.log("  ✓ allowlist seeded (dev@ admin, asesor@ asesor)");
 }
 
 async function seedActivity() {
@@ -303,6 +305,8 @@ async function main() {
   await seedAllowlist();
   console.log("→ Seeding 14 days of fake activity");
   await seedActivity();
+  console.log("→ Seeding CRM fixtures");
+  await seedCrm(sql);
   console.log("✓ Dev seed complete");
   await sql.end();
 }

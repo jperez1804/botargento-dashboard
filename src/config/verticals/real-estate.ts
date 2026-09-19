@@ -1,4 +1,5 @@
 import type { VerticalConfig } from "./_types";
+import { CRM_LABELS_ES } from "./_crm-labels-es";
 
 export const realEstate: VerticalConfig = {
   key: "real-estate",
@@ -129,5 +130,51 @@ export const realEstate: VerticalConfig = {
     // Capability only — the /inbox tab activates per tenant via N8N_INBOX_WEBHOOK_URL/
     // TOKEN in dashboard.env (currently only client1 has the n8n inbox webhook).
     inboxTab: true,
+    crmTab: true,
+  },
+
+  // CRM-lite pipeline. The bot moves leads through nuevo → contactado →
+  // calificado (handoff) and into perdido (opt-out / inactivity); visita,
+  // reserva and cerrado are set by a person. Keys are persisted — don't rename.
+  crm: {
+    stages: [
+      { key: "nuevo", label: "Nuevo", tone: "neutral" },
+      { key: "contactado", label: "Contactado", tone: "info" },
+      { key: "calificado", label: "Calificado", tone: "info" },
+      { key: "visita", label: "Visita", tone: "progress", manualOnly: true },
+      { key: "reserva", label: "Reserva", tone: "progress", manualOnly: true },
+      { key: "cerrado", label: "Cerrado", tone: "good", manualOnly: true, terminal: true },
+      { key: "perdido", label: "Perdido", tone: "bad", terminal: true },
+    ],
+    autoStages: { new: "nuevo", contacted: "contactado", qualified: "calificado", lost: "perdido" },
+    autoLostDays: 30,
+    warnDays: 7,
+    qualificationFields: [
+      { source: "snapshot", key: "selected_flow", label: "Consulta por" },
+      { source: "escalation", key: "target_zone", label: "Zona" },
+      { source: "escalation", key: "property_type", label: "Tipo de propiedad" },
+      { source: "escalation", key: "bedrooms", label: "Ambientes" },
+      {
+        source: "escalation",
+        key: "budget_amount",
+        label: "Presupuesto",
+        format: "money",
+        currencyKey: "budget_currency",
+      },
+      { source: "snapshot", key: "selected_price_range", label: "Rango de precio" },
+      { source: "escalation", key: "payment_mode", label: "Forma de pago" },
+      { source: "escalation", key: "purchase_timing", label: "Plazo" },
+      { source: "snapshot", key: "tasaciones_address", label: "Dirección a tasar" },
+      { source: "snapshot", key: "tasaciones_property_type", label: "Propiedad a tasar" },
+      { source: "snapshot", key: "tasaciones_area", label: "Superficie" },
+      { source: "snapshot", key: "tasaciones_condition", label: "Estado" },
+      { source: "snapshot", key: "tasaciones_reason", label: "Motivo de la tasación" },
+      { source: "snapshot", key: "owners_service_type", label: "Servicio (propietario)" },
+      { source: "snapshot", key: "owners_zone", label: "Zona (propietario)" },
+      { source: "escalation", key: "preferred_contact_slot", label: "Horario de contacto" },
+      { source: "escalation", key: "matched_listing_urls", label: "Propiedades sugeridas", format: "links" },
+      { source: "escalation", key: "transcript_summary", label: "Resumen del bot" },
+    ],
+    labels: CRM_LABELS_ES,
   },
 };

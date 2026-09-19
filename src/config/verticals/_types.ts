@@ -11,6 +11,7 @@ export type NavIconKey =
   | "labor-pool"
   | "campaigns"
   | "inbox"
+  | "leads"
   | "settings";
 
 export type NavItemDef = {
@@ -121,6 +122,126 @@ export type VerticalFeatures = {
   // inboxEnabled() in lib/inbox) — tenants without the n8n inbox webhook never
   // render the tab even on this vertical.
   inboxTab?: boolean;
+  // CRM-lite (/leads + the CRM card on /conversations/[waId]): stage, owner,
+  // activities and reminders per lead. Requires a `crm` block on the config
+  // (see crmEnabled() in lib/crm/enabled). Needs no tenant env: all state lives
+  // in dashboard.*.
+  crmTab?: boolean;
+};
+
+// ── CRM-lite ────────────────────────────────────────────────────────────────
+
+// Visual tone of a stage chip. Maps to the semantic palette in LeadStageChip —
+// not a brand color.
+export type CrmStageTone = "neutral" | "info" | "progress" | "good" | "bad";
+
+export type CrmStageDef = {
+  key: string; // Persisted in dashboard.lead_state.stage — never rename a live key.
+  label: string;
+  tone: CrmStageTone;
+  // Closed stages (won / lost): sticky, no inactivity timer, no "por vencer".
+  terminal?: boolean;
+  // Only a person can move a lead here; the bot never derives it.
+  manualOnly?: boolean;
+};
+
+// Activities a person logs by hand from the lead card.
+export type CrmActivityKind = "note" | "call" | "visit" | "meeting";
+
+// Everything that lands in dashboard.lead_events.kind.
+export type CrmEventKind =
+  | CrmActivityKind
+  | "stage_change"
+  | "assignment"
+  | "reminder_set"
+  | "reminder_done"
+  | "contact";
+
+export type CrmLabels = {
+  nav: string;
+  pageKicker: string;
+  pageTitle: string;
+  viewList: string;
+  viewBoard: string;
+  searchPlaceholder: string;
+  filterAllStages: string;
+  filterAllOwners: string;
+  filterMine: string;
+  filterAtRisk: string;
+  filterOverdue: string;
+  filterUnassigned: string;
+  columnContact: string;
+  columnStage: string;
+  columnOwner: string;
+  columnLastActivity: string;
+  columnNextStep: string;
+  cardTitle: string;
+  stageLabel: string;
+  ownerLabel: string;
+  nextStepLabel: string;
+  unassigned: string;
+  takeLead: string;
+  takeLeadConfirm: string;
+  moveTo: string;
+  setReminder: string;
+  reminderNotePlaceholder: string;
+  markDone: string;
+  addActivity: string;
+  activityPlaceholder: string;
+  activityTitle: string;
+  remindersTitle: string;
+  qualificationTitle: string;
+  emptyLeads: string;
+  emptyActivity: string;
+  emptyColumn: string;
+  save: string;
+  cancel: string;
+  saved: string;
+  whenLabel: string;
+  // Templates: {date}, {reason}, {n}, {days} are substituted at render time.
+  autoStageHint: string;
+  lostSinceTemplate: string;
+  atRiskTemplate: string;
+  daysInactiveTemplate: string;
+  bannerAtRiskTemplate: string;
+  bannerAtRiskOne: string;
+  bannerOverdueTemplate: string;
+  bannerOverdueOne: string;
+  reminderOverdueTemplate: string;
+  reminderUpcomingTemplate: string;
+  lostReasonLabel: string;
+  lostReasons: ReadonlyArray<string>;
+  lostReasonAuto: { opt_out: string; inactivity: string };
+  eventKinds: Record<CrmEventKind, string>;
+  errors: Record<string, string>;
+};
+
+// A qualification datum the bot captured, shown on the lead card. "escalation"
+// reads a column of the latest real handoff (automation.escalations); "snapshot"
+// reads a key of automation.session_memory.qualification_snapshot_json. Empty
+// values are hidden, so listing fields a flow never fills is harmless.
+export type CrmQualificationField = {
+  source: "escalation" | "snapshot";
+  key: string;
+  label: string;
+  // money: `key` is the amount, `currencyKey` (same source) the currency.
+  // links: newline/comma separated URLs rendered as links.
+  format?: "text" | "money" | "links";
+  currencyKey?: string;
+};
+
+export type CrmConfig = {
+  // Order defines progression rank: an automatic signal can only push a lead
+  // FORWARD in this list, never back.
+  stages: ReadonlyArray<CrmStageDef>;
+  // Which stage keys the bot's signals map to.
+  autoStages: { new: string; contacted: string; qualified: string; lost: string };
+  // Days without activity before a non-terminal lead becomes "perdido" (auto,
+  // reversible), and how many days before that it shows up as "por vencer".
+  autoLostDays: number;
+  warnDays: number;
+  qualificationFields: ReadonlyArray<CrmQualificationField>;
+  labels: CrmLabels;
 };
 
 export type VerticalConfig = {
@@ -133,4 +254,5 @@ export type VerticalConfig = {
   attribution: AttributionConfig;
   windows: WindowConfig;
   features?: VerticalFeatures;
+  crm?: CrmConfig;
 };
