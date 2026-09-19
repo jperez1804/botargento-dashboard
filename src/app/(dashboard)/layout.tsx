@@ -99,7 +99,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex-1 flex min-h-0">
         <Sidebar items={navItems} />
         <main className="flex-1 min-w-0 overflow-x-hidden">
-          <div className="mx-auto w-full max-w-[1280px] px-4 py-6 md:px-6">{children}</div>
+          {/* The 1280px reading width applies to every page except when a
+            * full-bleed surface is mounted (the /leads board marks itself with
+            * data-board-bleed): a kanban wants the whole viewport. Pure CSS —
+            * the layout stays a plain Server Component. */}
+          <div className="mx-auto w-full max-w-[1280px] px-4 py-6 md:px-6 has-[[data-board-bleed]]:max-w-none">
+            {children}
+          </div>
         </main>
       </div>
     </div>

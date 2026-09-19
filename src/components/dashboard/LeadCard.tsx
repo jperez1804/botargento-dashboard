@@ -1,13 +1,15 @@
 "use client";
 
-// One card on the /leads board. The name opens the conversation; the card is
-// draggable between columns (native HTML5 DnD) and also carries a "Mover a…"
-// select — the keyboard / touch path, and what the e2e drives.
+// One card on the /leads board, Jira-style: the name opens the conversation,
+// the state lines flag what needs attention, and the actions hide behind the ⋯
+// menu (move) and the owner avatar (assign). Dragging between columns still
+// works; the menu is the keyboard and touch path.
 
 import Link from "next/link";
-import { BellRing, GripVertical } from "lucide-react";
+import { BellRing, Clock3, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LEAD_FIELD_CLASS } from "@/components/dashboard/lead-field-class";
+import { LeadAvatar } from "@/components/dashboard/LeadAvatar";
+import { LeadCardMenu } from "@/components/dashboard/LeadCardMenu";
 import type { CrmLabels } from "@/config/verticals/_types";
 
 export type BoardCard = {
@@ -15,24 +17,45 @@ export type BoardCard = {
   displayName: string;
   stageKey: string;
   auto: boolean;
+  ownerEmail: string | null;
   ownerLabel: string;
-  hasOwner: boolean;
   statusText: string | null;
   statusTone: "danger" | "warning" | null;
   reminderText: string | null;
   reminderOverdue: boolean;
+  lastActivity: string;
 };
 
 type Props = {
   card: BoardCard;
   stages: ReadonlyArray<{ key: string; label: string }>;
+  members: ReadonlyArray<{ email: string; label: string }>;
   labels: CrmLabels;
   canEdit: boolean;
+  isAdmin: boolean;
+  sessionEmail: string;
   busy: boolean;
   onMove: (waId: string, stage: string) => void;
+  onAssign: (waId: string, ownerEmail: string | null) => void;
 };
 
-export function LeadCard({ card, stages, labels, canEdit, busy, onMove }: Props) {
+export function LeadCard({
+  card,
+  stages,
+  members,
+  labels,
+  canEdit,
+  isAdmin,
+  sessionEmail,
+  busy,
+  onMove,
+  onAssign,
+}: Props) {
+  // Mirror the API rule (403 not_owner): an asesor manages unassigned leads
+  // and their own; reassigning a colleague's lead is an admin call.
+  const canAssign =
+    canEdit && (isAdmin || card.ownerEmail === null || card.ownerEmail === sessionEmail);
+
   return (
     <article
       data-lead-card={card.waId}
@@ -42,29 +65,34 @@ export function LeadCard({ card, stages, labels, canEdit, busy, onMove }: Props)
         e.dataTransfer.effectAllowed = "move";
       }}
       className={cn(
-        "group/card space-y-2 rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-3 text-[13px]",
+        "group/card space-y-1.5 rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-3",
+        "shadow-xs transition-shadow hover:shadow-sm",
         canEdit && "cursor-grab active:cursor-grabbing",
         busy && "opacity-60",
       )}
     >
       <div className="flex items-start gap-1.5">
+        {/* inline-block: the pointer + underline stay on the text, not across
+            the whole card. */}
+        <Link
+          href={`/conversations/${encodeURIComponent(card.waId)}`}
+          className="inline-block w-fit max-w-full flex-1 truncate text-[13.5px] font-medium text-[var(--ink)] hover:underline underline-offset-2"
+        >
+          {card.displayName}
+        </Link>
         {canEdit ? (
-          <GripVertical
-            className="mt-0.5 size-3.5 shrink-0 text-[var(--faint-ink)] group-hover/card:text-[var(--soft-ink)]"
-            aria-hidden
+          <LeadCardMenu
+            variant="move"
+            card={card}
+            stages={stages}
+            members={members}
+            sessionEmail={sessionEmail}
+            labels={labels}
+            disabled={busy}
+            onMove={onMove}
+            onAssign={onAssign}
           />
         ) : null}
-        <div className="min-w-0 flex-1">
-          <Link
-            href={`/conversations/${encodeURIComponent(card.waId)}`}
-            className="block font-medium text-[var(--ink)] truncate hover:underline underline-offset-2"
-          >
-            {card.displayName}
-          </Link>
-          <p className={cn("text-[12px] truncate", card.hasOwner ? "text-[var(--muted-ink)]" : "text-[var(--soft-ink)] italic")}>
-            {card.ownerLabel}
-          </p>
-        </div>
       </div>
 
       {card.statusText ? (
@@ -84,7 +112,7 @@ export function LeadCard({ card, stages, labels, canEdit, busy, onMove }: Props)
         <p
           className={cn(
             "flex items-center gap-1 text-[11.5px] tabular-nums",
-            card.reminderOverdue ? "text-[var(--danger)] font-medium" : "text-[var(--muted-ink)]",
+            card.reminderOverdue ? "font-medium text-[var(--danger)]" : "text-[var(--muted-ink)]",
           )}
         >
           <BellRing className="size-3 shrink-0" aria-hidden />
@@ -92,27 +120,37 @@ export function LeadCard({ card, stages, labels, canEdit, busy, onMove }: Props)
         </p>
       ) : null}
 
-      {canEdit ? (
-        <select
-          aria-label={`${labels.moveTo} ${card.displayName}`}
-          data-testid="lead-move"
-          value=""
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.value) onMove(card.waId, e.target.value);
-          }}
-          className={cn(LEAD_FIELD_CLASS, "h-7 text-[12px] text-[var(--muted-ink)]")}
-        >
-          <option value="">{labels.moveTo}</option>
-          {stages
-            .filter((s) => s.key !== card.stageKey)
-            .map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-        </select>
-      ) : null}
+      <div className="flex items-end justify-between gap-2 pt-0.5">
+        <div className="min-w-0 space-y-0.5 text-[11.5px] text-[var(--soft-ink)]">
+          <p className="flex items-center gap-1 font-[var(--font-geist-mono)] tabular-nums">
+            <MessageCircle className="size-3 shrink-0" aria-hidden />
+            {card.waId}
+          </p>
+          <p className="flex items-center gap-1">
+            <Clock3 className="size-3 shrink-0" aria-hidden />
+            {card.lastActivity}
+          </p>
+        </div>
+        {canAssign ? (
+          <LeadCardMenu
+            variant="assign"
+            card={card}
+            stages={stages}
+            members={members}
+            sessionEmail={sessionEmail}
+            labels={labels}
+            disabled={busy}
+            onMove={onMove}
+            onAssign={onAssign}
+          />
+        ) : (
+          <LeadAvatar
+            label={card.ownerEmail ? card.ownerLabel : null}
+            seed={card.ownerEmail ?? undefined}
+            emptyLabel={labels.unassigned}
+          />
+        )}
+      </div>
     </article>
   );
 }

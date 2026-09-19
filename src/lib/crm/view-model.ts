@@ -42,6 +42,23 @@ export function formatDayTime(date: Date, locale: string, timezone: string): str
   });
 }
 
+/**
+ * "hoy" / "ayer" / "hace 3 días" / "hace 2 meses". Used on the board cards,
+ * where an exact timestamp is noise; the list keeps the precise date.
+ */
+export function formatRelative(date: Date, now: Date, locale: string): string {
+  const days = Math.round((date.getTime() - now.getTime()) / 86_400_000);
+  // Days read better as words ("hoy", "ayer"); months and years don't — "el
+  // mes pasado" is vaguer than "hace 1 mes" on a card you scan.
+  if (Math.abs(days) < 30) {
+    return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(days, "day");
+  }
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "always" });
+  const months = Math.round(days / 30);
+  if (Math.abs(months) < 12) return rtf.format(months, "month");
+  return rtf.format(Math.round(months / 12), "year");
+}
+
 export type LeadView = {
   stageKey: string;
   stageLabel: string;
@@ -53,6 +70,7 @@ export type LeadView = {
   ownerLabel: string;
   reminder: { atIso: string; note: string; status: ReminderStatus; text: string } | null;
   lastActivityText: string;
+  lastActivityRelative: string;
 };
 
 export function buildLeadView(
@@ -61,6 +79,7 @@ export function buildLeadView(
   ownerLabel: (email: string | null) => string,
   locale: string,
   timezone: string,
+  now: Date = new Date(),
 ): LeadView {
   const labels = config.labels;
   const stageDef = config.stages.find((s) => s.key === lead.stage);
@@ -110,6 +129,9 @@ export function buildLeadView(
     reminder,
     lastActivityText: lead.lastActivityAt
       ? formatDayTime(lead.lastActivityAt, locale, timezone)
+      : "—",
+    lastActivityRelative: lead.lastActivityAt
+      ? formatRelative(lead.lastActivityAt, now, locale)
       : "—",
   };
 }

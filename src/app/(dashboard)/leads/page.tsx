@@ -65,7 +65,7 @@ export default async function LeadsPage({ searchParams }: Props) {
   const views = result.rows.map((r) => ({
     waId: r.contactWaId,
     displayName: r.displayName,
-    view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone),
+    view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now),
   }));
 
   const buildPageHref = (page: number) => {
@@ -93,24 +93,37 @@ export default async function LeadsPage({ searchParams }: Props) {
         displayName: v.displayName,
         stageKey: v.view.stageKey,
         auto: v.view.auto,
+        ownerEmail: v.view.ownerEmail,
         ownerLabel: v.view.ownerLabel,
-        hasOwner: v.view.ownerEmail !== null,
         statusText: v.view.statusText,
         statusTone: v.view.statusTone,
         reminderText:
           v.view.reminder && v.view.reminder.status !== "done" ? v.view.reminder.text : null,
         reminderOverdue: v.view.reminder?.status === "overdue",
+        lastActivity: v.view.lastActivityRelative,
       })),
     };
   });
 
   const pageRows = views.slice((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE);
+  // Owner filter lists everyone who can own a lead (including deactivated
+  // people, whose old leads still need filtering); the board's assign menu
+  // only offers the active ones.
   const owners = team
     .filter((m) => m.role !== "viewer")
     .map((m) => ({ email: m.email, label: m.displayName || m.email }));
+  const members = team
+    .filter((m) => m.role !== "viewer" && m.active)
+    .map((m) => ({ email: m.email, label: m.displayName || m.email }));
+
+  // In board view the board itself breaks out of the 1280px container (see
+  // has-[[data-board-bleed]] in the dashboard layout); the masthead and the
+  // filters stay centered, so they get their own wrapper.
+  const headerWrapper = view === "board" ? "mx-auto w-full max-w-[1280px] space-y-6" : "space-y-6";
 
   return (
     <div className="space-y-6">
+      <div className={headerWrapper}>
       <header className="space-y-3 border-b border-[var(--rule)] pb-5">
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
           {labels.pageKicker}
@@ -137,9 +150,17 @@ export default async function LeadsPage({ searchParams }: Props) {
         showOwnerFilter
         showMine={canEdit}
       />
+      </div>
 
       {view === "board" ? (
-        <LeadsBoard columns={columns} labels={labels} canEdit={canEdit} />
+        <LeadsBoard
+          columns={columns}
+          members={members}
+          labels={labels}
+          canEdit={canEdit}
+          isAdmin={session.role === "admin"}
+          sessionEmail={session.email}
+        />
       ) : (
         <LeadsTable
           rows={pageRows}
