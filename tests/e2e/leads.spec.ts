@@ -60,7 +60,7 @@ test("Seguimiento lists open reminders, overdue first", async ({ page }) => {
 
 test("Leads list derives stages, hides lost leads and filters by owner", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
-  await page.goto("/leads");
+  await page.goto("/leads?view=list");
   await expect(leadRows(page).filter({ hasText: F.visita.name })).toContainText("Visita");
   await expect(leadRows(page).filter({ hasText: F.contacted.name })).toContainText("Contactado");
   // 40 idle days → perdido (auto), hidden unless the stage filter asks for it.
@@ -70,10 +70,29 @@ test("Leads list derives stages, hides lost leads and filters by owner", async (
   await page.waitForURL(/stage=perdido/);
   await expect(leadRows(page).filter({ hasText: F.lost.name })).toContainText("sin actividad");
 
-  await page.goto("/leads?mine=1");
+  await page.goto("/leads?view=list&mine=1");
   await expect(leadRows(page)).toHaveCount(2);
   await expect(page.getByText(F.visita.name)).toBeVisible();
   await expect(page.getByText(F.overdue.name)).toBeVisible();
+});
+
+test("Leads opens on the board and the tabs switch views", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads");
+  await expect(page.locator("[data-board-column]")).toHaveCount(7);
+
+  const tabs = page.getByTestId("leads-view-tabs");
+  await expect(tabs.getByRole("link", { name: "Tablero" })).toHaveAttribute("aria-current", "page");
+  await tabs.getByRole("link", { name: "Lista" }).click();
+  await page.waitForURL(/view=list/);
+  await expect(leadRows(page).first()).toBeVisible();
+  await expect(page.locator("[data-board-column]")).toHaveCount(0);
+
+  // Filters survive the switch back to the board.
+  await page.goto("/leads?view=list&mine=1");
+  await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Tablero" }).click();
+  await page.waitForURL(/mine=1/);
+  await expect(page.locator("[data-board-column]")).toHaveCount(7);
 });
 
 test("Board moves a lead from the ⋯ menu and audits the change", async ({ page }) => {
@@ -207,7 +226,7 @@ test("Asesor manages leads but cannot touch Settings or someone else's lead", as
 
 test("Viewer reads leads without controls and the API refuses writes", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH, VIEWER);
-  await page.goto("/leads");
+  await page.goto("/leads?view=list");
   await expect(leadRows(page).first()).toBeVisible();
 
   await page.goto("/leads?view=board");

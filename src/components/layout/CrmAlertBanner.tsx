@@ -16,6 +16,8 @@ const LINK =
 
 export function CrmAlertBanner({ alerts, labels, scopeMine }: Props) {
   if (alerts.atRisk === 0 && alerts.overdueReminders === 0) return null;
+  // Straight to the list view: a filtered board is mostly empty columns, and
+  // this is a "work through these" list.
   const mine = scopeMine ? "&mine=1" : "";
   return (
     <div
@@ -25,7 +27,7 @@ export function CrmAlertBanner({ alerts, labels, scopeMine }: Props) {
     >
       <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center gap-x-6 gap-y-1.5 px-4 py-2 text-[13px] md:px-6">
         {alerts.atRisk > 0 ? (
-          <Link href={`/leads?filter=at_risk${mine}`} className={LINK}>
+          <Link href={`/leads?view=list&filter=at_risk${mine}`} className={LINK}>
             <Hourglass className="size-3.5 shrink-0" aria-hidden />
             {alerts.atRisk === 1
               ? labels.bannerAtRiskOne
@@ -33,7 +35,7 @@ export function CrmAlertBanner({ alerts, labels, scopeMine }: Props) {
           </Link>
         ) : null}
         {alerts.overdueReminders > 0 ? (
-          <Link href={`/leads?filter=overdue${mine}`} className={LINK}>
+          <Link href={`/leads?view=list&filter=overdue${mine}`} className={LINK}>
             <AlarmClock className="size-3.5 shrink-0" aria-hidden />
             {alerts.overdueReminders === 1
               ? labels.bannerOverdueOne

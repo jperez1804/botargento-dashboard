@@ -6,6 +6,7 @@ import { hasRole, requireRole } from "@/lib/role-guard";
 import { LEAD_LIST_FILTERS, listLeads, type LeadListFilter } from "@/lib/queries/leads";
 import { listTeam, memberLabel } from "@/lib/queries/team";
 import { LeadsFilters } from "@/components/dashboard/LeadsFilters";
+import { LeadsViewTabs } from "@/components/dashboard/LeadsViewTabs";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { LeadsBoard, type BoardColumn } from "@/components/dashboard/LeadsBoard";
 import { formatNumber } from "@/lib/format";
@@ -35,7 +36,9 @@ export default async function LeadsPage({ searchParams }: Props) {
   const labels = crm.labels;
   const tenant = tenantConfig();
 
-  const view = sp.view === "board" ? "board" : "list";
+  // The board is the default view: it is how the team works the pipeline.
+  // The list stays one click away as ?view=list.
+  const view = sp.view === "list" ? "list" : "board";
   const stage = crm.stages.some((s) => s.key === sp.stage) ? String(sp.stage) : "";
   const filter = LEAD_LIST_FILTERS.includes(sp.filter as LeadListFilter)
     ? (sp.filter as LeadListFilter)
@@ -68,17 +71,23 @@ export default async function LeadsPage({ searchParams }: Props) {
     view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now),
   }));
 
-  const buildPageHref = (page: number) => {
+  // Shared query-string builder for pagination and the view tabs: every link
+  // keeps the active filters, drops the page, and only spells out the view
+  // when it is not the default one.
+  const buildHref = (overrides: { page?: number; view?: "board" | "list" } = {}) => {
+    const nextView = overrides.view ?? view;
     const params = new URLSearchParams();
+    if (nextView === "list") params.set("view", "list");
     if (stage) params.set("stage", stage);
     if (sp.owner && !mine) params.set("owner", owner);
     if (mine) params.set("mine", "1");
     if (filter) params.set("filter", filter);
     if (q) params.set("q", q);
-    if (page > 1) params.set("page", String(page));
+    if (overrides.page && overrides.page > 1) params.set("page", String(overrides.page));
     const qs = params.toString();
     return `/leads${qs ? `?${qs}` : ""}`;
   };
+  const buildPageHref = (page: number) => buildHref({ page });
 
   const columns: BoardColumn[] = crm.stages.map((s) => {
     const inStage = views.filter((v) => v.view.stageKey === s.key);
@@ -124,7 +133,7 @@ export default async function LeadsPage({ searchParams }: Props) {
   return (
     <div className="space-y-6">
       <div className={headerWrapper}>
-      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
+      <header className="space-y-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
           {labels.pageKicker}
         </p>
@@ -136,6 +145,23 @@ export default async function LeadsPage({ searchParams }: Props) {
             {formatNumber(views.length, tenant.locale)}
           </p>
         </div>
+        <LeadsViewTabs
+          label={labels.pageTitle}
+          tabs={[
+            {
+              key: "board",
+              label: labels.viewBoard,
+              href: buildHref({ view: "board" }),
+              active: view === "board",
+            },
+            {
+              key: "list",
+              label: labels.viewList,
+              href: buildHref({ view: "list" }),
+              active: view === "list",
+            },
+          ]}
+        />
       </header>
 
       <LeadsFilters
