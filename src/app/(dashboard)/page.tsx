@@ -25,6 +25,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { OtrasBreakdown } from "@/components/dashboard/OtrasBreakdown";
 import { VolumeChart } from "@/components/dashboard/VolumeChart";
 import { WindowToggle } from "@/components/dashboard/WindowToggle";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { formatNumber } from "@/lib/format";
 import type { WindowDays } from "@/config/verticals/_types";
 
@@ -129,31 +130,23 @@ export default async function OverviewPage({
 
   return (
     <div className="space-y-8">
-      {/* Page masthead — sans Display weight, mono kicker line above, hairline
-          rule below. The editorial Fraunces serif is gone product-wide; type
-          hierarchy now comes from weight + size, not face. */}
-      <header
-        data-reveal
-        style={{ ["--reveal-delay" as string]: "0ms" }}
-        className="space-y-3 border-b border-[var(--rule)] pb-5"
+      {/* Page masthead — the period controls sit above the title, then title +
+          subtitle flush left (see components/layout/PageHeader). */}
+      <PageHeader
+        revealDelay="0ms"
+        kicker={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <WindowToggle value={windowDays} config={vertical.windows} />
+            <ExportCsvButton endpoint="/api/export/daily-metrics" label="Exportar métricas" />
+          </div>
+        }
+        title="Operaciones del período"
+        meta={comparisonSubline}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <WindowToggle value={windowDays} config={vertical.windows} />
-          <ExportCsvButton
-            endpoint="/api/export/daily-metrics"
-            label="Exportar métricas"
-          />
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
-            Operaciones del período
-          </h1>
-          <p className="text-sm text-[var(--muted-ink)]">{comparisonSubline}</p>
-        </div>
         <p className="text-[11px] leading-snug text-[var(--soft-ink)]">
           {vertical.windows.scopeNote}
         </p>
-      </header>
+      </PageHeader>
 
       {/* Standard KPI strip — 4 volume metrics. Gives a quick read of the
           period without overwhelming the eye. */}

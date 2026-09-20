@@ -7,6 +7,7 @@ import { LEAD_LIST_FILTERS, listLeads, type LeadListFilter } from "@/lib/queries
 import { listTeam, memberLabel } from "@/lib/queries/team";
 import { LeadsFilters } from "@/components/dashboard/LeadsFilters";
 import { LeadsViewTabs } from "@/components/dashboard/LeadsViewTabs";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { LeadsBoard, type BoardColumn } from "@/components/dashboard/LeadsBoard";
 import { formatNumber } from "@/lib/format";
@@ -133,18 +134,16 @@ export default async function LeadsPage({ searchParams }: Props) {
   return (
     <div className="space-y-6">
       <div className={headerWrapper}>
-      <header className="space-y-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
-          {labels.pageKicker}
-        </p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
-            {labels.pageTitle}
-          </h1>
-          <p className="text-[13px] text-[var(--muted-ink)] tabular-nums">
-            {formatNumber(views.length, tenant.locale)}
-          </p>
-        </div>
+      <PageHeader
+        kicker={labels.pageKicker}
+        title={labels.pageTitle}
+        meta={
+          <span className="tabular-nums">
+            {formatNumber(views.length, tenant.locale)} {labels.nav.toLowerCase()}
+          </span>
+        }
+        divider={false}
+      >
         <LeadsViewTabs
           label={labels.pageTitle}
           tabs={[
@@ -162,7 +161,7 @@ export default async function LeadsPage({ searchParams }: Props) {
             },
           ]}
         />
-      </header>
+      </PageHeader>
 
       <LeadsFilters
         labels={labels}

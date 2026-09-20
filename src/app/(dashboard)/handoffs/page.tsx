@@ -8,6 +8,7 @@ import { verticalConfig } from "@/config/verticals";
 import { HandoffSummaryCards } from "@/components/dashboard/HandoffSummaryCards";
 import { HandoffsTable } from "@/components/dashboard/HandoffsTable";
 import { formatNumber } from "@/lib/format";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export default async function HandoffsPage() {
   const [summary, rows, total] = await Promise.all([
@@ -20,21 +21,11 @@ export default async function HandoffsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header — sans Display weight, mono kicker, hairline rule below.
-       * Mirrors the masthead pattern on the overview page. */}
-      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
-          Operación
-        </p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
-            Derivaciones
-          </h1>
-          <p className="text-[13px] text-[var(--muted-ink)]">
-            Pedidos de contacto con el equipo humano · {formatNumber(total, tenant.locale)} en total
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        kicker="Operación"
+        title="Derivaciones"
+        meta={`Pedidos de contacto con el equipo humano · ${formatNumber(total, tenant.locale)} en total`}
+      />
 
       <section className="space-y-2.5">
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">

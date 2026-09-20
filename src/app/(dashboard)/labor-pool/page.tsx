@@ -8,6 +8,7 @@ import { verticalConfig } from "@/config/verticals";
 import { tenantConfig } from "@/config/tenant";
 import { LaborPoolFilters } from "@/components/dashboard/LaborPoolFilters";
 import { LaborPoolTable } from "@/components/dashboard/LaborPoolTable";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { ExportCsvButton } from "@/components/dashboard/ExportCsvButton";
 import { formatNumber } from "@/lib/format";
 
@@ -67,25 +68,17 @@ export default async function LaborPoolPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
-          Directorio
-        </p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
-            Mano de obra
-          </h1>
-          <div className="flex items-center gap-3">
-            <p className="text-[13px] text-[var(--muted-ink)]">
-              Pool de oficios capturado vía WhatsApp · {formatNumber(total, tenant.locale)} en total
-            </p>
-            <ExportCsvButton
-              endpoint="/api/export/labor-pool"
-              params={{ search, specialty, zone, mode, status }}
-            />
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        kicker="Directorio"
+        title="Mano de obra"
+        meta={`Pool de oficios capturado vía WhatsApp · ${formatNumber(total, tenant.locale)} en total`}
+        actions={
+          <ExportCsvButton
+            endpoint="/api/export/labor-pool"
+            params={{ search, specialty, zone, mode, status }}
+          />
+        }
+      />
 
       <LaborPoolFilters specialties={specialties} />
 

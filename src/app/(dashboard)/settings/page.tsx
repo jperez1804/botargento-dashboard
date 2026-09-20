@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronRight, History, Users } from "lucide-react";
 import { TEAM_LABELS } from "@/config/team-labels";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColorPicker } from "@/components/dashboard/ColorPicker";
 import { getAppSettings } from "@/lib/queries/app-settings";
@@ -12,19 +13,11 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
-          Administración
-        </p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
-            Configuración
-          </h1>
-          <p className="text-[13px] text-[var(--muted-ink)]">
-            Los cambios se aplican a todo el tenant y quedan registrados en la bitácora de auditoría.
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        kicker="Administración"
+        title="Configuración"
+        meta="Los cambios se aplican a todo el tenant y quedan registrados en la bitácora de auditoría."
+      />
 
       <section className="space-y-3">
         <div className="space-y-1.5">
