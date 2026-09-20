@@ -5,6 +5,7 @@ import { tenantConfig } from "@/config/tenant";
 import { requireRole } from "@/lib/role-guard";
 import { formatDateTime } from "@/lib/date";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const ACTION_LABEL: Record<string, string> = {
   theme_update: "Color de marca",
@@ -22,25 +23,19 @@ export default async function AuditLogPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
-        <div className="flex items-center gap-2 text-[13px]">
+      <PageHeader
+        kicker={
           <Link
             href="/settings"
-            className="inline-flex items-center gap-1.5 text-[var(--muted-ink)] hover:text-[var(--ink)] hover:underline underline-offset-[3px]"
+            className="inline-flex items-center gap-1.5 text-[13px] text-[var(--muted-ink)] hover:text-[var(--ink)] hover:underline underline-offset-[3px]"
           >
             <ChevronLeft className="size-3.5" aria-hidden="true" />
             Configuración
           </Link>
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
-            Bitácora de auditoría
-          </h1>
-          <p className="text-[13px] text-[var(--muted-ink)]">
-            Últimos {entries.length} eventos administrativos.
-          </p>
-        </div>
-      </header>
+        }
+        title="Bitácora de auditoría"
+        meta={`Últimos ${entries.length} eventos administrativos.`}
+      />
 
       {entries.length === 0 ? (
         <EmptyState

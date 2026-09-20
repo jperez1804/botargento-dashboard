@@ -156,9 +156,14 @@ test("Lead card: take the lead, log a call and schedule a reminder", async ({ pa
   await expect(card).toContainText("Nuevo");
   await expect(card.getByTestId("lead-status")).toContainText("Pasa a perdido el");
 
-  await card.getByTestId("lead-take").click();
-  await card.getByRole("button", { name: "¿Tomar este lead?" }).click();
-  await expect(card.getByTestId("lead-owner")).toHaveText("Dev Admin");
+  // "Tomar" is a two-click confirm whose pill auto-reverts after 4s — on a
+  // cold dev server the second click can miss that window, so retry the pair.
+  await expect(async () => {
+    const take = card.getByTestId("lead-take");
+    if (await take.isVisible()) await take.click();
+    await card.getByRole("button", { name: "¿Tomar este lead?" }).click({ timeout: 3000 });
+    await expect(card.getByTestId("lead-owner")).toHaveText("Dev Admin", { timeout: 5000 });
+  }).toPass({ timeout: 30_000 });
 
   const activity = page.getByTestId("lead-activity");
   await activity.getByTestId("lead-activity-body").fill("Le ofrecí dos PH en Villa Crespo");

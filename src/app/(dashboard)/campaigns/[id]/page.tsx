@@ -23,6 +23,7 @@ import {
   CampaignsPoller,
 } from "@/components/dashboard/CampaignRowActions";
 import { CampaignsDailyChart } from "@/components/dashboard/CampaignsDailyChart";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { campaignActionsEnabled } from "@/lib/campaigns";
 import { formatNumber, formatPercent } from "@/lib/format";
 
@@ -89,39 +90,39 @@ export default async function CampaignDetailPage({ params }: Props) {
   return (
     <div className="space-y-6">
       <CampaignsPoller />
-      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
-        <Link
-          href="/campaigns"
-          className="inline-flex items-center gap-1 font-[var(--font-geist-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] hover:text-[var(--ink)]"
-        >
-          <ArrowLeft className="size-3" aria-hidden />
-          Campañas
-        </Link>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-[30px] font-semibold leading-[1.1] tracking-[-0.025em] text-[var(--ink)]">
-              {c.name}
-            </h1>
-            <p className="font-[var(--font-geist-mono)] text-[12px] text-[var(--soft-ink)]">
-              {c.template_name} · {c.vertical} · Envíos:{" "}
-              {formatSendWindow(c.send_hour_start, c.send_hour_end)} · Lu–Vi · Hora Argentina
-              (GMT-3)
-            </p>
-          </div>
-          {actionsEnabled ? (
+      <PageHeader
+        kicker={
+          <Link
+            href="/campaigns"
+            className="inline-flex items-center gap-1 font-[var(--font-geist-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] hover:text-[var(--ink)]"
+          >
+            <ArrowLeft className="size-3" aria-hidden />
+            Campañas
+          </Link>
+        }
+        title={c.name}
+        meta={
+          <span className="font-[var(--font-geist-mono)] text-[12px] text-[var(--soft-ink)]">
+            {c.template_name} · {c.vertical} · Envíos:{" "}
+            {formatSendWindow(c.send_hour_start, c.send_hour_end)} · Lu–Vi · Hora Argentina (GMT-3)
+          </span>
+        }
+        actions={
+          actionsEnabled ? (
             <CampaignRowActions
               campaignId={c.campaign_id}
               status={c.status}
               pending={c.pending}
             />
-          ) : null}
-        </div>
+          ) : null
+        }
+      >
         <CampaignProgressBar
           value={campaignProgress(c)}
           locale={tenant.locale}
           className="max-w-md"
         />
-      </header>
+      </PageHeader>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         {tiles.map((t) => (

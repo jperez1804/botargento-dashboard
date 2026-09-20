@@ -3,6 +3,7 @@ import { getFollowUpQueue } from "@/lib/queries/follow-up";
 import { tenantConfig } from "@/config/tenant";
 import { formatNumber } from "@/lib/format";
 import { FollowUpQueue } from "@/components/dashboard/FollowUpQueue";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { RemindersList, type ReminderRow } from "@/components/dashboard/RemindersList";
 import { crmConfig } from "@/lib/crm/enabled";
 import { buildLeadView } from "@/lib/crm/view-model";
@@ -21,27 +22,20 @@ export default async function FollowUpPage() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)] font-[var(--font-geist-mono)]">
-          Operación
-        </p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-[30px] leading-[1.1] tracking-[-0.025em] text-[var(--ink)] font-semibold">
-            Seguimiento
-          </h1>
-          {/* Tier summary chips — same tone semantics as the priority pills
-            * in the queue below. Inline since this row IS the page subtitle
-            * and the only counts that matter on this page. */}
+      <PageHeader
+        kicker="Operación"
+        title="Seguimiento"
+        meta={
+          /* Tier summary chips — same tone semantics as the priority pills in
+           * the queue below. They ARE this page's subtitle. */
           <div className="flex flex-wrap items-center gap-3 text-[12.5px]">
-            <span className="text-[var(--muted-ink)]">
-              {formatNumber(rows.length, tenant.locale)} contactos pendientes
-            </span>
+            <span>{formatNumber(rows.length, tenant.locale)} contactos pendientes</span>
             <TierTag tone="danger" count={high} label="alta" locale={tenant.locale} />
             <TierTag tone="warning" count={medium} label="media" locale={tenant.locale} />
             <TierTag tone="positive" count={low} label="baja" locale={tenant.locale} />
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {crm ? (
         <RemindersList rows={reminders} labels={crm.labels} title={crm.labels.remindersTitle} />

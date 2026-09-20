@@ -13,6 +13,7 @@ import { CampaignsDailyChart } from "@/components/dashboard/CampaignsDailyChart"
 import { CampaignsPoller } from "@/components/dashboard/CampaignRowActions";
 import { campaignActionsEnabled } from "@/lib/campaigns";
 import { formatNumber, formatPercent } from "@/lib/format";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -50,19 +51,11 @@ export default async function CampaignsPage() {
   return (
     <div className="space-y-6">
       <CampaignsPoller />
-      <header className="space-y-3 border-b border-[var(--rule)] pb-5">
-        <p className="font-[var(--font-geist-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">
-          Outbound
-        </p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-[30px] font-semibold leading-[1.1] tracking-[-0.025em] text-[var(--ink)]">
-            Campañas
-          </h1>
-          <p className="text-[13px] text-[var(--muted-ink)]">
-            Enviados hoy: {formatNumber(overview.sent_today, tenant.locale)}
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        kicker="Outbound"
+        title="Campañas"
+        meta={`Enviados hoy: ${formatNumber(overview.sent_today, tenant.locale)}`}
+      />
 
       <QualityBadge
         rating={quality.quality_rating}
