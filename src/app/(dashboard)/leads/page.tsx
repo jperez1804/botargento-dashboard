@@ -127,9 +127,11 @@ export default async function LeadsPage({ searchParams }: Props) {
     .map((m) => ({ email: m.email, label: m.displayName || m.email }));
 
   // In board view the board itself breaks out of the 1280px container (see
-  // has-[[data-board-bleed]] in the dashboard layout); the masthead and the
-  // filters stay centered, so they get their own wrapper.
-  const headerWrapper = view === "board" ? "mx-auto w-full max-w-[1280px] space-y-6" : "space-y-6";
+  // has-[[data-board-bleed]] in the dashboard layout). The masthead and filters
+  // keep the 1280px reading width but start at the SAME left edge as the first
+  // board column — no mx-auto, which would centre them in the widened container
+  // and leave the title floating away from the board.
+  const headerWrapper = view === "board" ? "w-full max-w-[1280px] space-y-6" : "space-y-6";
 
   return (
     <div className="space-y-6">
