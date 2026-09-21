@@ -9,7 +9,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LEAD_FIELD_CLASS } from "@/components/dashboard/lead-field-class";
-import type { CrmLabels } from "@/config/verticals/_types";
+import type { CrmLabels, CrmPriorityKey } from "@/config/verticals/_types";
+import { priorityOptions } from "@/lib/crm/priority";
 import type { LeadListFilter } from "@/lib/queries/leads";
 
 type Props = {
@@ -22,6 +23,7 @@ type Props = {
     owner: string;
     filter: LeadListFilter | "";
     mine: boolean;
+    priority: CrmPriorityKey | "";
     view: "list" | "board";
   };
   showOwnerFilter: boolean;
@@ -158,6 +160,24 @@ export function LeadsFilters({ labels, stages, owners, current, showOwnerFilter,
             {f.label}
           </button>
         ))}
+        <span
+          role="group"
+          aria-label={labels.priority.filterLabel}
+          className="flex flex-wrap gap-2 sm:ml-2 sm:border-l sm:border-[var(--rule)] sm:pl-4"
+        >
+          {priorityOptions(labels).map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              data-priority={p.key}
+              aria-pressed={current.priority === p.key}
+              onClick={() => navigate({ priority: current.priority === p.key ? null : p.key })}
+              className={cn(CHIP, current.priority === p.key ? CHIP_ON : CHIP_OFF)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </span>
       </div>
     </div>
   );

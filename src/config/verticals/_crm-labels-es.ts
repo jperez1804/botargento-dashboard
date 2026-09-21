@@ -78,6 +78,7 @@ export const CRM_LABELS_ES: CrmLabels = {
     reminder_done: "Recordatorio cumplido",
     contact: "Respuesta desde el panel",
     created: "Cargado a mano",
+    priority: "Prioridad",
   },
   errors: {
     already_owned: "Otra persona tomó este lead recién. Actualizá la página.",
@@ -85,6 +86,7 @@ export const CRM_LABELS_ES: CrmLabels = {
     invalid_phone: "Revisá el teléfono: poné el código de área y el número.",
     invalid_source: "Elegí un origen de la lista.",
     invalid_stage: "Esa etapa no existe para este panel.",
+    invalid_priority: "Esa prioridad no existe.",
     invalid_owner: "Ese responsable no tiene acceso al panel.",
     invalid_body: "Revisá los datos e intentá de nuevo.",
     forbidden: "Tu usuario no puede modificar leads.",
@@ -121,4 +123,72 @@ export const CRM_LABELS_ES: CrmLabels = {
   openWhatsapp: "Abrir en WhatsApp",
   manualOriginTemplate: "Cargado a mano · {source}",
   manualByTemplate: "por {who} el {date}",
+
+  priority: {
+    label: "Prioridad",
+    none: "Sin prioridad",
+    names: { alta: "Alta", media: "Media", baja: "Baja" },
+    filterLabel: "Prioridad",
+  },
+
+  summary: {
+    view: "Resumen",
+    windowTemplate: "Últimos {days} días",
+    closed: "Cerrados",
+    active: "Con actividad",
+    new: "Nuevos",
+    dueSoon: "Vencen pronto",
+    overdueCaptionTemplate: "{n} vencidos",
+    overdueCaptionOne: "1 vencido",
+    noOverdueCaption: "Sin vencidos",
+    stagesTitle: "Etapas",
+    stagesDescription: "Leads por etapa, incluidos los perdidos.",
+    priorityTitle: "Prioridad",
+    priorityDescription: "Leads abiertos según la prioridad que les puso el equipo.",
+    workloadTitle: "Carga del equipo",
+    workloadDescription: "Leads abiertos por responsable.",
+    sourcesTitle: "Origen",
+    sourcesDescription: "Por dónde llegó cada lead.",
+    totalUnit: "leads",
+    empty: "Todavía no hay leads para resumir.",
+  },
+
+  guide: {
+    view: "Guía",
+    title: "Cómo funciona el seguimiento",
+    intro:
+      "Cada lead está en una sola etapa. Algunas las mueve el bot según la conversación; otras las marca un asesor desde el panel. Esta guía explica cada una y las reglas que aplican solas.",
+    stagesTitle: "Etapas",
+    moverBot: "La mueve el bot",
+    moverPerson: "La marca un asesor",
+    moverBoth: "El bot o un asesor",
+    autoNew: "Cuando la persona escribe por primera vez, o cuando se carga a mano.",
+    autoContacted: "Cuando alguien del equipo le responde desde el panel.",
+    autoQualified: "Cuando el bot deriva la consulta al equipo.",
+    autoLostTemplate:
+      "Cuando pide no recibir más mensajes, o tras {days} días sin actividad. Un asesor también puede marcarla, con un motivo.",
+    manualOnlyNote: "Solo a mano: el bot nunca la asigna.",
+    rulesTitle: "Reglas automáticas",
+    inactivityRuleTemplate:
+      "Un lead sin actividad durante {days} días pasa a {lost} solo. {warn} días antes aparece como «Por vencer» en el tablero y en el aviso de arriba.",
+    inactivityReversible:
+      "Si la persona vuelve a escribir, o registrás una actividad o lo movés de etapa, sale de {lost} y retoma su seguimiento.",
+    activityTitle: "Qué cuenta como actividad",
+    activityIntro: "Cualquiera de estas cosas reinicia el reloj de inactividad:",
+    activityMessages: "Un mensaje de WhatsApp, entrante o saliente",
+    remindersTitle: "Recordatorios",
+    remindersBody:
+      "Desde la ficha del lead podés dejar un próximo paso con fecha. Los vencidos aparecen en Seguimiento y en el aviso de arriba; asignar un responsable o programar un recordatorio no cuenta como actividad.",
+    priorityTitle: "Prioridad",
+    priorityBody:
+      "Es una marca que pone el equipo, nunca el bot. Los leads con prioridad aparecen primero en su columna y se pueden filtrar.",
+    priorityMeaning: {
+      alta: "Atender hoy: hay una oportunidad concreta o una urgencia.",
+      media: "Seguir esta semana.",
+      baja: "Sin apuro; se retoma cuando haya tiempo.",
+    },
+    sourcesTitle: "Origen",
+    sourcesBody:
+      "Los leads que escriben al bot llegan por WhatsApp. Los que llaman, visitan la oficina o vienen por un portal o un referido se cargan a mano con «Nuevo lead»; si después escriben, la conversación se suma al mismo lead.",
+  },
 };

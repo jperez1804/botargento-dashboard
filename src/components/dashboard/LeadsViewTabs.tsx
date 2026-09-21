@@ -4,15 +4,17 @@
 
 import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
-import { Activity, LayoutList, SquareKanban } from "lucide-react";
+import { Activity, BookOpen, ChartPie, LayoutList, SquareKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type LeadsViewTabKey = "board" | "list" | "activity";
+export type LeadsViewTabKey = "board" | "list" | "summary" | "activity" | "guide";
 
 const ICONS: Record<LeadsViewTabKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   board: SquareKanban,
   list: LayoutList,
   activity: Activity,
+  summary: ChartPie,
+  guide: BookOpen,
 };
 
 type Props = {

@@ -8,6 +8,7 @@ import {
   ArrowRightLeft,
   BellRing,
   CheckCheck,
+  Flag,
   House,
   MessageSquareReply,
   Phone,
@@ -26,6 +27,7 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 const KIND_ICON: Record<string, Icon> = {
   note: StickyNote,
+  priority: Flag,
   call: Phone,
   visit: House,
   meeting: Users,

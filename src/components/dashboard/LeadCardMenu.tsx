@@ -13,10 +13,12 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LeadAvatar } from "@/components/dashboard/LeadAvatar";
-import type { CrmLabels } from "@/config/verticals/_types";
+import type { CrmLabels, CrmPriorityKey } from "@/config/verticals/_types";
+import { priorityOptions } from "@/lib/crm/priority";
 
 // DropdownMenuContent defaults to the trigger's width (`w-(--anchor-width)`),
 // which is a 24px icon here — force a readable popup instead.
@@ -24,7 +26,14 @@ const MENU_CLASS = "w-auto min-w-[220px] max-w-[280px]";
 
 type Props = {
   variant: "move" | "assign";
-  card: { waId: string; displayName: string; stageKey: string; ownerEmail: string | null; ownerLabel: string };
+  card: {
+    waId: string;
+    displayName: string;
+    stageKey: string;
+    ownerEmail: string | null;
+    ownerLabel: string;
+    priorityKey: CrmPriorityKey | null;
+  };
   stages: ReadonlyArray<{ key: string; label: string }>;
   members: ReadonlyArray<{ email: string; label: string }>;
   sessionEmail: string;
@@ -32,6 +41,7 @@ type Props = {
   disabled?: boolean;
   onMove: (waId: string, stage: string) => void;
   onAssign: (waId: string, ownerEmail: string | null) => void;
+  onSetPriority: (waId: string, priority: CrmPriorityKey | "") => void;
 };
 
 export function LeadCardMenu({
@@ -44,6 +54,7 @@ export function LeadCardMenu({
   disabled,
   onMove,
   onAssign,
+  onSetPriority,
 }: Props) {
   const isAssign = variant === "assign";
   return (
@@ -103,16 +114,39 @@ export function LeadCardMenu({
             ) : null}
           </DropdownMenuGroup>
         ) : (
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>{labels.moveTo}</DropdownMenuLabel>
-            {stages
-              .filter((s) => s.key !== card.stageKey)
-              .map((s) => (
-                <DropdownMenuItem key={s.key} onClick={() => onMove(card.waId, s.key)}>
-                  {s.label}
+          <>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{labels.moveTo}</DropdownMenuLabel>
+              {stages
+                .filter((s) => s.key !== card.stageKey)
+                .map((s) => (
+                  <DropdownMenuItem key={s.key} onClick={() => onMove(card.waId, s.key)}>
+                    {s.label}
+                  </DropdownMenuItem>
+                ))}
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            {/* A second group, not a submenu: one tap on touch, and the
+                current level is visible at a glance. */}
+            <DropdownMenuGroup data-testid="lead-priority-menu">
+              <DropdownMenuLabel>{labels.priority.label}</DropdownMenuLabel>
+              {priorityOptions(labels).map((p) => (
+                <DropdownMenuItem
+                  key={p.key}
+                  onClick={() => onSetPriority(card.waId, p.key)}
+                  className="gap-2"
+                >
+                  <span className="flex-1">{p.label}</span>
+                  {p.key === card.priorityKey ? <Check className="size-3.5" aria-hidden /> : null}
                 </DropdownMenuItem>
               ))}
-          </DropdownMenuGroup>
+              {card.priorityKey ? (
+                <DropdownMenuItem onClick={() => onSetPriority(card.waId, "")}>
+                  {labels.priority.none}
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuGroup>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

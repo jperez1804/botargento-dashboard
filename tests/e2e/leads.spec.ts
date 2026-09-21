@@ -376,3 +376,94 @@ test("Header search finds leads by name and by phone", async ({ page }) => {
   await page.goto("/buscar?q=zzzz-nadie");
   await expect(page.getByText("No encontramos nada con “zzzz-nadie”")).toBeVisible();
 });
+
+test("Resumen tab shows the 7-day indicators and the breakdowns", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads");
+  await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Resumen" }).click();
+  await page.waitForURL(/view=summary/);
+  await expect(page.locator("[data-board-column]")).toHaveCount(0);
+  await expect(page.locator("[data-board-bleed]")).toHaveCount(1);
+
+  // Fixture-stable numbers (lead_state and manual_leads are truncated per test).
+  const dueSoon = page.getByTestId("summary-kpi-dueSoon");
+  await expect(dueSoon).toContainText("1");
+  await expect(dueSoon).toContainText("1 vencido");
+  await expect(page.getByTestId("summary-stages").locator("[data-summary-stage]")).toHaveCount(7);
+  await expect(page.getByTestId("summary-stages").locator(".recharts-surface")).toBeVisible();
+  await expect(page.getByTestId("summary-priority").locator('[data-row="alta"] [data-count]')).toHaveText("1");
+  await expect(
+    page.getByTestId("summary-workload").locator("li", { hasText: "Ana Asesora" }).locator("[data-count]"),
+  ).toHaveText("3");
+  await expect(page.getByTestId("summary-sources").locator('[data-row="visita"] [data-count]')).toHaveText("1");
+
+  // Closing a lead today shows up under "Cerrados".
+  const res = await page.request.post("/api/leads/set-stage", {
+    data: { contactWaId: F.contacted.wa_id, stage: "cerrado" },
+  });
+  expect(res.status()).toBe(200);
+  await page.reload();
+  await expect(page.getByTestId("summary-kpi-closed")).toContainText("1");
+});
+
+test("Priority from the board ⋯ menu, on the list, and as a filter", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board");
+  // Seeded: visita = Alta, and prioritized cards come first in their column.
+  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`).getByTestId("lead-priority")).toHaveText("Alta");
+
+  const card = page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`);
+  await card.getByTestId("lead-menu").click();
+  await page.getByRole("menuitem", { name: "Alta", exact: true }).click();
+  await expect(card.getByTestId("lead-priority")).toHaveText("Alta");
+  await expect
+    .poll(() =>
+      withSql(async (sql) => {
+        const rows = await sql`SELECT priority FROM dashboard.lead_state WHERE contact_wa_id = ${F.atRisk.wa_id}`;
+        return rows[0]?.priority ?? null;
+      }),
+    )
+    .toBe("alta");
+  await expect.poll(() => lastAudit("lead_set_priority")).toMatchObject({
+    contact_wa_id: F.atRisk.wa_id,
+    to: "alta",
+    ok: true,
+  });
+
+  await page.goto("/leads?view=list&priority=alta");
+  await expect(leadRows(page)).toHaveCount(2);
+  await expect(leadRows(page).first().getByTestId("lead-priority")).toHaveText("Alta");
+  await expect(page.locator('button[data-priority="alta"]')).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Priority from the lead card is logged in its history", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto(`/conversations/${F.reserva.wa_id}`);
+  const card = page.getByTestId("lead-crm-card");
+  await expect(card.getByTestId("lead-priority")).toHaveText("Media");
+  await card.getByTestId("lead-priority-select").selectOption("baja");
+  await expect(card.getByTestId("lead-priority")).toHaveText("Baja");
+  const activity = page.getByTestId("lead-activity");
+  await expect(activity).toContainText("Prioridad");
+  await expect(activity).toContainText("→ Baja");
+});
+
+test("Guía documents the stages and rules; the viewer can read it but not prioritize", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH, VIEWER);
+  await page.goto("/leads");
+  await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Guía" }).click();
+  await page.waitForURL(/view=guide/);
+  const guide = page.getByTestId("leads-guide");
+  await expect(guide.locator("[data-guide-stage]")).toHaveCount(7);
+  await expect(guide.locator('[data-guide-stage="visita"]')).toContainText("La marca un asesor");
+  await expect(guide).toContainText("30 días");
+  await expect(guide).toContainText("Visita a la oficina");
+
+  await page.goto(`/conversations/${F.reserva.wa_id}`);
+  await expect(page.getByTestId("lead-crm-card").getByTestId("lead-priority")).toHaveText("Media");
+  await expect(page.getByTestId("lead-priority-select")).toHaveCount(0);
+  const res = await page.request.post("/api/leads/set-priority", {
+    data: { contactWaId: F.reserva.wa_id, priority: "alta" },
+  });
+  expect(res.status()).toBe(403);
+});

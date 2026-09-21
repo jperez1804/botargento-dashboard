@@ -6,6 +6,7 @@
 //   G human reply from the inbox (sent_by='human') → contactado (auto)
 //   H registered by hand (dashboard.manual_leads, walk-in, asesor@) — no
 //     WhatsApp conversation yet
+// Priorities: A alta, B media (the Resumen and the priority e2e count them).
 // Plus: the seed's most recent business handoff gets qualification columns and
 // a session_memory snapshot, so the "Lo que captó el bot" card has data
 // without adding a 13th business escalation (the e2e expects exactly 12).
@@ -62,20 +63,20 @@ export async function seedCrmState(sql: Sql): Promise<void> {
     INSERT INTO dashboard.lead_state
       (contact_wa_id, stage, stage_changed_at, stage_changed_by,
        owner_email, owner_assigned_at, owner_assigned_by,
-       next_action_at, next_action_note, next_action_set_by)
+       next_action_at, next_action_note, next_action_set_by, priority)
     VALUES
       (${f.visita.wa_id}, 'visita', ${ago(1)}, 'dev@botargento.com.ar',
-       'dev@botargento.com.ar', ${ago(2)}, 'dev@botargento.com.ar', NULL, '', ''),
+       'dev@botargento.com.ar', ${ago(2)}, 'dev@botargento.com.ar', NULL, '', '', 'alta'),
       (${f.reserva.wa_id}, 'reserva', ${ago(1)}, 'asesor@cliente.com',
-       'asesor@cliente.com', ${ago(3)}, 'asesor@cliente.com', NULL, '', ''),
+       'asesor@cliente.com', ${ago(3)}, 'asesor@cliente.com', NULL, '', '', 'media'),
       (${f.overdue.wa_id}, NULL, NULL, '',
        'dev@botargento.com.ar', ${ago(4)}, 'dev@botargento.com.ar',
-       ${ago(1)}, 'Llamar para coordinar la visita', 'dev@botargento.com.ar'),
+       ${ago(1)}, 'Llamar para coordinar la visita', 'dev@botargento.com.ar', ''),
       (${f.upcoming.wa_id}, NULL, NULL, '',
        'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com',
-       ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com'),
+       ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com', ''),
       (${f.manual.wa_id}, NULL, NULL, '',
-       'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com', NULL, '', '')
+       'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com', NULL, '', '', '')
   `;
 
   await sql`

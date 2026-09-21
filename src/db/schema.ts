@@ -80,6 +80,10 @@ export const leadState = dashboardSchema.table("lead_state", {
   nextActionSetBy: text("next_action_set_by").notNull().default(""),
   nextActionNotifiedAt: timestamp("next_action_notified_at", { withTimezone: true }),
   nextActionDoneAt: timestamp("next_action_done_at", { withTimezone: true }),
+  // Manual priority (migrations/0007_lead_priority.sql): '' | alta | media | baja.
+  priority: text("priority").notNull().default(""),
+  prioritySetAt: timestamp("priority_set_at", { withTimezone: true }),
+  prioritySetBy: text("priority_set_by").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

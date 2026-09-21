@@ -4,6 +4,7 @@
 // person logged render their own text.
 
 import type { CrmConfig, CrmEventKind } from "@/config/verticals/_types";
+import { parsePriority } from "@/lib/crm/priority";
 
 export type DescribableEvent = {
   kind: string;
@@ -39,6 +40,11 @@ export function describeLeadEvent(
   if (event.kind === "created") {
     const source = config.manualLeadSources.find((s) => s.key === meta.source)?.label;
     return source ? `${config.labels.sourceLabel}: ${source}` : event.body;
+  }
+  if (event.kind === "priority") {
+    if (!("to" in meta)) return event.body;
+    const to = parsePriority(meta.to);
+    return `→ ${to ? config.labels.priority.names[to] : config.labels.priority.none}`;
   }
   return event.body;
 }
