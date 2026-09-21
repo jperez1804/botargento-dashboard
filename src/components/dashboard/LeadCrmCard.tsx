@@ -8,6 +8,8 @@ import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
 import { LeadStageControl } from "@/components/dashboard/LeadStageControl";
 import { LeadOwnerControl } from "@/components/dashboard/LeadOwnerControl";
 import { LeadReminderControl } from "@/components/dashboard/LeadReminderControl";
+import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
+import { LeadPriorityControl } from "@/components/dashboard/LeadPriorityControl";
 import { LEAD_CAPTION_CLASS } from "@/components/dashboard/lead-field-class";
 import type { CrmConfig } from "@/config/verticals/_types";
 import type { LeadView } from "@/lib/crm/view-model";
@@ -61,6 +63,20 @@ export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin
               lostKey={config.autoStages.lost}
               labels={labels}
             />
+          ) : null}
+        </section>
+
+        <section className="space-y-2 border-t border-[var(--rule)] pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12.5px] text-[var(--soft-ink)]">{labels.priority.label}</span>
+            {view.priority ? (
+              <LeadPriorityChip label={view.priority.label} tone={view.priority.tone} />
+            ) : (
+              <span className="text-[12.5px] italic text-[var(--soft-ink)]">{labels.priority.none}</span>
+            )}
+          </div>
+          {canEdit ? (
+            <LeadPriorityControl waId={waId} current={view.priority?.key ?? ""} labels={labels} />
           ) : null}
         </section>
 

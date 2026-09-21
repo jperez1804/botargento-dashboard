@@ -6,6 +6,7 @@
 
 import type { CrmConfig, CrmStageTone } from "@/config/verticals/_types";
 import type { EffectiveLead, ReminderStatus } from "@/lib/crm/effective-stage";
+import { priorityView, type PriorityView } from "@/lib/crm/priority";
 import type { LeadBudget } from "@/lib/queries/leads";
 
 export function fillTemplate(template: string, vars: Record<string, string | number>): string {
@@ -105,6 +106,7 @@ export type LeadView = {
   lastActivityRelative: string;
   budgetText: string | null;
   daysInStageText: string | null;
+  priority: PriorityView | null;
 };
 
 export function buildLeadView(
@@ -170,6 +172,7 @@ export function buildLeadView(
       : "—",
     budgetText: formatBudget(budget, locale),
     daysInStageText: daysInStage(lead.stageSince, now, labels),
+    priority: priorityView(lead.priority, labels),
   };
 }
 

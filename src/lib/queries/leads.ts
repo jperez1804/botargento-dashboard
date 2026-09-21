@@ -11,7 +11,7 @@
 // tests/unit/crm-effective-stage.test.ts as the equivalence fixture.
 
 import { sql } from "@/db/client";
-import type { CrmConfig } from "@/config/verticals/_types";
+import type { CrmConfig, CrmPriorityKey } from "@/config/verticals/_types";
 import {
   ACTIVITY_EVENT_KINDS,
   deriveLead,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/crm/effective-stage";
 import { hasLeadLogSentBy, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
 import { priceRangeText } from "@/lib/crm/price-range";
+import { priorityRank } from "@/lib/crm/priority";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
 
 // What the lead said they can spend: the amount of their latest real handoff
@@ -146,7 +147,7 @@ async function selectLeadRows(
       e.last_crm_activity_at, e.last_contact_event_at,
       s.contact_wa_id AS state_wa_id,
       s.stage, s.stage_changed_at, s.lost_reason, s.owner_email,
-      s.next_action_at, s.next_action_note, s.next_action_done_at,
+      s.next_action_at, s.next_action_note, s.next_action_done_at, s.priority,
       ${suppression
         ? sql`(SELECT MIN(o.created_at) FROM outreach.suppression o WHERE o.wa_id = c.contact_wa_id)`
         : sql`NULL::timestamptz`} AS opted_out_at
@@ -178,6 +179,7 @@ async function selectLeadRows(
           nextActionAt: toDate(r.next_action_at),
           nextActionNote: String(r.next_action_note ?? ""),
           nextActionDoneAt: toDate(r.next_action_done_at),
+          priority: String(r.priority ?? ""),
         }
       : null;
     return {
@@ -216,6 +218,7 @@ export type ListLeadsParams = {
   // Lost leads pile up (every idle contact ends there), so they are hidden
   // unless the stage filter asks for them explicitly.
   includeLost?: boolean;
+  priority?: CrmPriorityKey | "none";
 };
 
 export type ListLeadsResult = {
@@ -245,6 +248,8 @@ export async function listLeads(
     if (params.filter === "at_risk" && !row.lead.atRisk) return false;
     if (params.filter === "overdue" && row.lead.reminder?.status !== "overdue") return false;
     if (params.filter === "unassigned" && row.lead.owner !== null) return false;
+    if (params.priority === "none" && row.lead.priority !== null) return false;
+    if (params.priority && params.priority !== "none" && row.lead.priority !== params.priority) return false;
     if (params.q && !matchesQuery(row, params.q)) return false;
     return true;
   });
@@ -258,8 +263,11 @@ export async function listLeads(
       if (params.stage) return row.lead.stage === params.stage;
       return params.includeLost === true || row.lead.stage !== lostKey;
     })
+    // Prioritized leads first (an "Alta" must never sink under untouched
+    // leads), then most recent activity — one sort for the board and the list.
     .sort(
       (a, b) =>
+        priorityRank(a.lead.priority) - priorityRank(b.lead.priority) ||
         (b.lead.lastActivityAt?.getTime() ?? 0) - (a.lead.lastActivityAt?.getTime() ?? 0),
     );
 

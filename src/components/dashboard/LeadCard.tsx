@@ -10,7 +10,9 @@ import { BellRing, Clock3, MessageCircle, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LeadAvatar } from "@/components/dashboard/LeadAvatar";
 import { LeadCardMenu } from "@/components/dashboard/LeadCardMenu";
-import type { CrmLabels } from "@/config/verticals/_types";
+import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
+import type { CrmLabels, CrmPriorityKey } from "@/config/verticals/_types";
+import type { PriorityView } from "@/lib/crm/priority";
 
 export type BoardCard = {
   waId: string;
@@ -28,6 +30,7 @@ export type BoardCard = {
   daysInStage: string | null;
   // Origin of a lead registered by hand ("Portal inmobiliario"); null = WhatsApp.
   sourceLabel: string | null;
+  priority: PriorityView | null;
 };
 
 type Props = {
@@ -41,6 +44,7 @@ type Props = {
   busy: boolean;
   onMove: (waId: string, stage: string) => void;
   onAssign: (waId: string, ownerEmail: string | null) => void;
+  onSetPriority: (waId: string, priority: CrmPriorityKey | "") => void;
 };
 
 export function LeadCard({
@@ -54,7 +58,9 @@ export function LeadCard({
   busy,
   onMove,
   onAssign,
+  onSetPriority,
 }: Props) {
+  const menuCard = { ...card, priorityKey: card.priority?.key ?? null };
   // Mirror the API rule (403 not_owner): an asesor manages unassigned leads
   // and their own; reassigning a colleague's lead is an admin call.
   const canAssign =
@@ -87,7 +93,7 @@ export function LeadCard({
         {canEdit ? (
           <LeadCardMenu
             variant="move"
-            card={card}
+            card={menuCard}
             stages={stages}
             members={members}
             sessionEmail={sessionEmail}
@@ -95,17 +101,25 @@ export function LeadCard({
             disabled={busy}
             onMove={onMove}
             onAssign={onAssign}
+            onSetPriority={onSetPriority}
           />
         ) : null}
       </div>
 
-      {card.sourceLabel ? (
-        <span
-          data-testid="lead-source"
-          className="inline-flex h-[18px] items-center rounded-full border border-[var(--rule)] px-1.5 text-[10.5px] text-[var(--muted-ink)]"
-        >
-          {card.sourceLabel}
-        </span>
+      {card.sourceLabel || card.priority ? (
+        <div className="flex flex-wrap items-center gap-1">
+          {card.priority ? (
+            <LeadPriorityChip label={card.priority.label} tone={card.priority.tone} />
+          ) : null}
+          {card.sourceLabel ? (
+            <span
+              data-testid="lead-source"
+              className="inline-flex h-[18px] items-center rounded-full border border-[var(--rule)] px-1.5 text-[10.5px] text-[var(--muted-ink)]"
+            >
+              {card.sourceLabel}
+            </span>
+          ) : null}
+        </div>
       ) : null}
 
       {card.budgetText ? (
@@ -160,7 +174,7 @@ export function LeadCard({
         {canAssign ? (
           <LeadCardMenu
             variant="assign"
-            card={card}
+            card={menuCard}
             stages={stages}
             members={members}
             sessionEmail={sessionEmail}
@@ -168,6 +182,7 @@ export function LeadCard({
             disabled={busy}
             onMove={onMove}
             onAssign={onAssign}
+            onSetPriority={onSetPriority}
           />
         ) : (
           <LeadAvatar

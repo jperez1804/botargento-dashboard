@@ -6,6 +6,7 @@ import { SquareKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DataTable, type DataTableColumn } from "@/components/dashboard/DataTable";
 import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
+import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
 import type { CrmLabels } from "@/config/verticals/_types";
 import type { LeadView } from "@/lib/crm/view-model";
 
@@ -54,12 +55,17 @@ export function LeadsTable({ rows, labels, pagination }: Props) {
       header: labels.columnStage,
       width: "140px",
       cell: (r) => (
-        <LeadStageChip
-          label={r.view.stageLabel}
-          tone={r.view.tone}
-          auto={r.view.auto}
-          autoTitle={labels.autoStageHint}
-        />
+        <div className="flex flex-col items-start gap-1">
+          <LeadStageChip
+            label={r.view.stageLabel}
+            tone={r.view.tone}
+            auto={r.view.auto}
+            autoTitle={labels.autoStageHint}
+          />
+          {r.view.priority ? (
+            <LeadPriorityChip label={r.view.priority.label} tone={r.view.priority.tone} />
+          ) : null}
+        </div>
       ),
     },
     {

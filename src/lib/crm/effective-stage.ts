@@ -13,7 +13,8 @@
 //   5. A non-terminal lead with no activity for autoLostDays → perdido
 //      (automatic, reversible: any manual stage change restarts the clock).
 
-import type { CrmConfig, CrmEventKind } from "@/config/verticals/_types";
+import type { CrmConfig, CrmEventKind, CrmPriorityKey } from "@/config/verticals/_types";
+import { parsePriority } from "@/lib/crm/priority";
 
 const DAY_MS = 86_400_000;
 
@@ -48,6 +49,7 @@ export type LeadStateRow = {
   nextActionAt: Date | null;
   nextActionNote: string;
   nextActionDoneAt: Date | null;
+  priority: string; // '' | alta | media | baja (validated by parsePriority)
 };
 
 export type LostInfo = {
@@ -69,6 +71,8 @@ export type EffectiveLead = {
   atRisk: { lostOn: Date; daysLeft: number } | null;
   reminder: { at: Date; note: string; status: ReminderStatus } | null;
   owner: string | null;
+  // Manual priority; setting it is not activity (same rule as assigning).
+  priority: CrmPriorityKey | null;
 };
 
 function maxDate(...dates: Array<Date | null | undefined>): Date | null {
@@ -197,5 +201,6 @@ export function deriveLead(
     atRisk,
     reminder,
     owner: state?.ownerEmail ?? null,
+    priority: parsePriority(state?.priority),
   };
 }

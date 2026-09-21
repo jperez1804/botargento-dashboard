@@ -12,7 +12,7 @@
 
 import type { Sql, TransactionSql } from "postgres";
 import { sql } from "@/db/client";
-import type { CrmActivityKind } from "@/config/verticals/_types";
+import type { CrmActivityKind, CrmPriorityKey } from "@/config/verticals/_types";
 import { invalidateCrmAlerts } from "@/lib/queries/leads";
 
 async function appendEvent(
@@ -54,6 +54,35 @@ export async function setLeadStage(
     await appendEvent(tx, waId, "stage_change", lostReason, by, {
       from: fromStage,
       to: stage,
+    });
+  });
+  invalidateCrmAlerts();
+}
+
+/**
+ * Sets (or clears, with '') the manual priority. Touches ONLY its own columns
+ * so stage/owner/reminder upserts and this one never overwrite each other.
+ */
+export async function setLeadPriority(
+  waId: string,
+  priority: CrmPriorityKey | "",
+  by: string,
+  fromPriority: CrmPriorityKey | null,
+): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`
+      INSERT INTO dashboard.lead_state
+        (contact_wa_id, priority, priority_set_at, priority_set_by, updated_at)
+      VALUES (${waId}, ${priority}, NOW(), ${by}, NOW())
+      ON CONFLICT (contact_wa_id) DO UPDATE
+      SET priority = EXCLUDED.priority,
+          priority_set_at = NOW(),
+          priority_set_by = EXCLUDED.priority_set_by,
+          updated_at = NOW()
+    `;
+    await appendEvent(tx, waId, "priority", "", by, {
+      from: fromPriority,
+      to: priority || null,
     });
   });
   invalidateCrmAlerts();
