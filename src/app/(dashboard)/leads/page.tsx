@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { tenantConfig } from "@/config/tenant";
 import { crmConfig } from "@/lib/crm/enabled";
-import { buildLeadView } from "@/lib/crm/view-model";
+import { buildLeadView, sumBudgets } from "@/lib/crm/view-model";
 import { hasRole, requireRole } from "@/lib/role-guard";
 import { LEAD_LIST_FILTERS, listLeads, type LeadListFilter } from "@/lib/queries/leads";
 import { listTeam, memberLabel } from "@/lib/queries/team";
@@ -10,6 +10,10 @@ import { LeadsViewTabs } from "@/components/dashboard/LeadsViewTabs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { LeadsBoard, type BoardColumn } from "@/components/dashboard/LeadsBoard";
+import { NewLeadDialog } from "@/components/dashboard/NewLeadDialog";
+import { TeamActivityFeed } from "@/components/dashboard/TeamActivityFeed";
+import { TeamActivityFilters } from "@/components/dashboard/TeamActivityFilters";
+import { listTeamLeadEvents } from "@/lib/queries/lead-detail";
 import { formatNumber } from "@/lib/format";
 
 const PAGE_SIZE = 25;
@@ -26,8 +30,12 @@ type Props = {
     filter?: string;
     q?: string;
     page?: string;
+    kind?: string;
+    by?: string;
   }>;
 };
+
+type LeadsView = "board" | "list" | "activity";
 
 export default async function LeadsPage({ searchParams }: Props) {
   const crm = crmConfig();
@@ -38,8 +46,10 @@ export default async function LeadsPage({ searchParams }: Props) {
   const tenant = tenantConfig();
 
   // The board is the default view: it is how the team works the pipeline.
-  // The list stays one click away as ?view=list.
-  const view = sp.view === "list" ? "list" : "board";
+  // The list and the team's activity feed are one tab away.
+  const view: LeadsView = sp.view === "list" || sp.view === "activity" ? sp.view : "board";
+  const activityKind = sp.kind && sp.kind in labels.eventKinds ? sp.kind : "";
+  const activityBy = (sp.by ?? "").trim().toLowerCase();
   const stage = crm.stages.some((s) => s.key === sp.stage) ? String(sp.stage) : "";
   const filter = LEAD_LIST_FILTERS.includes(sp.filter as LeadListFilter)
     ? (sp.filter as LeadListFilter)
@@ -51,7 +61,7 @@ export default async function LeadsPage({ searchParams }: Props) {
   const canEdit = hasRole(session, "asesor");
 
   const now = new Date();
-  const [result, team] = await Promise.all([
+  const [result, team, events] = await Promise.all([
     listLeads(
       crm,
       {
@@ -64,19 +74,29 @@ export default async function LeadsPage({ searchParams }: Props) {
       now,
     ),
     listTeam(),
+    view === "activity"
+      ? listTeamLeadEvents({ kind: activityKind || undefined, by: activityBy || undefined })
+      : Promise.resolve([]),
   ]);
   const labelFor = (email: string | null) => memberLabel(team, email);
+  const sourceLabel = (key: string) =>
+    crm.manualLeadSources.find((s) => s.key === key)?.label ?? key;
   const views = result.rows.map((r) => ({
     waId: r.contactWaId,
     displayName: r.displayName,
-    view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now),
+    budget: r.budget,
+    // Only leads registered by hand show an origin; WhatsApp is the default.
+    sourceLabel: r.manual ? sourceLabel(r.manual.source) : null,
+    view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now, r.budget),
   }));
 
   // Shared query-string builder for pagination and the view tabs: every link
   // keeps the active filters, drops the page, and only spells out the view
   // when it is not the default one.
-  const buildHref = (overrides: { page?: number; view?: "board" | "list" } = {}) => {
+  const buildHref = (overrides: { page?: number; view?: LeadsView } = {}) => {
     const nextView = overrides.view ?? view;
+    // The activity feed has its own filters; the lead filters don't apply.
+    if (nextView === "activity") return "/leads?view=activity";
     const params = new URLSearchParams();
     if (nextView === "list") params.set("view", "list");
     if (stage) params.set("stage", stage);
@@ -98,6 +118,10 @@ export default async function LeadsPage({ searchParams }: Props) {
       label: s.label,
       tone: s.tone,
       total: inStage.length,
+      budgetTotal: sumBudgets(
+        inStage.map((v) => v.budget),
+        tenant.locale,
+      ),
       cards: inStage.slice(0, cap).map((v) => ({
         waId: v.waId,
         displayName: v.displayName,
@@ -111,6 +135,9 @@ export default async function LeadsPage({ searchParams }: Props) {
           v.view.reminder && v.view.reminder.status !== "done" ? v.view.reminder.text : null,
         reminderOverdue: v.view.reminder?.status === "overdue",
         lastActivity: v.view.lastActivityRelative,
+        budgetText: v.view.budgetText,
+        daysInStage: v.view.daysInStageText,
+        sourceLabel: v.sourceLabel,
       })),
     };
   });
@@ -144,6 +171,11 @@ export default async function LeadsPage({ searchParams }: Props) {
             {formatNumber(views.length, tenant.locale)} {labels.nav.toLowerCase()}
           </span>
         }
+        actions={
+          canEdit && crm.manualLeadSources.length > 0 ? (
+            <NewLeadDialog labels={labels} sources={crm.manualLeadSources} />
+          ) : null
+        }
         divider={false}
       >
         <LeadsViewTabs
@@ -161,25 +193,48 @@ export default async function LeadsPage({ searchParams }: Props) {
               href: buildHref({ view: "list" }),
               active: view === "list",
             },
+            {
+              key: "activity",
+              label: labels.viewActivity,
+              href: buildHref({ view: "activity" }),
+              active: view === "activity",
+            },
           ]}
         />
       </PageHeader>
 
-      <LeadsFilters
-        labels={labels}
-        stages={crm.stages.map((s) => ({
-          key: s.key,
-          label: s.label,
-          count: result.stageCounts[s.key] ?? 0,
-        }))}
-        owners={owners}
-        current={{ q, stage, owner: mine ? "" : owner, filter, mine, view }}
-        showOwnerFilter
-        showMine={canEdit}
-      />
+      {view === "activity" ? (
+        <TeamActivityFilters
+          labels={labels}
+          kinds={Object.entries(labels.eventKinds).map(([key, label]) => ({ key, label }))}
+          people={team.map((m) => ({ email: m.email, label: m.displayName || m.email }))}
+          current={{ kind: activityKind, by: activityBy }}
+        />
+      ) : (
+        <LeadsFilters
+          labels={labels}
+          stages={crm.stages.map((s) => ({
+            key: s.key,
+            label: s.label,
+            count: result.stageCounts[s.key] ?? 0,
+          }))}
+          owners={owners}
+          current={{ q, stage, owner: mine ? "" : owner, filter, mine, view }}
+          showOwnerFilter
+          showMine={canEdit}
+        />
+      )}
       </div>
 
-      {view === "board" ? (
+      {view === "activity" ? (
+        <TeamActivityFeed
+          events={events}
+          config={crm}
+          memberLabel={labelFor}
+          locale={tenant.locale}
+          timezone={tenant.timezone}
+        />
+      ) : view === "board" ? (
         <LeadsBoard
           columns={columns}
           members={members}

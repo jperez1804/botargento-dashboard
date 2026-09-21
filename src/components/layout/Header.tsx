@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { TenantBadge } from "./TenantBadge";
 import { RefreshButton } from "./RefreshButton";
 import { MobileNav } from "./MobileNav";
+import { GlobalSearch } from "./GlobalSearch";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import type { NavItemDef } from "@/config/verticals/_types";
 
@@ -23,6 +24,9 @@ export function Header({ userEmail, navItems }: HeaderProps) {
       <div className="flex items-center gap-2.5 min-w-0">
         <MobileNav items={navItems} />
         <TenantBadge />
+      </div>
+      <div className="flex flex-1 justify-center">
+        <GlobalSearch />
       </div>
       <div className="flex items-center gap-1.5">
         <ThemeToggle />

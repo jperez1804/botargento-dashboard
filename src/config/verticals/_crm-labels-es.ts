@@ -77,9 +77,13 @@ export const CRM_LABELS_ES: CrmLabels = {
     reminder_set: "Recordatorio",
     reminder_done: "Recordatorio cumplido",
     contact: "Respuesta desde el panel",
+    created: "Cargado a mano",
   },
   errors: {
     already_owned: "Otra persona tomó este lead recién. Actualizá la página.",
+    already_exists: "Ese teléfono ya es un lead.",
+    invalid_phone: "Revisá el teléfono: poné el código de área y el número.",
+    invalid_source: "Elegí un origen de la lista.",
     invalid_stage: "Esa etapa no existe para este panel.",
     invalid_owner: "Ese responsable no tiene acceso al panel.",
     invalid_body: "Revisá los datos e intentá de nuevo.",
@@ -87,4 +91,34 @@ export const CRM_LABELS_ES: CrmLabels = {
     not_found: "Esta función no está habilitada.",
     network: "No se pudo guardar. Revisá la conexión e intentá de nuevo.",
   },
+
+  columnBudget: "Presupuesto",
+  columnSource: "Origen",
+  sourceWhatsapp: "WhatsApp",
+  daysInStageTemplate: "{days} d en la etapa",
+  daysInStageToday: "Entró hoy a la etapa",
+
+  viewActivity: "Actividad",
+  filterAllKinds: "Todos los tipos",
+  filterAllPeople: "Todas las personas",
+
+  newLead: "Nuevo lead",
+  newLeadTitle: "Cargar un lead",
+  newLeadHint:
+    "Para consultas que no llegaron por WhatsApp. Si después escribe al bot, la conversación se suma a este mismo lead.",
+  nameLabel: "Nombre",
+  phoneLabel: "Teléfono",
+  phonePlaceholder: "11 5555-0000",
+  phonePreviewTemplate: "Se guarda como {phone}",
+  sourceLabel: "Origen",
+  noteLabel: "Nota (opcional)",
+  createLead: "Cargar lead",
+  leadCreated: "Lead cargado",
+  openExisting: "Abrir el existente",
+  noConversationTitle: "Todavía no escribió por WhatsApp",
+  noConversationBody:
+    "Este lead se cargó a mano. Cuando escriba al bot, la conversación aparece acá.",
+  openWhatsapp: "Abrir en WhatsApp",
+  manualOriginTemplate: "Cargado a mano · {source}",
+  manualByTemplate: "por {who} el {date}",
 };

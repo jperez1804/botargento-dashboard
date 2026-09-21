@@ -6,6 +6,7 @@
 
 import type { CrmConfig, CrmStageTone } from "@/config/verticals/_types";
 import type { EffectiveLead, ReminderStatus } from "@/lib/crm/effective-stage";
+import type { LeadBudget } from "@/lib/queries/leads";
 
 export function fillTemplate(template: string, vars: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (m, key: string) =>
@@ -59,6 +60,37 @@ export function formatRelative(date: Date, now: Date, locale: string): string {
   return rtf.format(Math.round(months / 12), "year");
 }
 
+/** "USD 150.000" — whole units, grouped for the locale. */
+export function formatMoney(amount: number, currency: string, locale: string): string {
+  const n = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount);
+  return currency ? `${currency} ${n}` : n;
+}
+
+/** A lead's budget as one line: the amount, or the range text the bot captured. */
+export function formatBudget(budget: LeadBudget | null, locale: string): string | null {
+  if (!budget) return null;
+  if (budget.amount !== null) return formatMoney(budget.amount, budget.currency, locale);
+  return budget.text || null;
+}
+
+/**
+ * Board column total: numeric amounts summed PER CURRENCY ("USD 450.000 ·
+ * ARS 30.000.000") — never across currencies, and range texts are left out.
+ * Null when there is nothing to add.
+ */
+export function sumBudgets(budgets: ReadonlyArray<LeadBudget | null>, locale: string): string | null {
+  const totals = new Map<string, number>();
+  for (const b of budgets) {
+    if (!b || b.amount === null) continue;
+    totals.set(b.currency, (totals.get(b.currency) ?? 0) + b.amount);
+  }
+  if (totals.size === 0) return null;
+  return [...totals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([currency, total]) => formatMoney(total, currency, locale))
+    .join(" · ");
+}
+
 export type LeadView = {
   stageKey: string;
   stageLabel: string;
@@ -71,6 +103,8 @@ export type LeadView = {
   reminder: { atIso: string; note: string; status: ReminderStatus; text: string } | null;
   lastActivityText: string;
   lastActivityRelative: string;
+  budgetText: string | null;
+  daysInStageText: string | null;
 };
 
 export function buildLeadView(
@@ -80,6 +114,7 @@ export function buildLeadView(
   locale: string,
   timezone: string,
   now: Date = new Date(),
+  budget: LeadBudget | null = null,
 ): LeadView {
   const labels = config.labels;
   const stageDef = config.stages.find((s) => s.key === lead.stage);
@@ -133,5 +168,14 @@ export function buildLeadView(
     lastActivityRelative: lead.lastActivityAt
       ? formatRelative(lead.lastActivityAt, now, locale)
       : "—",
+    budgetText: formatBudget(budget, locale),
+    daysInStageText: daysInStage(lead.stageSince, now, labels),
   };
+}
+
+function daysInStage(since: Date | null, now: Date, labels: CrmConfig["labels"]): string | null {
+  if (!since) return null;
+  const days = Math.floor((now.getTime() - since.getTime()) / 86_400_000);
+  if (days < 0) return null;
+  return days === 0 ? labels.daysInStageToday : fillTemplate(labels.daysInStageTemplate, { days });
 }

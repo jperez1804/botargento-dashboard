@@ -175,6 +175,15 @@ export const realEstate: VerticalConfig = {
       { source: "escalation", key: "matched_listing_urls", label: "Propiedades sugeridas", format: "links" },
       { source: "escalation", key: "transcript_summary", label: "Resumen del bot" },
     ],
+    // Leads that did not come through WhatsApp (registered from /leads).
+    // Keys are persisted in dashboard.manual_leads — don't rename.
+    manualLeadSources: [
+      { key: "telefono", label: "Teléfono" },
+      { key: "visita", label: "Visita a la oficina" },
+      { key: "portal", label: "Portal inmobiliario" },
+      { key: "referido", label: "Referido" },
+      { key: "otro", label: "Otro" },
+    ],
     labels: CRM_LABELS_ES,
   },
 };

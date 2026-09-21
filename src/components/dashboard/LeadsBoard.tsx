@@ -19,6 +19,9 @@ export type BoardColumn = {
   label: string;
   tone: CrmStageTone;
   total: number;
+  // Sum of the column's budgets per currency ("USD 450.000 · ARS 30.000.000");
+  // computed server-side over every lead in the stage, not just the shown ones.
+  budgetTotal: string | null;
   cards: ReadonlyArray<BoardCard>;
 };
 
@@ -151,6 +154,14 @@ export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, session
                   {count}
                 </span>
               </header>
+              {col.budgetTotal ? (
+                <p
+                  data-column-budget
+                  className="-mt-1 px-1.5 text-[11.5px] font-medium tabular-nums text-[var(--muted-ink)]"
+                >
+                  {col.budgetTotal}
+                </p>
+              ) : null}
 
               {cards.length === 0 ? (
                 <p className="px-1 py-6 text-center text-[12px] text-[var(--faint-ink)]">

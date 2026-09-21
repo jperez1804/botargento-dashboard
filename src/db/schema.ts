@@ -83,6 +83,16 @@ export const leadState = dashboardSchema.table("lead_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Leads registered by hand (migrations/0006_manual_leads.sql), keyed by the
+// same contact_wa_id WhatsApp uses.
+export const manualLeads = dashboardSchema.table("manual_leads", {
+  contactWaId: text("contact_wa_id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  source: text("source").notNull(),
+  createdBy: text("created_by").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const leadEvents = dashboardSchema.table("lead_events", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   contactWaId: text("contact_wa_id").notNull(),
