@@ -22,6 +22,11 @@ function syntheticUser(email: string): AdapterUser {
   return { id: email, email, emailVerified: null };
 }
 
+/** Allowlist check shared with the signIn callback (normalizes first). */
+export async function isEmailAllowed(email: string): Promise<boolean> {
+  return isAllowed(email.trim().toLowerCase());
+}
+
 async function isAllowed(email: string): Promise<boolean> {
   const rows = await db
     .select({ email: allowedEmails.email })
