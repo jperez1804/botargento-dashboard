@@ -1,12 +1,12 @@
 import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
-import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { allowedEmails, auditLog } from "@/db/schema";
+import { auditLog } from "@/db/schema";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
-import { dashboardAdapter } from "@/lib/db-adapter";
+import { dashboardAdapter, isEmailAllowed } from "@/lib/db-adapter";
 import { renderMagicLinkEmail } from "@/lib/email";
+import { decideSignIn } from "@/lib/login-flow";
 
 export const { handlers, auth, signIn, signOut } = NextAuth(() => {
   const runtimeEnv = env();
@@ -21,24 +21,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
       Resend({
         apiKey: runtimeEnv.RESEND_API_KEY,
         from: runtimeEnv.AUTH_EMAIL_FROM,
+        // Only ever reached for allowlisted emails: callbacks.signIn runs
+        // BEFORE this on a link request and short-circuits everyone else (see
+        // lib/login-flow). No allowlist logic here on purpose — the old silent
+        // "don't send, don't tell" branch was unreachable and contradicted it.
         async sendVerificationRequest({ identifier, url, provider }) {
           const email = identifier.toLowerCase();
-
-          const allowed = await db
-            .select()
-            .from(allowedEmails)
-            .where(eq(allowedEmails.email, email))
-            .limit(1);
-
-          if (allowed.length === 0) {
-            await db.insert(auditLog).values({
-              email,
-              action: "login_denied",
-              metadata: { reason: "not_in_allowlist" },
-            });
-            logger.warn({ email }, "Magic link requested for non-allowlisted email");
-            return;
-          }
 
           // Dev short-circuit: print the URL instead of calling Resend.
           if (runtimeEnv.NODE_ENV !== "production") {
@@ -76,26 +64,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
         // excludes /login, /verify, /api/auth, _next, etc.
         return !!session;
       },
-      async signIn({ user }) {
-        const email = user.email?.toLowerCase();
-        if (!email) return false;
-
-        const allowed = await db
-          .select()
-          .from(allowedEmails)
-          .where(eq(allowedEmails.email, email))
-          .limit(1);
-
-        if (allowed.length === 0) {
-          await db
-            .insert(auditLog)
-            .values({ email, action: "login_denied", metadata: { reason: "signin_callback" } });
-          return false;
-        }
-
-        // `login` is written inside the adapter's useVerificationToken, only
-        // after the token is successfully consumed.
-        return true;
+      // The allowlist gate, for both steps of the magic link:
+      //   - link request (verificationRequest): a non-allowlisted email gets
+      //     a redirect back to /login?error=not_allowed — a readable message,
+      //     no token, no email. (Returning false here made Auth.js throw
+      //     AccessDenied and the login form answered HTTP 500.)
+      //   - link click: false → AccessDenied, never a session.
+      // Both denials are audited as login_denied. `login` itself is written in
+      // the adapter's useVerificationToken, after the token is consumed.
+      async signIn({ user, email }) {
+        return decideSignIn(
+          { email: user.email, verificationRequest: email?.verificationRequest === true },
+          {
+            isAllowed: isEmailAllowed,
+            audit: async (address, reason) => {
+              logger.warn({ email: address, reason }, "Login denied: email not in allowlist");
+              await db
+                .insert(auditLog)
+                .values({ email: address, action: "login_denied", metadata: { reason } });
+            },
+          },
+        );
       },
       async jwt({ token }) {
         return token;
