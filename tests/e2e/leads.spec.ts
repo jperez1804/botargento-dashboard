@@ -95,6 +95,8 @@ test("Leads opens on the board and the tabs switch views", async ({ page }) => {
   await page.waitForURL(/view=list/);
   await expect(leadRows(page).first()).toBeVisible();
   await expect(page.locator("[data-board-column]")).toHaveCount(0);
+  // The list uses the full width too, not just the board.
+  await expect(page.locator("[data-board-bleed]")).toHaveCount(1);
 
   // Filters survive the switch back to the board.
   await page.goto("/leads?view=list&mine=1");
@@ -322,6 +324,11 @@ test("Board shows the budget the bot captured and totals it per column", async (
   const column = page.locator('[data-board-column="calificado"]');
   await expect(column.locator(`[data-lead-card="${waId}"]`)).toHaveCount(1);
   await expect(column.locator("[data-column-budget]")).toHaveText("USD 150.000");
+  // Leads from the bot say so; a range with no amount shows the range itself
+  // (engine snapshot object → one line), never raw JSON.
+  await expect(card.getByTestId("lead-source")).toHaveText("WhatsApp");
+  const upcoming = page.locator(`[data-lead-card="${F.upcoming.wa_id}"]`);
+  await expect(upcoming.getByTestId("lead-budget")).toHaveText("USD 90.000 – 110.000");
 
   await page.goto("/leads?view=list");
   await expect(page.locator(`a[href="/conversations/${waId}"]`).first()).toContainText("USD 150.000");

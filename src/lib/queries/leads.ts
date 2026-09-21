@@ -20,6 +20,7 @@ import {
   type LeadStateRow,
 } from "@/lib/crm/effective-stage";
 import { hasLeadLogSentBy, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
+import { priceRangeText } from "@/lib/crm/price-range";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
 
 // What the lead said they can spend: the amount of their latest real handoff
@@ -45,7 +46,7 @@ function toBudget(amountRaw: unknown, currencyRaw: unknown, rangeRaw: unknown): 
   if (Number.isFinite(amount) && amount > 0) {
     return { amount, currency: String(currencyRaw ?? "").trim().toUpperCase(), text: "" };
   }
-  const range = typeof rangeRaw === "string" ? rangeRaw.trim() : "";
+  const range = priceRangeText(rangeRaw);
   return range ? { amount: null, currency: "", text: range } : null;
 }
 
@@ -124,10 +125,10 @@ async function selectLeadRows(
     ),
     snaps AS (
       ${snapshot
-        ? sql`SELECT contact_wa_id, qualification_snapshot_json ->> 'selected_price_range' AS price_range
+        ? sql`SELECT contact_wa_id, qualification_snapshot_json -> 'selected_price_range' AS price_range
               FROM automation.session_memory
               WHERE contact_wa_id IN (SELECT contact_wa_id FROM contacts)`
-        : sql`SELECT NULL::text AS contact_wa_id, NULL::text AS price_range WHERE false`}
+        : sql`SELECT NULL::text AS contact_wa_id, NULL::jsonb AS price_range WHERE false`}
     ),
     events AS (
       SELECT contact_wa_id,

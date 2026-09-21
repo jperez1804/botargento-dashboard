@@ -5,6 +5,7 @@
 import { sql } from "@/db/client";
 import type { CrmConfig } from "@/config/verticals/_types";
 import { hasSessionMemory } from "@/lib/crm/probes";
+import { priceRangeText } from "@/lib/crm/price-range";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
 
 export type LeadEvent = {
@@ -97,7 +98,8 @@ export type QualificationItem = {
 
 function asText(v: unknown): string {
   if (v === null || v === undefined) return "";
-  if (typeof v === "object") return "";
+  // Structured snapshot values (the price range object) read as one line.
+  if (typeof v === "object") return priceRangeText(v);
   return String(v).trim();
 }
 

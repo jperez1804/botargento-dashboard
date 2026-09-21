@@ -85,8 +85,10 @@ export default async function LeadsPage({ searchParams }: Props) {
     waId: r.contactWaId,
     displayName: r.displayName,
     budget: r.budget,
-    // Only leads registered by hand show an origin; WhatsApp is the default.
-    sourceLabel: r.manual ? sourceLabel(r.manual.source) : null,
+    // Every lead shows where it came from: the origin picked when it was
+    // registered by hand (kept even after the person writes on WhatsApp),
+    // otherwise WhatsApp.
+    sourceLabel: r.manual ? sourceLabel(r.manual.source) : labels.sourceWhatsapp,
     view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now, r.budget),
   }));
 
@@ -153,16 +155,14 @@ export default async function LeadsPage({ searchParams }: Props) {
     .filter((m) => m.role !== "viewer" && m.active)
     .map((m) => ({ email: m.email, label: m.displayName || m.email }));
 
-  // In board view the board itself breaks out of the 1280px container (see
-  // has-[[data-board-bleed]] in the dashboard layout). The masthead and filters
-  // keep the 1280px reading width but start at the SAME left edge as the first
-  // board column — no mx-auto, which would centre them in the widened container
-  // and leave the title floating away from the board.
-  const headerWrapper = view === "board" ? "w-full max-w-[1280px] space-y-6" : "space-y-6";
-
+  // Every Leads view (board, list, activity) breaks out of the 1280px
+  // container (has-[[data-board-bleed]] in the dashboard layout) and uses the
+  // whole width. The masthead and filters keep the 1280px reading width but
+  // start at the SAME left edge as the content — no mx-auto, which would
+  // centre them in the widened container.
   return (
-    <div className="space-y-6">
-      <div className={headerWrapper}>
+    <div data-board-bleed className="space-y-6">
+      <div className="w-full max-w-[1280px] space-y-6">
       <PageHeader
         kicker={labels.pageKicker}
         title={labels.pageTitle}

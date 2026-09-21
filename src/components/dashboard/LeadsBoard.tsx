@@ -107,7 +107,7 @@ export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, session
     email ? (members.find((m) => m.email === email)?.label ?? email) : labels.unassigned;
 
   return (
-    <div data-board-bleed className="overflow-x-auto pb-2">
+    <div className="overflow-x-auto pb-2">
       {/* 210px keeps the 7 stages inside a 1920px screen (they stretch to fill
         * it); narrower viewports scroll horizontally instead of squeezing. */}
       <div className="grid w-full min-w-max grid-flow-col auto-cols-[minmax(210px,1fr)] gap-3">
