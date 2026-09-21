@@ -6,7 +6,7 @@
 // works; the menu is the keyboard and touch path.
 
 import Link from "next/link";
-import { BellRing, Clock3, MessageCircle } from "lucide-react";
+import { BellRing, Clock3, MessageCircle, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LeadAvatar } from "@/components/dashboard/LeadAvatar";
 import { LeadCardMenu } from "@/components/dashboard/LeadCardMenu";
@@ -24,6 +24,10 @@ export type BoardCard = {
   reminderText: string | null;
   reminderOverdue: boolean;
   lastActivity: string;
+  budgetText: string | null;
+  daysInStage: string | null;
+  // Origin of a lead registered by hand ("Portal inmobiliario"); null = WhatsApp.
+  sourceLabel: string | null;
 };
 
 type Props = {
@@ -95,6 +99,25 @@ export function LeadCard({
         ) : null}
       </div>
 
+      {card.sourceLabel ? (
+        <span
+          data-testid="lead-source"
+          className="inline-flex h-[18px] items-center rounded-full border border-[var(--rule)] px-1.5 text-[10.5px] text-[var(--muted-ink)]"
+        >
+          {card.sourceLabel}
+        </span>
+      ) : null}
+
+      {card.budgetText ? (
+        <p
+          data-testid="lead-budget"
+          className="flex items-center gap-1 text-[12.5px] font-medium tabular-nums text-[var(--ink)]"
+        >
+          <Wallet className="size-3.5 shrink-0 text-[var(--soft-ink)]" aria-hidden />
+          {card.budgetText}
+        </p>
+      ) : null}
+
       {card.statusText ? (
         <p
           className={cn(
@@ -126,9 +149,12 @@ export function LeadCard({
             <MessageCircle className="size-3 shrink-0" aria-hidden />
             {card.waId}
           </p>
-          <p className="flex items-center gap-1">
+          <p className="flex flex-wrap items-center gap-x-1">
             <Clock3 className="size-3 shrink-0" aria-hidden />
             {card.lastActivity}
+            {card.daysInStage ? (
+              <span className="text-[var(--faint-ink)]">· {card.daysInStage}</span>
+            ) : null}
           </p>
         </div>
         {canAssign ? (

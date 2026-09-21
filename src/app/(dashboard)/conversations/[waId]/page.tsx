@@ -17,6 +17,7 @@ import { listTeam, memberLabel } from "@/lib/queries/team";
 import { LeadCrmCard } from "@/components/dashboard/LeadCrmCard";
 import { LeadActivityFeed } from "@/components/dashboard/LeadActivityFeed";
 import { LeadQualificationCard } from "@/components/dashboard/LeadQualificationCard";
+import { NoConversationYet } from "@/components/dashboard/NoConversationYet";
 
 type Props = {
   params: Promise<{ waId: string }>;
@@ -48,14 +49,15 @@ export default async function ConversationDetailPage({ params }: Props) {
         ])
       : Promise.resolve(null),
   ]);
-  if (!contact) notFound();
+  const [lead, events, qualification, team] = crmData ?? [null, [], [], []];
+  // A lead registered by hand may not have written on WhatsApp yet: it has a
+  // CRM record but no conversation, and still gets its page.
+  if (!contact && !lead?.manual) notFound();
 
   const tenant = tenantConfig();
   const vertical = verticalConfig();
-  const lastIntentLabel = resolveLastIntent(contact.lastIntent, vertical.intents);
-  const contactName = contact.displayName ?? contact.contactWaId;
-
-  const [lead, events, qualification, team] = crmData ?? [null, [], [], []];
+  const lastIntentLabel = contact ? resolveLastIntent(contact.lastIntent, vertical.intents) : null;
+  const contactName = contact?.displayName ?? lead?.displayName ?? waId;
   const labelFor = (email: string | null) => memberLabel(team, email);
   const canEdit = session ? hasRole(session, "asesor") : false;
   const members = team
@@ -99,19 +101,30 @@ export default async function ConversationDetailPage({ params }: Props) {
             <h1 className="text-[24px] font-semibold tracking-[-0.02em] leading-[1.15] text-[var(--ink)]">
               {contactName}
             </h1>
-            {contact.displayName ? (
+            {contactName !== waId ? (
               <div className="text-[12.5px] text-[var(--soft-ink)] font-[var(--font-geist-mono)] tabular-nums">
-                {contact.contactWaId}
+                {waId}
               </div>
             ) : null}
           </header>
 
-          <ConversationTimeline
-            entries={entries}
-            intents={vertical.intents}
-            locale={tenant.locale}
-            timezone={tenant.timezone}
-          />
+          {contact ? (
+            <ConversationTimeline
+              entries={entries}
+              intents={vertical.intents}
+              locale={tenant.locale}
+              timezone={tenant.timezone}
+            />
+          ) : crm && lead?.manual ? (
+            <NoConversationYet
+              waId={waId}
+              manual={lead.manual}
+              config={crm}
+              memberLabel={labelFor}
+              locale={tenant.locale}
+              timezone={tenant.timezone}
+            />
+          ) : null}
         </section>
 
         <div className="order-1 lg:order-2 space-y-3">
@@ -119,7 +132,7 @@ export default async function ConversationDetailPage({ params }: Props) {
             <>
               <LeadCrmCard
                 waId={waId}
-                view={buildLeadView(lead.lead, crm, labelFor, tenant.locale, tenant.timezone)}
+                view={buildLeadView(lead.lead, crm, labelFor, tenant.locale, tenant.timezone, now, lead.budget)}
                 config={crm}
                 members={members}
                 sessionEmail={session.email}
@@ -142,12 +155,14 @@ export default async function ConversationDetailPage({ params }: Props) {
               />
             </>
           ) : null}
-          <ContactSidebar
-            contact={contact}
-            locale={tenant.locale}
-            timezone={tenant.timezone}
-            lastIntentLabel={lastIntentLabel}
-          />
+          {contact ? (
+            <ContactSidebar
+              contact={contact}
+              locale={tenant.locale}
+              timezone={tenant.timezone}
+              lastIntentLabel={lastIntentLabel}
+            />
+          ) : null}
         </div>
       </div>
     </div>

@@ -19,8 +19,15 @@ import {
   type LeadSignals,
   type LeadStateRow,
 } from "@/lib/crm/effective-stage";
-import { hasLeadLogSentBy, hasOutreachSuppression } from "@/lib/crm/probes";
+import { hasLeadLogSentBy, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
+
+// What the lead said they can spend: the amount of their latest real handoff
+// that carried one, or — if the bot only captured a range — that range text.
+export type LeadBudget = { amount: number | null; currency: string; text: string };
+
+// Set when a person registered the lead by hand (dashboard.manual_leads).
+export type ManualLeadInfo = { source: string; createdBy: string; createdAt: Date };
 
 export type LeadRow = {
   contactWaId: string;
@@ -28,8 +35,19 @@ export type LeadRow = {
   firstSeen: Date | null;
   lastMessageAt: Date | null;
   handoffCount: number;
+  budget: LeadBudget | null;
+  manual: ManualLeadInfo | null;
   lead: EffectiveLead;
 };
+
+function toBudget(amountRaw: unknown, currencyRaw: unknown, rangeRaw: unknown): LeadBudget | null {
+  const amount = amountRaw === null || amountRaw === undefined ? NaN : Number(amountRaw);
+  if (Number.isFinite(amount) && amount > 0) {
+    return { amount, currency: String(currencyRaw ?? "").trim().toUpperCase(), text: "" };
+  }
+  const range = typeof rangeRaw === "string" ? rangeRaw.trim() : "";
+  return range ? { amount: null, currency: "", text: range } : null;
+}
 
 const toDate = (v: unknown): Date | null =>
   v === null || v === undefined ? null : new Date(v as string | Date);
@@ -39,12 +57,16 @@ async function selectLeadRows(
   now: Date,
   waIds?: ReadonlyArray<string>,
 ): Promise<LeadRow[]> {
-  const [sentBy, suppression] = await Promise.all([
+  const [sentBy, suppression, snapshot] = await Promise.all([
     hasLeadLogSentBy(),
     hasOutreachSuppression(),
+    hasSessionMemory(),
   ]);
   const onlyIds = waIds && waIds.length > 0 ? [...waIds] : null;
 
+  // contacts = everyone who wrote on WhatsApp ∪ everyone registered by hand,
+  // joined on the shared contact_wa_id: a manual lead who later writes is ONE
+  // row. The name typed by a person wins over the WhatsApp profile name.
   const rows = await sql<Record<string, unknown>[]>`
     WITH msgs AS (
       SELECT
@@ -60,37 +82,79 @@ async function selectLeadRows(
         ${onlyIds ? sql`AND contact_wa_id IN ${sql(onlyIds)}` : sql``}
       GROUP BY contact_wa_id
     ),
+    manual AS (
+      SELECT contact_wa_id, display_name, source, created_by, created_at
+      FROM dashboard.manual_leads
+      WHERE true ${onlyIds ? sql`AND contact_wa_id IN ${sql(onlyIds)}` : sql``}
+    ),
+    contacts AS (
+      SELECT
+        COALESCE(m.contact_wa_id, ml.contact_wa_id) AS contact_wa_id,
+        COALESCE(NULLIF(ml.display_name, ''), m.display_name) AS display_name,
+        LEAST(m.first_seen, ml.created_at) AS first_seen,
+        m.last_message_at,
+        m.last_human_log_at,
+        ml.source AS manual_source,
+        ml.created_by AS manual_created_by,
+        ml.created_at AS manual_created_at
+      FROM msgs m
+      FULL JOIN manual ml ON ml.contact_wa_id = m.contact_wa_id
+    ),
     handoffs AS (
       SELECT contact_wa_id,
              MAX(escalation_timestamp) AS last_handoff_at,
              COUNT(*)::int AS handoff_count
       FROM automation.escalations
       WHERE escalation_type NOT IN ${sql(NON_BUSINESS_ESCALATION_TYPES)}
-        AND contact_wa_id IN (SELECT contact_wa_id FROM msgs)
+        AND contact_wa_id IN (SELECT contact_wa_id FROM contacts)
       GROUP BY contact_wa_id
+    ),
+    budgets AS (
+      -- Latest real handoff that carried an amount. Read through to_jsonb:
+      -- not every tenant's escalations table has the budget columns.
+      SELECT DISTINCT ON (e.contact_wa_id)
+             e.contact_wa_id,
+             to_jsonb(e) ->> 'budget_amount' AS budget_amount,
+             to_jsonb(e) ->> 'budget_currency' AS budget_currency
+      FROM automation.escalations e
+      WHERE e.escalation_type NOT IN ${sql(NON_BUSINESS_ESCALATION_TYPES)}
+        AND e.contact_wa_id IN (SELECT contact_wa_id FROM contacts)
+        AND NULLIF(to_jsonb(e) ->> 'budget_amount', '') IS NOT NULL
+      ORDER BY e.contact_wa_id, e.escalation_timestamp DESC
+    ),
+    snaps AS (
+      ${snapshot
+        ? sql`SELECT contact_wa_id, qualification_snapshot_json ->> 'selected_price_range' AS price_range
+              FROM automation.session_memory
+              WHERE contact_wa_id IN (SELECT contact_wa_id FROM contacts)`
+        : sql`SELECT NULL::text AS contact_wa_id, NULL::text AS price_range WHERE false`}
     ),
     events AS (
       SELECT contact_wa_id,
              MAX(occurred_at) FILTER (WHERE kind IN ${sql([...ACTIVITY_EVENT_KINDS])}) AS last_crm_activity_at,
              MAX(occurred_at) FILTER (WHERE kind = 'contact') AS last_contact_event_at
       FROM dashboard.lead_events
-      WHERE contact_wa_id IN (SELECT contact_wa_id FROM msgs)
+      WHERE contact_wa_id IN (SELECT contact_wa_id FROM contacts)
       GROUP BY contact_wa_id
     )
     SELECT
-      m.contact_wa_id, m.display_name, m.first_seen, m.last_message_at, m.last_human_log_at,
+      c.contact_wa_id, c.display_name, c.first_seen, c.last_message_at, c.last_human_log_at,
+      c.manual_source, c.manual_created_by, c.manual_created_at,
       h.last_handoff_at, COALESCE(h.handoff_count, 0) AS handoff_count,
+      b.budget_amount, b.budget_currency, sn.price_range,
       e.last_crm_activity_at, e.last_contact_event_at,
       s.contact_wa_id AS state_wa_id,
       s.stage, s.stage_changed_at, s.lost_reason, s.owner_email,
       s.next_action_at, s.next_action_note, s.next_action_done_at,
       ${suppression
-        ? sql`(SELECT MIN(o.created_at) FROM outreach.suppression o WHERE o.wa_id = m.contact_wa_id)`
+        ? sql`(SELECT MIN(o.created_at) FROM outreach.suppression o WHERE o.wa_id = c.contact_wa_id)`
         : sql`NULL::timestamptz`} AS opted_out_at
-    FROM msgs m
-    LEFT JOIN handoffs h ON h.contact_wa_id = m.contact_wa_id
-    LEFT JOIN events e ON e.contact_wa_id = m.contact_wa_id
-    LEFT JOIN dashboard.lead_state s ON s.contact_wa_id = m.contact_wa_id
+    FROM contacts c
+    LEFT JOIN handoffs h ON h.contact_wa_id = c.contact_wa_id
+    LEFT JOIN budgets b ON b.contact_wa_id = c.contact_wa_id
+    LEFT JOIN snaps sn ON sn.contact_wa_id = c.contact_wa_id
+    LEFT JOIN events e ON e.contact_wa_id = c.contact_wa_id
+    LEFT JOIN dashboard.lead_state s ON s.contact_wa_id = c.contact_wa_id
   `;
 
   return rows.map((r) => {
@@ -121,6 +185,15 @@ async function selectLeadRows(
       firstSeen: signals.firstSeen,
       lastMessageAt: signals.lastMessageAt,
       handoffCount: Number(r.handoff_count ?? 0),
+      budget: toBudget(r.budget_amount, r.budget_currency, r.price_range),
+      manual:
+        r.manual_source === null || r.manual_source === undefined
+          ? null
+          : {
+              source: String(r.manual_source),
+              createdBy: String(r.manual_created_by ?? ""),
+              createdAt: new Date(r.manual_created_at as string | Date),
+            },
       lead: deriveLead(signals, state, config, now),
     };
   });

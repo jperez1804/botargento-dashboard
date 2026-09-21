@@ -155,7 +155,9 @@ export type CrmEventKind =
   | "assignment"
   | "reminder_set"
   | "reminder_done"
-  | "contact";
+  | "contact"
+  // A person registered a lead that did not come in through WhatsApp.
+  | "created";
 
 export type CrmLabels = {
   nav: string;
@@ -214,7 +216,42 @@ export type CrmLabels = {
   lostReasonAuto: { opt_out: string; inactivity: string };
   eventKinds: Record<CrmEventKind, string>;
   errors: Record<string, string>;
+
+  // Budget + time in stage (board, list)
+  columnBudget: string;
+  columnSource: string;
+  sourceWhatsapp: string;
+  daysInStageTemplate: string; // {days}
+  daysInStageToday: string;
+
+  // Activity tab
+  viewActivity: string;
+  filterAllKinds: string;
+  filterAllPeople: string;
+
+  // Manual leads
+  newLead: string;
+  newLeadTitle: string;
+  newLeadHint: string;
+  nameLabel: string;
+  phoneLabel: string;
+  phonePlaceholder: string;
+  phonePreviewTemplate: string; // {phone}
+  sourceLabel: string;
+  noteLabel: string;
+  createLead: string;
+  leadCreated: string;
+  openExisting: string;
+  noConversationTitle: string;
+  noConversationBody: string;
+  openWhatsapp: string;
+  manualOriginTemplate: string; // {source}
+  manualByTemplate: string; // {who} {date}
 };
+
+// Where a lead that did not come through WhatsApp came from ("Portal
+// inmobiliario", "Referido"…). `key` is persisted in dashboard.manual_leads.
+export type CrmLeadSourceDef = { key: string; label: string };
 
 // A qualification datum the bot captured, shown on the lead card. "escalation"
 // reads a column of the latest real handoff (automation.escalations); "snapshot"
@@ -241,6 +278,9 @@ export type CrmConfig = {
   autoLostDays: number;
   warnDays: number;
   qualificationFields: ReadonlyArray<CrmQualificationField>;
+  // Origins offered when someone registers a lead by hand. Empty = no manual
+  // lead creation for this vertical.
+  manualLeadSources: ReadonlyArray<CrmLeadSourceDef>;
   labels: CrmLabels;
 };
 

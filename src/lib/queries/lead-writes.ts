@@ -165,3 +165,49 @@ export async function recordHumanContact(
   await appendEvent(sql, waId, "contact", "", by, { source });
   invalidateCrmAlerts();
 }
+
+export type CreateManualLeadResult = { ok: true } | { ok: false; error: "already_exists" };
+
+/**
+ * Registers a lead that did not come through WhatsApp. The phone IS the
+ * contact_wa_id, so a person already known — by WhatsApp or registered before
+ * — is refused with already_exists instead of duplicated. In one transaction:
+ * the manual_leads row, a `created` event (starts the inactivity clock), the
+ * optional note, and the lead assigned to whoever registered it.
+ */
+export async function createManualLead(input: {
+  waId: string;
+  name: string;
+  source: string;
+  note: string;
+  by: string;
+}): Promise<CreateManualLeadResult> {
+  const result = await sql.begin(async (tx) => {
+    const known = await tx`
+      SELECT 1 FROM automation.lead_log WHERE contact_wa_id = ${input.waId} LIMIT 1
+    `;
+    if (known.length > 0) return { ok: false as const, error: "already_exists" as const };
+
+    const inserted = await tx`
+      INSERT INTO dashboard.manual_leads (contact_wa_id, display_name, source, created_by)
+      VALUES (${input.waId}, ${input.name}, ${input.source}, ${input.by})
+      ON CONFLICT (contact_wa_id) DO NOTHING
+      RETURNING contact_wa_id
+    `;
+    if (inserted.length === 0) return { ok: false as const, error: "already_exists" as const };
+
+    await appendEvent(tx, input.waId, "created", "", input.by, { source: input.source });
+    if (input.note) await appendEvent(tx, input.waId, "note", input.note, input.by);
+    await tx`
+      INSERT INTO dashboard.lead_state
+        (contact_wa_id, owner_email, owner_assigned_at, owner_assigned_by, updated_at)
+      VALUES (${input.waId}, ${input.by}, NOW(), ${input.by}, NOW())
+      ON CONFLICT (contact_wa_id) DO UPDATE
+      SET owner_email = COALESCE(dashboard.lead_state.owner_email, EXCLUDED.owner_email),
+          updated_at = NOW()
+    `;
+    return { ok: true as const };
+  });
+  if (result.ok) invalidateCrmAlerts();
+  return result;
+}

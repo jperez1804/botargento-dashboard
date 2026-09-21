@@ -48,6 +48,46 @@ export async function listLeadEvents(waId: string, limit = 50): Promise<LeadEven
   }));
 }
 
+export type TeamLeadEvent = LeadEvent & { contactWaId: string; leadName: string };
+
+/**
+ * The team-wide Actividad feed: latest lead_events across every lead, newest
+ * first, optionally narrowed to one kind and/or one person. Each row carries
+ * the lead's name — typed by hand for manual leads, else the WhatsApp name.
+ */
+export async function listTeamLeadEvents(
+  opts: { kind?: string; by?: string; limit?: number } = {},
+): Promise<TeamLeadEvent[]> {
+  const { kind, by, limit = 100 } = opts;
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT
+      ev.id, ev.contact_wa_id, ev.kind, ev.body, ev.occurred_at, ev.created_by, ev.metadata,
+      COALESCE(
+        NULLIF(ml.display_name, ''),
+        (SELECT COALESCE(NULLIF(MAX(l.lead_name), ''), NULLIF(MAX(l.profile_name), ''))
+           FROM automation.lead_log l WHERE l.contact_wa_id = ev.contact_wa_id),
+        ev.contact_wa_id
+      ) AS lead_name
+    FROM dashboard.lead_events ev
+    LEFT JOIN dashboard.manual_leads ml ON ml.contact_wa_id = ev.contact_wa_id
+    WHERE true
+      ${kind ? sql`AND ev.kind = ${kind}` : sql``}
+      ${by ? sql`AND ev.created_by = ${by}` : sql``}
+    ORDER BY ev.occurred_at DESC, ev.id DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => ({
+    id: Number(r.id),
+    contactWaId: String(r.contact_wa_id),
+    leadName: String(r.lead_name ?? r.contact_wa_id),
+    kind: String(r.kind),
+    body: String(r.body ?? ""),
+    occurredAt: new Date(r.occurred_at as string | Date),
+    createdBy: String(r.created_by ?? ""),
+    metadata: asObject(r.metadata),
+  }));
+}
+
 export type QualificationItem = {
   label: string;
   value: string;

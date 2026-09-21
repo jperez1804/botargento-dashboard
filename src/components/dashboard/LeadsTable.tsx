@@ -9,7 +9,13 @@ import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
 import type { CrmLabels } from "@/config/verticals/_types";
 import type { LeadView } from "@/lib/crm/view-model";
 
-export type LeadTableRow = { waId: string; displayName: string; view: LeadView };
+export type LeadTableRow = {
+  waId: string;
+  displayName: string;
+  view: LeadView;
+  // Origin of a lead registered by hand; null = came through WhatsApp.
+  sourceLabel: string | null;
+};
 
 type Props = {
   rows: ReadonlyArray<LeadTableRow>;
@@ -34,6 +40,11 @@ export function LeadsTable({ rows, labels, pagination }: Props) {
           <p className="font-medium truncate">{r.displayName}</p>
           <p className="text-[12px] text-[var(--soft-ink)] tabular-nums font-[var(--font-geist-mono)]">
             {r.waId}
+            {r.sourceLabel ? (
+              <span className="ml-2 font-[var(--font-geist-sans)] text-[var(--muted-ink)]">
+                · {r.sourceLabel}
+              </span>
+            ) : null}
           </p>
         </div>
       ),
@@ -50,6 +61,17 @@ export function LeadsTable({ rows, labels, pagination }: Props) {
           autoTitle={labels.autoStageHint}
         />
       ),
+    },
+    {
+      id: "budget",
+      header: labels.columnBudget,
+      width: "minmax(0,0.9fr)",
+      cell: (r) =>
+        r.view.budgetText ? (
+          <span className="block truncate tabular-nums">{r.view.budgetText}</span>
+        ) : (
+          <span className="text-[var(--faint-ink)]">—</span>
+        ),
     },
     {
       id: "owner",
@@ -115,7 +137,7 @@ export function LeadsTable({ rows, labels, pagination }: Props) {
       rowHref={(r) => `/conversations/${encodeURIComponent(r.waId)}`}
       rowAriaLabel={(r) => `${labels.pageTitle}: ${r.displayName}`}
       empty={{ icon: <SquareKanban className="size-5" aria-hidden />, title: labels.emptyLeads }}
-      minWidth={880}
+      minWidth={1000}
       pagination={pagination}
     />
   );

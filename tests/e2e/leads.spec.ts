@@ -29,6 +29,14 @@ async function withSql<T>(fn: (sql: ReturnType<typeof postgres>) => Promise<T>):
 
 const leadRows = (page: Page) => page.locator('a[aria-label^="Leads: "]');
 
+// The audit row is written after the handler's transaction commits, so a test
+// that just saw the state change must poll for it rather than read once.
+const lastAudit = (action: string) =>
+  withSql(async (sql) => {
+    const rows = await sql`SELECT metadata FROM dashboard.audit_log WHERE action = ${action} ORDER BY id DESC LIMIT 1`;
+    return rows[0]?.metadata ?? null;
+  });
+
 test.beforeEach(async () => {
   await resetAuthState();
   await withSql((sql) => seedCrmState(sql));
@@ -114,10 +122,7 @@ test("Board moves a lead from the ⋯ menu and audits the change", async ({ page
       }),
     )
     .toBe("visita");
-  const audit = await withSql(
-    (sql) => sql`SELECT metadata FROM dashboard.audit_log WHERE action = 'lead_set_stage' ORDER BY id DESC LIMIT 1`,
-  );
-  expect(audit[0]?.metadata).toMatchObject({
+  await expect.poll(() => lastAudit("lead_set_stage")).toMatchObject({
     contact_wa_id: F.contacted.wa_id,
     from: "contactado",
     to: "visita",
@@ -143,10 +148,7 @@ test("Board assigns an owner from the avatar menu", async ({ page }) => {
       }),
     )
     .toBe(ASESOR);
-  const audit = await withSql(
-    (sql) => sql`SELECT metadata FROM dashboard.audit_log WHERE action = 'lead_assign' ORDER BY id DESC LIMIT 1`,
-  );
-  expect(audit[0]?.metadata).toMatchObject({ contact_wa_id: F.atRisk.wa_id, to: ASESOR, ok: true });
+  await expect.poll(() => lastAudit("lead_assign")).toMatchObject({ contact_wa_id: F.atRisk.wa_id, to: ASESOR, ok: true });
 });
 
 test("Lead card: take the lead, log a call and schedule a reminder", async ({ page }) => {
@@ -247,4 +249,123 @@ test("Viewer reads leads without controls and the API refuses writes", async ({ 
     data: { contactWaId: F.visita.wa_id, stage: "cerrado" },
   });
   expect(res.status()).toBe(403);
+});
+
+test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads");
+
+  await page.getByTestId("new-lead").click();
+  await page.locator("#new-lead-name").fill("Marta Iglesias");
+  await page.locator("#new-lead-phone").fill("011 15 4444-7777");
+  await expect(page.getByTestId("new-lead-phone-preview")).toContainText("+54 9 1144447777");
+  await page.locator("#new-lead-source").selectOption("telefono");
+  await page.locator("#new-lead-note").fill("Llamó por el PH de Caballito");
+  await page.getByRole("button", { name: "Cargar lead" }).click();
+
+  // Lands on the lead's page, which exists without a WhatsApp conversation.
+  await page.waitForURL(/\/conversations\/5491144447777/);
+  await expect(page.getByTestId("no-conversation")).toContainText("Teléfono");
+  await expect(page.getByTestId("lead-crm-card")).toContainText("Nuevo");
+  await expect(page.getByTestId("lead-owner")).toHaveText("Dev Admin");
+  await expect(page.getByTestId("lead-activity")).toContainText("Llamó por el PH de Caballito");
+
+  // On the board: Nuevo column, origin chip.
+  await page.goto("/leads");
+  const card = page.locator('[data-lead-card="5491144447777"]');
+  await expect(page.locator('[data-board-column="nuevo"]')).toContainText("Marta Iglesias");
+  await expect(card.getByTestId("lead-source")).toHaveText("Teléfono");
+
+  await expect.poll(() => lastAudit("lead_create")).toMatchObject({ contact_wa_id: "5491144447777", ok: true });
+
+  // Same person again (and a WhatsApp contact) → "already exists", no duplicate.
+  await page.getByTestId("new-lead").click();
+  await page.locator("#new-lead-name").fill("Marta I.");
+  await page.locator("#new-lead-phone").fill("+54 9 11 4444 7777");
+  await page.getByRole("button", { name: "Cargar lead" }).click();
+  const alert = page.getByRole("dialog").getByRole("alert");
+  await expect(alert).toContainText("Ese teléfono ya es un lead.");
+  await expect(alert.getByRole("link", { name: "Abrir el existente" })).toHaveAttribute(
+    "href",
+    "/conversations/5491144447777",
+  );
+
+  const res = await page.request.post("/api/leads/create", {
+    data: { name: "Ramiro", phone: F.visita.wa_id, source: "otro" },
+  });
+  expect(res.status()).toBe(409);
+  expect(await res.json()).toMatchObject({ error: "already_exists", contactWaId: F.visita.wa_id });
+});
+
+test("Seeded manual lead shows its origin and no conversation", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=list");
+  await expect(leadRows(page).filter({ hasText: F.manual.name })).toContainText("Visita a la oficina");
+
+  await page.goto(`/conversations/${F.manual.wa_id}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(F.manual.name);
+  const panel = page.getByTestId("no-conversation");
+  await expect(panel).toContainText("Todavía no escribió por WhatsApp");
+  await expect(panel).toContainText("Ana Asesora");
+  await expect(panel.getByRole("link")).toHaveAttribute("href", `https://wa.me/${F.manual.wa_id}`);
+});
+
+test("Board shows the budget the bot captured and totals it per column", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  const rows = await withSql(
+    (sql) => sql`SELECT contact_wa_id FROM automation.escalations WHERE target_zone = 'Palermo' LIMIT 1`,
+  );
+  const waId = rows[0]?.contact_wa_id as string;
+  await page.goto("/leads");
+  const card = page.locator(`[data-lead-card="${waId}"]`);
+  await expect(card.getByTestId("lead-budget")).toHaveText("USD 150.000");
+  const column = page.locator('[data-board-column="calificado"]');
+  await expect(column.locator(`[data-lead-card="${waId}"]`)).toHaveCount(1);
+  await expect(column.locator("[data-column-budget]")).toHaveText("USD 150.000");
+
+  await page.goto("/leads?view=list");
+  await expect(page.locator(`a[href="/conversations/${waId}"]`).first()).toContainText("USD 150.000");
+});
+
+test("Activity tab lists the team's events and filters by kind", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads");
+  await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Actividad" }).click();
+  await page.waitForURL(/view=activity/);
+
+  const feed = page.getByTestId("team-activity");
+  await expect(feed.locator("li")).toHaveCount(5);
+  await expect(feed).toContainText("Coordinamos visita para el sábado");
+  await expect(feed).toContainText(F.manual.name);
+
+  await page.getByTestId("activity-kind-filter").selectOption("call");
+  await page.waitForURL(/kind=call/);
+  await expect(feed.locator("li")).toHaveCount(1);
+  await expect(feed.locator("li").first()).toHaveAttribute("data-event-kind", "call");
+  await feed.getByRole("link", { name: F.visita.name }).click();
+  await page.waitForURL(new RegExp(`/conversations/${F.visita.wa_id}`));
+});
+
+test("Header search finds leads by name and by phone", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads");
+
+  // "/" focuses the field from anywhere.
+  await page.keyboard.press("/");
+  const search = page.getByTestId("global-search");
+  await expect(search).toBeFocused();
+  await search.fill("agustina");
+  await search.press("Enter");
+  await page.waitForURL(/\/buscar\?q=agustina/);
+  await expect(page.getByTestId("search-meta")).toContainText("1 resultado");
+  await expect(page.getByRole("link", { name: `Abrir ${F.reserva.name}` })).toBeVisible();
+
+  // By phone, including a lead registered by hand and a lost one.
+  await page.goto("/buscar?q=55504008");
+  await expect(page.getByRole("link", { name: `Abrir ${F.manual.name}` })).toBeVisible();
+  await page.goto("/buscar?q=55504004");
+  await expect(page.getByRole("link", { name: `Abrir ${F.lost.name}` })).toContainText("Perdido");
+
+  await page.goto("/buscar?q=zzzz-nadie");
+  await expect(page.getByText("No encontramos nada con “zzzz-nadie”")).toBeVisible();
 });

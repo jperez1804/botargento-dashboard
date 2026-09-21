@@ -27,6 +27,8 @@ export const ACTIVITY_EVENT_KINDS: ReadonlyArray<CrmEventKind> = [
   "meeting",
   "stage_change",
   "contact",
+  // Registering a lead by hand starts its clock (it has no WhatsApp message).
+  "created",
 ];
 
 export type LeadSignals = {

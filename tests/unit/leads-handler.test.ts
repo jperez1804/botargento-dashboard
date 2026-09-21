@@ -53,6 +53,8 @@ function makeLead(overrides: Partial<LeadRow["lead"]> = {}): LeadRow {
     firstSeen: null,
     lastMessageAt: null,
     handoffCount: 0,
+    budget: null,
+    manual: null,
     lead: {
       stage: "contactado",
       source: "auto",

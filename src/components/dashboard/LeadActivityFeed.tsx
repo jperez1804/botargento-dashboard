@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LeadActivityComposer } from "@/components/dashboard/LeadActivityComposer";
 import { LEAD_CAPTION_CLASS } from "@/components/dashboard/lead-field-class";
 import { formatDayTime } from "@/lib/crm/view-model";
-import type { CrmConfig, CrmEventKind } from "@/config/verticals/_types";
+import { describeLeadEvent, eventKindLabel } from "@/lib/crm/event-text";
+import type { CrmConfig } from "@/config/verticals/_types";
 import type { LeadEvent } from "@/lib/queries/lead-detail";
 
 type Props = {
@@ -19,26 +20,9 @@ type Props = {
   timezone: string;
 };
 
-function detail(event: LeadEvent, config: CrmConfig, memberLabel: Props["memberLabel"]): string {
-  const meta = event.metadata;
-  const stageLabel = (key: unknown) =>
-    config.stages.find((s) => s.key === key)?.label ?? (typeof key === "string" ? key : "—");
-  if (event.kind === "stage_change") {
-    if (typeof meta.to !== "string") return event.body;
-    const move = meta.from ? `${stageLabel(meta.from)} → ${stageLabel(meta.to)}` : `→ ${stageLabel(meta.to)}`;
-    return event.body ? `${move} · ${event.body}` : move;
-  }
-  if (event.kind === "assignment") {
-    if (!("to" in meta)) return event.body;
-    const to = typeof meta.to === "string" ? memberLabel(meta.to) : config.labels.unassigned;
-    return `→ ${to}`;
-  }
-  return event.body;
-}
-
 export function LeadActivityFeed({ waId, events, config, memberLabel, canEdit, locale, timezone }: Props) {
   const labels = config.labels;
-  const kindLabel = (kind: string) => labels.eventKinds[kind as CrmEventKind] ?? kind;
+  const kindLabel = (kind: string) => eventKindLabel(config, kind);
   return (
     <Card data-testid="lead-activity">
       <CardContent className="px-5 py-4 space-y-3">
@@ -49,7 +33,7 @@ export function LeadActivityFeed({ waId, events, config, memberLabel, canEdit, l
         ) : (
           <ol className="max-h-[360px] overflow-y-auto space-y-2.5 pr-1">
             {events.map((e) => {
-              const text = detail(e, config, memberLabel);
+              const text = describeLeadEvent(e, config, memberLabel);
               return (
                 <li key={e.id} className="space-y-0.5 border-l-2 border-[var(--rule)] pl-2.5">
                   <p className="flex flex-wrap items-baseline gap-x-2 text-[11.5px] text-[var(--soft-ink)]">

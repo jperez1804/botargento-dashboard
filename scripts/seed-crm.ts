@@ -4,6 +4,8 @@
 //   C nuevo, 25 idle days → "por vencer" · D 40 idle days → perdido (auto)
 //   E overdue reminder (dev@) · F upcoming reminder (asesor@)
 //   G human reply from the inbox (sent_by='human') → contactado (auto)
+//   H registered by hand (dashboard.manual_leads, walk-in, asesor@) — no
+//     WhatsApp conversation yet
 // Plus: the seed's most recent business handoff gets qualification columns and
 // a session_memory snapshot, so the "Lo que captó el bot" card has data
 // without adding a 13th business escalation (the e2e expects exactly 12).
@@ -26,6 +28,7 @@ export const CRM_FIXTURES = {
   overdue: { wa_id: "5491155504005", name: "Pilar Quintana" },
   upcoming: { wa_id: "5491155504006", name: "Bruno Acosta" },
   contacted: { wa_id: "5491155504007", name: "Julieta Morales" },
+  manual: { wa_id: "5491155504008", name: "Horacio Benítez" },
 } as const;
 
 const ago = (days: number, hours = 0) => new Date(Date.now() - days * DAY - hours * 3_600_000);
@@ -41,6 +44,7 @@ export async function seedCrmState(sql: Sql): Promise<void> {
   await sql`TRUNCATE dashboard.lead_events RESTART IDENTITY`;
   await sql`TRUNCATE dashboard.lead_state`;
   await sql`TRUNCATE dashboard.team_members`;
+  await sql`TRUNCATE dashboard.manual_leads`;
 
   await sql`
     INSERT INTO dashboard.allowed_emails (email, role, created_by)
@@ -69,7 +73,14 @@ export async function seedCrmState(sql: Sql): Promise<void> {
        ${ago(1)}, 'Llamar para coordinar la visita', 'dev@botargento.com.ar'),
       (${f.upcoming.wa_id}, NULL, NULL, '',
        'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com',
-       ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com')
+       ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com'),
+      (${f.manual.wa_id}, NULL, NULL, '',
+       'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com', NULL, '', '')
+  `;
+
+  await sql`
+    INSERT INTO dashboard.manual_leads (contact_wa_id, display_name, source, created_by, created_at)
+    VALUES (${f.manual.wa_id}, ${f.manual.name}, 'visita', 'asesor@cliente.com', ${ago(1)})
   `;
 
   const events = [
@@ -78,6 +89,7 @@ export async function seedCrmState(sql: Sql): Promise<void> {
     { contact_wa_id: f.visita.wa_id, kind: "stage_change", body: "", occurred_at: ago(1), created_by: "dev@botargento.com.ar" },
     { contact_wa_id: f.reserva.wa_id, kind: "stage_change", body: "", occurred_at: ago(1), created_by: "asesor@cliente.com" },
   ];
+  const created = { contact_wa_id: f.manual.wa_id, kind: "created", body: "", occurred_at: ago(1), created_by: "asesor@cliente.com" };
   await sql`
     INSERT INTO dashboard.lead_events ${sql(
       events,
@@ -87,6 +99,11 @@ export async function seedCrmState(sql: Sql): Promise<void> {
       "occurred_at",
       "created_by",
     )}
+  `;
+  await sql`
+    INSERT INTO dashboard.lead_events (contact_wa_id, kind, body, occurred_at, created_by, metadata)
+    VALUES (${created.contact_wa_id}, ${created.kind}, ${created.body}, ${created.occurred_at},
+            ${created.created_by}, ${sql.json({ source: "visita" })})
   `;
 }
 
