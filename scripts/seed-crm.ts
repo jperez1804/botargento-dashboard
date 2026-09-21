@@ -170,10 +170,33 @@ export async function seedCrm(sql: Sql): Promise<void> {
     RETURNING contact_wa_id
   `;
   const qualifiedWaId = recent[0]?.contact_wa_id;
-  if (qualifiedWaId) {
+  // selected_price_range is an object in real snapshots (the engine's
+  // inventory wizard writes { min, max, label, currency }). F.upcoming gets one
+  // without a label and no handoff amount, so its card shows the range itself.
+  const snapshots = [
+    ...(qualifiedWaId
+      ? [
+          {
+            contact_wa_id: qualifiedWaId,
+            qualification_snapshot_json: sql.json({
+              selected_flow: "Ventas",
+              selected_price_range: { min: 120000, max: 160000, label: "USD 120k – 160k", currency: "USD" },
+            }),
+          },
+        ]
+      : []),
+    {
+      contact_wa_id: f.upcoming.wa_id,
+      qualification_snapshot_json: sql.json({
+        selected_flow: "Ventas",
+        selected_price_range: { min: 90000, max: 110000, currency: "USD" },
+      }),
+    },
+  ];
+  for (const s of snapshots) {
     await sql`
       INSERT INTO automation.session_memory (contact_wa_id, qualification_snapshot_json)
-      VALUES (${qualifiedWaId}, ${sql.json({ selected_flow: "Ventas", selected_price_range: "USD 120k – 160k" })})
+      VALUES (${s.contact_wa_id}, ${s.qualification_snapshot_json})
       ON CONFLICT (contact_wa_id) DO UPDATE SET qualification_snapshot_json = EXCLUDED.qualification_snapshot_json
     `;
   }

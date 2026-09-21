@@ -47,7 +47,7 @@ export default async function SearchPage({ searchParams }: Props) {
         name: r.displayName,
         sourceLabel: r.manual
           ? (crm.manualLeadSources.find((s) => s.key === r.manual?.source)?.label ?? r.manual.source)
-          : null,
+          : crm.labels.sourceWhatsapp,
         stage: { label: view.stageLabel, tone: view.tone, auto: view.auto },
         lastActivity: view.lastActivityText,
       };
