@@ -36,6 +36,7 @@ function state(overrides: Partial<LeadStateRow> = {}): LeadStateRow {
     nextActionAt: null,
     nextActionNote: "",
     nextActionDoneAt: null,
+    priority: "",
     ...overrides,
   };
 }

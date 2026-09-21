@@ -12,7 +12,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LeadCard, type BoardCard } from "@/components/dashboard/LeadCard";
 import { errorText, postLead } from "@/lib/crm/api-client";
-import type { CrmLabels, CrmStageTone } from "@/config/verticals/_types";
+import { STAGE_DOT_CLASS } from "@/components/dashboard/lead-field-class";
+import { priorityView } from "@/lib/crm/priority";
+import type { CrmLabels, CrmPriorityKey, CrmStageTone } from "@/config/verticals/_types";
 
 export type BoardColumn = {
   key: string;
@@ -34,19 +36,12 @@ type Props = {
   sessionEmail: string;
 };
 
-const DOT_TONE: Record<CrmStageTone, string> = {
-  neutral: "bg-[var(--faint-ink)]",
-  info: "bg-[var(--info)]",
-  progress: "bg-[var(--warning)]",
-  good: "bg-[var(--positive)]",
-  bad: "bg-[var(--danger)]",
-};
-
 export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, sessionEmail }: Props) {
   const router = useRouter();
   // waId → value the user just chose, pending server confirmation.
   const [moved, setMoved] = useState<Record<string, string>>({});
   const [assigned, setAssigned] = useState<Record<string, string | null>>({});
+  const [prioritized, setPrioritized] = useState<Record<string, CrmPriorityKey | null>>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
@@ -55,6 +50,8 @@ export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, session
   const stageOf = (card: BoardCard) => moved[card.waId] ?? card.stageKey;
   const ownerOf = (card: BoardCard) =>
     card.waId in assigned ? (assigned[card.waId] ?? null) : card.ownerEmail;
+  const priorityOf = (card: BoardCard) =>
+    card.waId in prioritized ? priorityView(prioritized[card.waId] ?? null, labels) : card.priority;
 
   function rollback<T>(setter: (fn: (prev: Record<string, T>) => Record<string, T>) => void, waId: string) {
     setter((prev) => {
@@ -67,7 +64,7 @@ export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, session
   async function run(
     waId: string,
     body: Record<string, unknown>,
-    path: "set-stage" | "assign",
+    path: "set-stage" | "assign" | "set-priority",
     undo: () => void,
   ) {
     setBusy((b) => ({ ...b, [waId]: true }));
@@ -101,6 +98,13 @@ export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, session
       "assign",
       () => rollback(setAssigned, waId),
     );
+  }
+
+  async function setPriority(waId: string, priority: CrmPriorityKey | "") {
+    const card = allCards.find((c) => c.waId === waId);
+    if (!card || (priorityOf(card)?.key ?? null) === (priority || null)) return;
+    setPrioritized((p) => ({ ...p, [waId]: priority || null }));
+    await run(waId, { priority }, "set-priority", () => rollback(setPrioritized, waId));
   }
 
   const ownerLabelOf = (email: string | null) =>
@@ -143,7 +147,7 @@ export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, session
               )}
             >
               <header className="flex items-center gap-2 px-1.5 py-1">
-                <span className={cn("size-1.5 shrink-0 rounded-full", DOT_TONE[col.tone])} aria-hidden />
+                <span className={cn("size-1.5 shrink-0 rounded-full", STAGE_DOT_CLASS[col.tone])} aria-hidden />
                 <h2 className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted-ink)]">
                   {col.label}
                 </h2>
@@ -176,6 +180,7 @@ export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, session
                       stageKey: stageOf(card),
                       ownerEmail: ownerOf(card),
                       ownerLabel: ownerLabelOf(ownerOf(card)),
+                      priority: priorityOf(card),
                     }}
                     stages={stages}
                     members={members}
@@ -186,6 +191,7 @@ export function LeadsBoard({ columns, members, labels, canEdit, isAdmin, session
                     busy={busy[card.waId] === true}
                     onMove={(id, stage) => void move(id, stage)}
                     onAssign={(id, owner) => void assign(id, owner)}
+                    onSetPriority={(id, p) => void setPriority(id, p)}
                   />
                 ))
               )}

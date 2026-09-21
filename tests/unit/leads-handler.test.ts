@@ -18,6 +18,7 @@ const writes = {
   addLeadActivity: vi.fn(async () => undefined),
   setLeadReminder: vi.fn(async () => undefined),
   completeLeadReminder: vi.fn(async () => true),
+  setLeadPriority: vi.fn(async () => undefined),
 };
 
 vi.mock("@/lib/role-guard", () => ({ requireRoleApi: async () => authResult }));
@@ -65,6 +66,7 @@ function makeLead(overrides: Partial<LeadRow["lead"]> = {}): LeadRow {
       atRisk: null,
       reminder: null,
       owner: null,
+      priority: null,
       ...overrides,
     },
   };
@@ -202,5 +204,41 @@ describe("activities and reminders", () => {
     writes.completeLeadReminder.mockImplementation(async () => false);
     const res = await call("reminder-done", { contactWaId: WA });
     expect(res.status).toBe(409);
+  });
+});
+
+describe("set-priority", () => {
+  it("rejects a level outside alta / media / baja", async () => {
+    const res = await call("set-priority", { contactWaId: WA, priority: "urgente" });
+    expect(res.status).toBe(400);
+    expect(writes.setLeadPriority).not.toHaveBeenCalled();
+  });
+
+  it("writes the level and audits from → to (any asesor, no owner rule)", async () => {
+    lead = makeLead({ owner: "dev@botargento.com.ar" });
+    const res = await call("set-priority", { contactWaId: WA, priority: "alta" });
+    expect(res.status).toBe(200);
+    expect(writes.setLeadPriority).toHaveBeenCalledWith(WA, "alta", "asesor@cliente.com", null);
+    expect(auditCalls[0]).toMatchObject({
+      action: "lead_set_priority",
+      metadata: { contact_wa_id: WA, from: null, to: "alta", ok: true },
+    });
+  });
+
+  it("clears the level with an empty string", async () => {
+    lead = makeLead({ priority: "media" });
+    const res = await call("set-priority", { contactWaId: WA, priority: "" });
+    expect(res.status).toBe(200);
+    expect(writes.setLeadPriority).toHaveBeenCalledWith(WA, "", "asesor@cliente.com", "media");
+    expect(auditCalls[0]).toMatchObject({ metadata: { from: "media", to: null, ok: true } });
+  });
+
+  it("answers 500 and still audits when the write fails", async () => {
+    writes.setLeadPriority.mockImplementationOnce(async () => {
+      throw new Error("db down");
+    });
+    const res = await call("set-priority", { contactWaId: WA, priority: "baja" });
+    expect(res.status).toBe(500);
+    expect(auditCalls[0]).toMatchObject({ action: "lead_set_priority", metadata: { ok: false, error: "internal_error" } });
   });
 });

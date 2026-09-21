@@ -143,7 +143,14 @@ export type CrmStageDef = {
   terminal?: boolean;
   // Only a person can move a lead here; the bot never derives it.
   manualOnly?: boolean;
+  // One or two sentences for the Guía tab: what the stage means and what
+  // puts a lead there.
+  help?: string;
 };
+
+// Manual priority a person sets on a lead. Persisted in
+// dashboard.lead_state.priority ('' = none) — never rename a live key.
+export type CrmPriorityKey = "alta" | "media" | "baja";
 
 // Activities a person logs by hand from the lead card.
 export type CrmActivityKind = "note" | "call" | "visit" | "meeting";
@@ -157,7 +164,9 @@ export type CrmEventKind =
   | "reminder_done"
   | "contact"
   // A person registered a lead that did not come in through WhatsApp.
-  | "created";
+  | "created"
+  // A person set or cleared the manual priority.
+  | "priority";
 
 export type CrmLabels = {
   nav: string;
@@ -247,6 +256,66 @@ export type CrmLabels = {
   openWhatsapp: string;
   manualOriginTemplate: string; // {source}
   manualByTemplate: string; // {who} {date}
+
+  // Manual priority (card, list, ⋯ menu, lead card, filter)
+  priority: {
+    label: string;
+    none: string;
+    names: Record<CrmPriorityKey, string>;
+    filterLabel: string;
+  };
+
+  // Resumen tab: fixed 7-day window, Jira-style indicators.
+  summary: {
+    view: string;
+    windowTemplate: string; // {days}
+    closed: string;
+    active: string;
+    new: string;
+    dueSoon: string;
+    overdueCaptionTemplate: string; // {n}
+    overdueCaptionOne: string;
+    noOverdueCaption: string;
+    stagesTitle: string;
+    stagesDescription: string;
+    priorityTitle: string;
+    priorityDescription: string;
+    workloadTitle: string;
+    workloadDescription: string;
+    sourcesTitle: string;
+    sourcesDescription: string;
+    totalUnit: string;
+    empty: string;
+  };
+
+  // Guía tab: how the stages and the rules work, in the vertical's words.
+  guide: {
+    view: string;
+    title: string;
+    intro: string;
+    stagesTitle: string;
+    moverBot: string;
+    moverPerson: string;
+    moverBoth: string;
+    autoNew: string;
+    autoContacted: string;
+    autoQualified: string;
+    autoLostTemplate: string; // {days}
+    manualOnlyNote: string;
+    rulesTitle: string;
+    inactivityRuleTemplate: string; // {days} {warn} {lost}
+    inactivityReversible: string;
+    activityTitle: string;
+    activityIntro: string;
+    activityMessages: string;
+    remindersTitle: string;
+    remindersBody: string;
+    priorityTitle: string;
+    priorityBody: string;
+    priorityMeaning: Record<CrmPriorityKey, string>;
+    sourcesTitle: string;
+    sourcesBody: string;
+  };
 };
 
 // Where a lead that did not come through WhatsApp came from ("Portal

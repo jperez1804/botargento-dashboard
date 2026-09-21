@@ -1,7 +1,13 @@
 // Browser-side caller for /api/leads/*. Mirrors postCampaign(): never throws,
 // returns the typed error code so the UI can map it to a vertical label.
 
-export type LeadApiPath = "set-stage" | "assign" | "event" | "reminder-set" | "reminder-done";
+export type LeadApiPath =
+  | "set-stage"
+  | "assign"
+  | "event"
+  | "reminder-set"
+  | "reminder-done"
+  | "set-priority";
 
 export async function postLead(
   path: LeadApiPath,

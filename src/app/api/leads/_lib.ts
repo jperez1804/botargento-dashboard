@@ -14,15 +14,22 @@ import {
   addLeadActivity,
   assignLead,
   completeLeadReminder,
+  setLeadPriority,
   setLeadReminder,
   setLeadStage,
 } from "@/lib/queries/lead-writes";
-import type { CrmConfig } from "@/config/verticals/_types";
+import type { CrmConfig, CrmPriorityKey } from "@/config/verticals/_types";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
 import { logger } from "@/lib/logger";
 
-export type LeadAction = "set-stage" | "assign" | "event" | "reminder-set" | "reminder-done";
+export type LeadAction =
+  | "set-stage"
+  | "assign"
+  | "event"
+  | "reminder-set"
+  | "reminder-done"
+  | "set-priority";
 
 const WaId = z.string().regex(/^[0-9]{8,15}$/, "contactWaId must be 8-15 digits");
 const DAY_MS = 86_400_000;
@@ -52,6 +59,8 @@ const Bodies = {
     note: z.string().trim().max(300),
   }),
   "reminder-done": z.object({ contactWaId: WaId }),
+  // "" clears the priority.
+  "set-priority": z.object({ contactWaId: WaId, priority: z.enum(["", "alta", "media", "baja"]) }),
 } as const;
 
 type Outcome = { status: number; body: Record<string, unknown>; audit: Record<string, unknown> };
@@ -79,6 +88,14 @@ async function apply(
       stage === config.autoStages.lost ? String(data.lostReason ?? "").trim() : "";
     await setLeadStage(waId, stage, lostReason, session.email, lead.lead.stage);
     return { status: 200, body: { ok: true }, audit: { from: lead.lead.stage, to: stage } };
+  }
+
+  if (action === "set-priority") {
+    // Same rule as set-stage: any asesor may prioritize any lead.
+    const priority = data.priority as CrmPriorityKey | "";
+    const to = priority === "" ? null : priority;
+    await setLeadPriority(waId, priority, session.email, lead.lead.priority);
+    return { status: 200, body: { ok: true }, audit: { from: lead.lead.priority, to } };
   }
 
   if (action === "assign") {
