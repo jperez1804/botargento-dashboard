@@ -29,6 +29,14 @@ async function withSql<T>(fn: (sql: ReturnType<typeof postgres>) => Promise<T>):
 
 const leadRows = (page: Page) => page.locator('a[aria-label^="Leads: "]');
 
+// The audit row is written after the handler's transaction commits, so a test
+// that just saw the state change must poll for it rather than read once.
+const lastAudit = (action: string) =>
+  withSql(async (sql) => {
+    const rows = await sql`SELECT metadata FROM dashboard.audit_log WHERE action = ${action} ORDER BY id DESC LIMIT 1`;
+    return rows[0]?.metadata ?? null;
+  });
+
 test.beforeEach(async () => {
   await resetAuthState();
   await withSql((sql) => seedCrmState(sql));
@@ -114,10 +122,7 @@ test("Board moves a lead from the ⋯ menu and audits the change", async ({ page
       }),
     )
     .toBe("visita");
-  const audit = await withSql(
-    (sql) => sql`SELECT metadata FROM dashboard.audit_log WHERE action = 'lead_set_stage' ORDER BY id DESC LIMIT 1`,
-  );
-  expect(audit[0]?.metadata).toMatchObject({
+  await expect.poll(() => lastAudit("lead_set_stage")).toMatchObject({
     contact_wa_id: F.contacted.wa_id,
     from: "contactado",
     to: "visita",
@@ -143,10 +148,7 @@ test("Board assigns an owner from the avatar menu", async ({ page }) => {
       }),
     )
     .toBe(ASESOR);
-  const audit = await withSql(
-    (sql) => sql`SELECT metadata FROM dashboard.audit_log WHERE action = 'lead_assign' ORDER BY id DESC LIMIT 1`,
-  );
-  expect(audit[0]?.metadata).toMatchObject({ contact_wa_id: F.atRisk.wa_id, to: ASESOR, ok: true });
+  await expect.poll(() => lastAudit("lead_assign")).toMatchObject({ contact_wa_id: F.atRisk.wa_id, to: ASESOR, ok: true });
 });
 
 test("Lead card: take the lead, log a call and schedule a reminder", async ({ page }) => {
@@ -274,10 +276,7 @@ test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ 
   await expect(page.locator('[data-board-column="nuevo"]')).toContainText("Marta Iglesias");
   await expect(card.getByTestId("lead-source")).toHaveText("Teléfono");
 
-  const audit = await withSql(
-    (sql) => sql`SELECT metadata FROM dashboard.audit_log WHERE action = 'lead_create' ORDER BY id DESC LIMIT 1`,
-  );
-  expect(audit[0]?.metadata).toMatchObject({ contact_wa_id: "5491144447777", ok: true });
+  await expect.poll(() => lastAudit("lead_create")).toMatchObject({ contact_wa_id: "5491144447777", ok: true });
 
   // Same person again (and a WhatsApp contact) → "already exists", no duplicate.
   await page.getByTestId("new-lead").click();
