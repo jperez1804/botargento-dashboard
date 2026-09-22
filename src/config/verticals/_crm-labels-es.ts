@@ -79,6 +79,7 @@ export const CRM_LABELS_ES: CrmLabels = {
     contact: "Respuesta desde el panel",
     created: "Cargado a mano",
     priority: "Prioridad",
+    budget: "Presupuesto",
   },
   errors: {
     already_owned: "Otra persona tomó este lead recién. Actualizá la página.",
@@ -87,6 +88,8 @@ export const CRM_LABELS_ES: CrmLabels = {
     invalid_source: "Elegí un origen de la lista.",
     invalid_stage: "Esa etapa no existe para este panel.",
     invalid_priority: "Esa prioridad no existe.",
+    invalid_currency: "Elegí una moneda de la lista.",
+    invalid_budget: "Poné un monto entero mayor a cero.",
     invalid_owner: "Ese responsable no tiene acceso al panel.",
     invalid_body: "Revisá los datos e intentá de nuevo.",
     forbidden: "Tu usuario no puede modificar leads.",
@@ -152,6 +155,29 @@ export const CRM_LABELS_ES: CrmLabels = {
     totalUnit: "leads",
     empty: "Todavía no hay leads para resumir.",
   },
+
+  budget: {
+    label: "Presupuesto",
+    none: "Sin presupuesto",
+    amountLabel: "Monto",
+    currencyLabel: "Moneda",
+    amountPlaceholder: "Ej.: 150000",
+    save: "Guardar",
+    clear: "Quitar",
+    clearHint: "Vuelve a mostrar el que captó el bot, si lo hay.",
+    fromBot: "Captado por el bot",
+  },
+
+  clearFilters: "Limpiar filtros",
+  intentLabel: "Intención",
+  filterAllIntents: "Todas las intenciones",
+
+  reminderOverdueRelativeTemplate: "Vencido {relative}",
+  reminderDueRelativeTemplate: "Vence {relative}",
+  reminderChange: "Cambiar",
+
+  openConversation: "Ver conversación",
+  close: "Cerrar",
 
   guide: {
     view: "Guía",

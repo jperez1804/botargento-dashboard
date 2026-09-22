@@ -115,28 +115,29 @@ describe("buildLeadView", () => {
       TZ,
     );
     expect(view.reminder).toMatchObject({ status: "overdue", note: "Llamar", text: "Vencido · 18/09, 10:30" });
+    expect(view.reminder?.relativeText).toMatch(/^Vencido /);
   });
 });
 
 describe("budgets", () => {
-  const usd = (amount: number) => ({ amount, currency: "USD", text: "" });
+  const usd = (amount: number) => ({ amount, currency: "USD", text: "", source: "bot" as const });
 
   it("formats the amount, or falls back to the captured range", () => {
     expect(formatBudget(usd(150000), "es-AR")).toBe("USD 150.000");
-    expect(formatBudget({ amount: null, currency: "", text: "USD 120k – 160k" }, "es-AR")).toBe("USD 120k – 160k");
-    expect(formatBudget({ amount: null, currency: "", text: "" }, "es-AR")).toBeNull();
+    expect(formatBudget({ amount: null, currency: "", text: "USD 120k – 160k", source: "bot" as const }, "es-AR")).toBe("USD 120k – 160k");
+    expect(formatBudget({ amount: null, currency: "", text: "", source: "bot" as const }, "es-AR")).toBeNull();
     expect(formatBudget(null, "es-AR")).toBeNull();
   });
 
   it("totals per currency and never mixes currencies or ranges", () => {
     const total = sumBudgets(
-      [usd(150000), usd(300000), { amount: 30000000, currency: "ARS", text: "" }, { amount: null, currency: "", text: "USD 1M" }, null],
+      [usd(150000), usd(300000), { amount: 30000000, currency: "ARS", text: "", source: "bot" as const }, { amount: null, currency: "", text: "USD 1M", source: "bot" as const }, null],
       "es-AR",
     );
     expect(total).toContain("USD 450.000");
     expect(total).toContain("ARS 30.000.000");
     expect(total?.split(" · ")).toHaveLength(2);
-    expect(sumBudgets([null, { amount: null, currency: "", text: "x" }], "es-AR")).toBeNull();
+    expect(sumBudgets([null, { amount: null, currency: "", text: "x", source: "bot" as const }], "es-AR")).toBeNull();
   });
 
   it("buildLeadView carries the budget and the days in the stage", () => {
@@ -170,5 +171,56 @@ describe("describeLeadEvent", () => {
 
   it("falls back to the body for person-logged activity", () => {
     expect(describeLeadEvent(ev("call", {}, "Coordinamos visita"), config, label)).toBe("Coordinamos visita");
+  });
+});
+
+describe("budget precedence and events", () => {
+  it("prefers the manual figure over the bot's amount and range", async () => {
+    const { toBudget } = await import("@/lib/queries/leads");
+    expect(toBudget("90000", "usd", "150000", "USD", { min: 1, max: 2 })).toEqual({
+      amount: 90000,
+      currency: "USD",
+      text: "",
+      source: "manual",
+    });
+    expect(toBudget(null, "", "150000", "USD", null)).toMatchObject({ amount: 150000, source: "bot" });
+    expect(toBudget(null, "", null, "", { min: 90000, max: 110000, currency: "USD" })).toMatchObject({
+      amount: null,
+      text: "USD 90.000 – 110.000",
+      source: "bot",
+    });
+    expect(toBudget(null, "", null, "", null)).toBeNull();
+  });
+
+  it("describes budget events with the formatted amount", () => {
+    const ev = (metadata: Record<string, unknown>) => ({ kind: "budget", body: "", metadata });
+    expect(describeLeadEvent(ev({ from: null, to: { amount: 150000, currency: "USD" } }), config, label)).toBe(
+      "→ USD 150.000",
+    );
+    expect(describeLeadEvent(ev({ from: { amount: 1, currency: "USD" }, to: null }), config, label)).toBe(
+      "→ Sin presupuesto",
+    );
+  });
+
+  it("gives the reminder a relative headline", () => {
+    const now = new Date("2026-09-21T15:00:00Z");
+    const view = buildLeadView(
+      lead({ reminder: { at: new Date("2026-09-22T15:00:00Z"), note: "Llamar", status: "upcoming" } }),
+      config,
+      label,
+      "es-AR",
+      TZ,
+      now,
+    );
+    expect(view.reminder?.relativeText).toBe("Vence mañana");
+    const overdue = buildLeadView(
+      lead({ reminder: { at: new Date("2026-09-19T15:00:00Z"), note: "", status: "overdue" } }),
+      config,
+      label,
+      "es-AR",
+      TZ,
+      now,
+    );
+    expect(overdue.reminder?.relativeText).toBe("Vencido anteayer");
   });
 });

@@ -22,11 +22,18 @@ import {
 import { hasLeadLogSentBy, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
 import { priceRangeText } from "@/lib/crm/price-range";
 import { priorityRank } from "@/lib/crm/priority";
+import { leadIntentForTenant } from "@/lib/crm/intent";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
 
-// What the lead said they can spend: the amount of their latest real handoff
-// that carried one, or — if the bot only captured a range — that range text.
-export type LeadBudget = { amount: number | null; currency: string; text: string };
+// What the lead can spend. A person's figure (lead_state) wins; otherwise the
+// amount of the latest real handoff that carried one, or — if the bot only
+// captured a range — that range text.
+export type LeadBudget = {
+  amount: number | null;
+  currency: string;
+  text: string;
+  source: "manual" | "bot";
+};
 
 // Set when a person registered the lead by hand (dashboard.manual_leads).
 export type ManualLeadInfo = { source: string; createdBy: string; createdAt: Date };
@@ -39,16 +46,33 @@ export type LeadRow = {
   handoffCount: number;
   budget: LeadBudget | null;
   manual: ManualLeadInfo | null;
+  // Raw intent of the last inbound WhatsApp message (null for leads that
+  // never wrote); lib/crm/intent maps it to the vertical's bucket.
+  lastIntent: string | null;
   lead: EffectiveLead;
 };
 
-function toBudget(amountRaw: unknown, currencyRaw: unknown, rangeRaw: unknown): LeadBudget | null {
-  const amount = amountRaw === null || amountRaw === undefined ? NaN : Number(amountRaw);
-  if (Number.isFinite(amount) && amount > 0) {
-    return { amount, currency: String(currencyRaw ?? "").trim().toUpperCase(), text: "" };
-  }
+const positive = (raw: unknown): number | null => {
+  // NUMERIC arrives as a string from postgres.js.
+  const n = raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+const upper = (raw: unknown) => String(raw ?? "").trim().toUpperCase();
+
+/** Precedence: manual amount → bot amount → bot range. Pure. */
+export function toBudget(
+  manualAmount: unknown,
+  manualCurrency: unknown,
+  botAmount: unknown,
+  botCurrency: unknown,
+  rangeRaw: unknown,
+): LeadBudget | null {
+  const m = positive(manualAmount);
+  if (m !== null) return { amount: m, currency: upper(manualCurrency), text: "", source: "manual" };
+  const b = positive(botAmount);
+  if (b !== null) return { amount: b, currency: upper(botCurrency), text: "", source: "bot" };
   const range = priceRangeText(rangeRaw);
-  return range ? { amount: null, currency: "", text: range } : null;
+  return range ? { amount: null, currency: "", text: range, source: "bot" } : null;
 }
 
 const toDate = (v: unknown): Date | null =>
@@ -131,6 +155,15 @@ async function selectLeadRows(
               WHERE contact_wa_id IN (SELECT contact_wa_id FROM contacts)`
         : sql`SELECT NULL::text AS contact_wa_id, NULL::jsonb AS price_range WHERE false`}
     ),
+    last_intent AS (
+      -- Intent of the last inbound message that carried one (same DISTINCT ON
+      -- pattern as lib/queries/intents.ts; rides ix_lead_log_contact_timestamp).
+      SELECT DISTINCT ON (contact_wa_id) contact_wa_id, intent
+      FROM automation.lead_log
+      WHERE direction = 'inbound' AND contact_wa_id <> '' AND NULLIF(intent, '') IS NOT NULL
+        ${onlyIds ? sql`AND contact_wa_id IN ${sql(onlyIds)}` : sql``}
+      ORDER BY contact_wa_id, log_timestamp DESC, id DESC
+    ),
     events AS (
       SELECT contact_wa_id,
              MAX(occurred_at) FILTER (WHERE kind IN ${sql([...ACTIVITY_EVENT_KINDS])}) AS last_crm_activity_at,
@@ -148,6 +181,8 @@ async function selectLeadRows(
       s.contact_wa_id AS state_wa_id,
       s.stage, s.stage_changed_at, s.lost_reason, s.owner_email,
       s.next_action_at, s.next_action_note, s.next_action_done_at, s.priority,
+      s.budget_amount AS manual_budget_amount, s.budget_currency AS manual_budget_currency,
+      li.intent AS last_intent,
       ${suppression
         ? sql`(SELECT MIN(o.created_at) FROM outreach.suppression o WHERE o.wa_id = c.contact_wa_id)`
         : sql`NULL::timestamptz`} AS opted_out_at
@@ -156,6 +191,7 @@ async function selectLeadRows(
     LEFT JOIN budgets b ON b.contact_wa_id = c.contact_wa_id
     LEFT JOIN snaps sn ON sn.contact_wa_id = c.contact_wa_id
     LEFT JOIN events e ON e.contact_wa_id = c.contact_wa_id
+    LEFT JOIN last_intent li ON li.contact_wa_id = c.contact_wa_id
     LEFT JOIN dashboard.lead_state s ON s.contact_wa_id = c.contact_wa_id
   `;
 
@@ -188,7 +224,14 @@ async function selectLeadRows(
       firstSeen: signals.firstSeen,
       lastMessageAt: signals.lastMessageAt,
       handoffCount: Number(r.handoff_count ?? 0),
-      budget: toBudget(r.budget_amount, r.budget_currency, r.price_range),
+      budget: toBudget(
+        r.manual_budget_amount,
+        r.manual_budget_currency,
+        r.budget_amount,
+        r.budget_currency,
+        r.price_range,
+      ),
+      lastIntent: r.last_intent === null || r.last_intent === undefined ? null : String(r.last_intent),
       manual:
         r.manual_source === null || r.manual_source === undefined
           ? null
@@ -219,6 +262,8 @@ export type ListLeadsParams = {
   // unless the stage filter asks for them explicitly.
   includeLost?: boolean;
   priority?: CrmPriorityKey | "none";
+  // Vertical intent key ("Ventas"); matched against the lead's last intent bucket.
+  intent?: string;
 };
 
 export type ListLeadsResult = {
@@ -250,6 +295,7 @@ export async function listLeads(
     if (params.filter === "unassigned" && row.lead.owner !== null) return false;
     if (params.priority === "none" && row.lead.priority !== null) return false;
     if (params.priority && params.priority !== "none" && row.lead.priority !== params.priority) return false;
+    if (params.intent && leadIntentForTenant(row.lastIntent)?.key !== params.intent) return false;
     if (params.q && !matchesQuery(row, params.q)) return false;
     return true;
   });

@@ -19,6 +19,7 @@ export type LeadsSearchParams = {
   kind?: string;
   by?: string;
   priority?: string;
+  intent?: string;
 };
 
 export type ParsedLeadsParams = {
@@ -30,6 +31,7 @@ export type ParsedLeadsParams = {
   ownerParam: string; // The explicit ?owner= value, kept in links.
   q: string;
   priority: CrmPriorityKey | "";
+  intent: string; // Vertical intent key, "" = all.
   pageNum: number;
   activityKind: string;
   activityBy: string;
@@ -44,6 +46,7 @@ export function parseLeadsSearchParams(
   sp: LeadsSearchParams,
   crm: CrmConfig,
   sessionEmail: string,
+  intentKeys: ReadonlyArray<string> = [],
 ): ParsedLeadsParams {
   // The board is the default view: it is how the team works the pipeline.
   const view = VIEWS.includes(sp.view as LeadsView) ? (sp.view as LeadsView) : "board";
@@ -58,6 +61,7 @@ export function parseLeadsSearchParams(
     ownerParam,
     q: sp.q?.trim() ?? "",
     priority: parsePriority(sp.priority) ?? "",
+    intent: sp.intent && intentKeys.includes(sp.intent) ? sp.intent : "",
     pageNum: Math.max(1, Number(sp.page) || 1),
     activityKind: sp.kind && sp.kind in crm.labels.eventKinds ? sp.kind : "",
     activityBy: (sp.by ?? "").trim().toLowerCase(),
@@ -81,6 +85,7 @@ export function buildLeadsHref(
   if (p.mine) params.set("mine", "1");
   if (p.filter) params.set("filter", p.filter);
   if (p.priority) params.set("priority", p.priority);
+  if (p.intent) params.set("intent", p.intent);
   if (p.q) params.set("q", p.q);
   if (overrides.page && overrides.page > 1) params.set("page", String(overrides.page));
   const qs = params.toString();

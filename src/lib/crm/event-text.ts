@@ -5,6 +5,7 @@
 
 import type { CrmConfig, CrmEventKind } from "@/config/verticals/_types";
 import { parsePriority } from "@/lib/crm/priority";
+import { formatMoney } from "@/lib/crm/view-model";
 
 export type DescribableEvent = {
   kind: string;
@@ -22,6 +23,7 @@ export function describeLeadEvent(
   event: DescribableEvent,
   config: CrmConfig,
   memberLabel: (email: string | null) => string,
+  locale = "es-AR",
 ): string {
   const meta = event.metadata;
   const stageLabel = (key: unknown) =>
@@ -40,6 +42,14 @@ export function describeLeadEvent(
   if (event.kind === "created") {
     const source = config.manualLeadSources.find((s) => s.key === meta.source)?.label;
     return source ? `${config.labels.sourceLabel}: ${source}` : event.body;
+  }
+  if (event.kind === "budget") {
+    const to = meta.to;
+    if (to && typeof to === "object" && typeof (to as { amount?: unknown }).amount === "number") {
+      const b = to as { amount: number; currency?: unknown };
+      return `→ ${formatMoney(b.amount, String(b.currency ?? ""), locale)}`;
+    }
+    return `→ ${config.labels.budget.none}`;
   }
   if (event.kind === "priority") {
     if (!("to" in meta)) return event.body;

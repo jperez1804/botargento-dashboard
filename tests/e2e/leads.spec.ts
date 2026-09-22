@@ -467,3 +467,124 @@ test("Guía documents the stages and rules; the viewer can read it but not prior
   });
   expect(res.status()).toBe(403);
 });
+
+test("Board card opens the lead modal; edits refresh the board; Esc and navigating away close it", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board");
+  const card = page.locator(`[data-lead-card="${F.reserva.wa_id}"]`);
+  await card.getByTestId("lead-open").click();
+  await page.waitForURL(new RegExp(`/leads/${F.reserva.wa_id}$`));
+  const modal = page.getByTestId("lead-detail-modal");
+  await expect(modal).toBeVisible();
+  await expect(modal).toContainText(F.reserva.name);
+  await expect(modal.getByTestId("lead-crm-card")).toContainText("Reserva");
+  await expect(modal.getByTestId("lead-activity")).toBeVisible();
+  // The board is still mounted behind the modal.
+  await expect(page.locator("[data-board-column]")).toHaveCount(7);
+
+  // An edit inside the modal reaches the card behind it (router.refresh()).
+  await modal.getByTestId("lead-priority-select").selectOption("baja");
+  await expect(modal.getByTestId("lead-priority").first()).toHaveText("Baja");
+  await expect(card.getByTestId("lead-priority")).toHaveText("Baja");
+
+  await page.keyboard.press("Escape");
+  await page.waitForURL(/\/leads\?view=board$/);
+  await expect(modal).toHaveCount(0);
+
+  // A soft navigation away (the modal's own "Ver conversación") closes it:
+  // the catch-all slot renders nothing on the new page.
+  await card.getByTestId("lead-open").click();
+  await expect(modal).toBeVisible();
+  await modal.getByTestId("lead-open-conversation").click();
+  await page.waitForURL(new RegExp(`/conversations/${F.reserva.wa_id}`));
+  await expect(modal).toHaveCount(0);
+  await expect(page.getByTestId("lead-crm-card")).toBeVisible();
+
+  // A hard load of the modal URL is the full conversation page.
+  await page.goto(`/leads/${F.reserva.wa_id}`);
+  await page.waitForURL(new RegExp(`/conversations/${F.reserva.wa_id}`));
+});
+
+test("Budget typed by hand wins over the bot's figure and can be cleared", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board");
+  const card = page.locator(`[data-lead-card="${F.reserva.wa_id}"]`);
+  await expect(card.getByTestId("lead-budget")).toHaveText("USD 90.000"); // seeded manual budget
+  await card.getByTestId("lead-open").click();
+  const modal = page.getByTestId("lead-detail-modal");
+  await expect(modal.getByTestId("lead-budget-value")).toHaveText("USD 90.000");
+
+  await modal.getByTestId("lead-budget-amount").fill("120000");
+  await modal.getByTestId("lead-budget-currency").selectOption("ARS");
+  await modal.getByTestId("lead-budget-save").click();
+  await expect(modal.getByTestId("lead-budget-value")).toHaveText("ARS 120.000");
+  await expect(card.getByTestId("lead-budget")).toHaveText("ARS 120.000");
+  await expect(modal.getByTestId("lead-activity")).toContainText("→ ARS 120.000");
+  await expect.poll(() => lastAudit("lead_set_budget")).toMatchObject({
+    contact_wa_id: F.reserva.wa_id,
+    from: { amount: 90000, currency: "USD" },
+    to: { amount: 120000, currency: "ARS" },
+    ok: true,
+  });
+
+  await modal.getByTestId("lead-budget-clear").click();
+  await expect(modal.getByTestId("lead-budget-section")).toContainText("Sin presupuesto");
+  await expect(card.getByTestId("lead-budget")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  // On a lead the bot qualified, clearing the manual figure brings the bot's back.
+  const rows = await withSql(
+    (sql) => sql`SELECT contact_wa_id FROM automation.escalations WHERE target_zone = 'Palermo' LIMIT 1`,
+  );
+  const botCard = page.locator(`[data-lead-card="${rows[0]?.contact_wa_id}"]`);
+  await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 150.000");
+  await botCard.getByTestId("lead-open").click();
+  await expect(modal.getByTestId("lead-budget-section")).toContainText("Captado por el bot");
+  await modal.getByTestId("lead-budget-amount").fill("180000");
+  await modal.getByTestId("lead-budget-save").click();
+  await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 180.000");
+  await modal.getByTestId("lead-budget-clear").click();
+  await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 150.000");
+});
+
+test("Intent shows on cards and filters the board; one click clears every filter", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board");
+  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`).getByTestId("lead-intent")).toHaveText("Ventas");
+  await expect(page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`).getByTestId("lead-intent")).toHaveText("Alquileres");
+  // A lead registered by hand never wrote: no intent chip.
+  await expect(page.locator(`[data-lead-card="${F.manual.wa_id}"]`).getByTestId("lead-intent")).toHaveCount(0);
+
+  await page.getByTestId("leads-intent-filter").selectOption("Alquileres");
+  await page.waitForURL(/intent=Alquileres/);
+  await expect(page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`)).toBeVisible();
+  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`)).toHaveCount(0);
+  // The filter survives the switch to the list.
+  await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Lista" }).click();
+  await page.waitForURL(/view=list.*intent=Alquileres|intent=Alquileres.*view=list/);
+  await expect(page.getByTestId("leads-intent-filter")).toHaveValue("Alquileres");
+  await expect(leadRows(page).filter({ hasText: F.atRisk.name })).toHaveCount(1);
+  await expect(leadRows(page).filter({ hasText: F.visita.name })).toHaveCount(0);
+
+  await page.goto("/leads?view=list&priority=alta&intent=Ventas&q=ram");
+  const clear = page.getByTestId("leads-clear-filters");
+  await expect(clear).toContainText("3");
+  await clear.click();
+  await page.waitForURL(/\/leads\?view=list$/);
+  await expect(clear).toHaveCount(0);
+  await expect(page.locator("#leads-search")).toHaveValue("");
+});
+
+test("Viewer opens the lead modal read-only and cannot set a budget", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH, VIEWER);
+  await page.goto("/leads?view=board");
+  await page.locator(`[data-lead-card="${F.reserva.wa_id}"]`).getByTestId("lead-open").click();
+  const modal = page.getByTestId("lead-detail-modal");
+  await expect(modal.getByTestId("lead-budget-value")).toHaveText("USD 90.000");
+  await expect(modal.getByTestId("lead-budget-save")).toHaveCount(0);
+  await expect(modal.getByTestId("lead-priority-select")).toHaveCount(0);
+  const res = await page.request.post("/api/leads/set-budget", {
+    data: { contactWaId: F.reserva.wa_id, amount: 1000, currency: "USD" },
+  });
+  expect(res.status()).toBe(403);
+});

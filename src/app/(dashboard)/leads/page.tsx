@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { tenantConfig } from "@/config/tenant";
+import { verticalConfig } from "@/config/verticals";
+import { intentOptions, leadIntent } from "@/lib/crm/intent";
 import { crmConfig } from "@/lib/crm/enabled";
 import { buildLeadView } from "@/lib/crm/view-model";
 import { buildLeadsSummary, closedStageKeys } from "@/lib/crm/summary";
@@ -39,7 +41,8 @@ export default async function LeadsPage({ searchParams }: Props) {
   const sp = await searchParams;
   const labels = crm.labels;
   const tenant = tenantConfig();
-  const p = parseLeadsSearchParams(sp, crm, session.email);
+  const intents = verticalConfig().intents;
+  const p = parseLeadsSearchParams(sp, crm, session.email, intents.map((i) => i.key));
   const { view } = p;
   const canEdit = hasRole(session, "asesor");
 
@@ -57,6 +60,7 @@ export default async function LeadsPage({ searchParams }: Props) {
               owner: p.owner || undefined,
               filter: p.filter || undefined,
               priority: p.priority || undefined,
+              intent: p.intent || undefined,
               q: p.q || undefined,
               includeLost: view === "board",
             },
@@ -78,6 +82,7 @@ export default async function LeadsPage({ searchParams }: Props) {
     // registered by hand (kept even after the person writes on WhatsApp),
     // otherwise WhatsApp.
     sourceLabel: r.manual ? sourceLabel(r.manual.source) : labels.sourceWhatsapp,
+    intentLabel: leadIntent(r.lastIntent, intents)?.label ?? null,
     view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now, r.budget),
   }));
 
@@ -157,6 +162,7 @@ export default async function LeadsPage({ searchParams }: Props) {
               count: result.stageCounts[s.key] ?? 0,
             }))}
             owners={owners}
+            intents={intentOptions(intents)}
             current={{
               q: p.q,
               stage: p.stage,
@@ -164,6 +170,7 @@ export default async function LeadsPage({ searchParams }: Props) {
               filter: p.filter,
               mine: p.mine,
               priority: p.priority,
+              intent: p.intent,
               view,
             }}
             showOwnerFilter

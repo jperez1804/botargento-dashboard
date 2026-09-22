@@ -7,6 +7,7 @@ import {
   jsonb,
   smallint,
   boolean,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 export const dashboardSchema = pgSchema("dashboard");
@@ -84,6 +85,11 @@ export const leadState = dashboardSchema.table("lead_state", {
   priority: text("priority").notNull().default(""),
   prioritySetAt: timestamp("priority_set_at", { withTimezone: true }),
   prioritySetBy: text("priority_set_by").notNull().default(""),
+  // Manual budget (migrations/0008_lead_budget.sql); NULL amount = none.
+  budgetAmount: numeric("budget_amount"),
+  budgetCurrency: text("budget_currency").notNull().default(""),
+  budgetSetAt: timestamp("budget_set_at", { withTimezone: true }),
+  budgetSetBy: text("budget_set_by").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

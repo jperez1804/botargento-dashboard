@@ -15,6 +15,7 @@ export type LeadViewRow = {
   displayName: string;
   budget: LeadBudget | null;
   sourceLabel: string | null;
+  intentLabel: string | null;
   view: LeadView;
 };
 
@@ -46,12 +47,17 @@ export function buildBoardColumns(
         statusTone: v.view.statusTone,
         reminderText:
           v.view.reminder && v.view.reminder.status !== "done" ? v.view.reminder.text : null,
+        reminderNote:
+          v.view.reminder && v.view.reminder.status !== "done" && v.view.reminder.note
+            ? v.view.reminder.note
+            : null,
         reminderOverdue: v.view.reminder?.status === "overdue",
         lastActivity: v.view.lastActivityRelative,
         budgetText: v.view.budgetText,
         daysInStage: v.view.daysInStageText,
         sourceLabel: v.sourceLabel,
         priority: v.view.priority,
+        intentLabel: v.intentLabel,
       })),
     };
   });

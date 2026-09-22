@@ -63,6 +63,33 @@ export async function setLeadStage(
  * Sets (or clears, with '') the manual priority. Touches ONLY its own columns
  * so stage/owner/reminder upserts and this one never overwrite each other.
  */
+/**
+ * Sets (or clears, with null) the budget a person typed. Only its own columns,
+ * like setLeadPriority, so the other upserts never overwrite it.
+ */
+export async function setLeadBudget(
+  waId: string,
+  to: { amount: number; currency: string } | null,
+  by: string,
+  from: { amount: number; currency: string } | null,
+): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`
+      INSERT INTO dashboard.lead_state
+        (contact_wa_id, budget_amount, budget_currency, budget_set_at, budget_set_by, updated_at)
+      VALUES (${waId}, ${to ? to.amount : null}, ${to ? to.currency : ""}, NOW(), ${by}, NOW())
+      ON CONFLICT (contact_wa_id) DO UPDATE
+      SET budget_amount = EXCLUDED.budget_amount,
+          budget_currency = EXCLUDED.budget_currency,
+          budget_set_at = NOW(),
+          budget_set_by = EXCLUDED.budget_set_by,
+          updated_at = NOW()
+    `;
+    await appendEvent(tx, waId, "budget", "", by, { from, to });
+  });
+  invalidateCrmAlerts();
+}
+
 export async function setLeadPriority(
   waId: string,
   priority: CrmPriorityKey | "",

@@ -1,11 +1,13 @@
 "use client";
 
-// One card on the /leads board, Jira-style: the name opens the conversation,
+// One card on the /leads board, Jira-style: the name (or the card body) opens
+// the lead's card as a modal over the board (/leads/[waId], intercepted),
 // the state lines flag what needs attention, and the actions hide behind the ⋯
 // menu (move) and the owner avatar (assign). Dragging between columns still
 // works; the menu is the keyboard and touch path.
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { BellRing, Clock3, MessageCircle, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LeadAvatar } from "@/components/dashboard/LeadAvatar";
@@ -24,6 +26,7 @@ export type BoardCard = {
   statusText: string | null;
   statusTone: "danger" | "warning" | null;
   reminderText: string | null;
+  reminderNote: string | null;
   reminderOverdue: boolean;
   lastActivity: string;
   budgetText: string | null;
@@ -31,6 +34,8 @@ export type BoardCard = {
   // Origin of a lead registered by hand ("Portal inmobiliario"); null = WhatsApp.
   sourceLabel: string | null;
   priority: PriorityView | null;
+  // WhatsApp intent bucket ("Ventas"); null for leads that never wrote.
+  intentLabel: string | null;
 };
 
 type Props = {
@@ -60,7 +65,16 @@ export function LeadCard({
   onAssign,
   onSetPriority,
 }: Props) {
+  const router = useRouter();
   const menuCard = { ...card, priorityKey: card.priority?.key ?? null };
+  const detailHref = `/leads/${encodeURIComponent(card.waId)}`;
+  // Clicking the card body (not a link, button or menu) opens the modal too;
+  // scroll: false keeps the board where it is.
+  function openFromBody(e: React.MouseEvent<HTMLElement>) {
+    const target = e.target as HTMLElement;
+    if (target.closest("a,button,[role='menu'],[role='menuitem'],input,select")) return;
+    router.push(detailHref, { scroll: false });
+  }
   // Mirror the API rule (403 not_owner): an asesor manages unassigned leads
   // and their own; reassigning a colleague's lead is an admin call.
   const canAssign =
@@ -70,14 +84,15 @@ export function LeadCard({
     <article
       data-lead-card={card.waId}
       draggable={canEdit && !busy}
+      onClick={openFromBody}
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", card.waId);
         e.dataTransfer.effectAllowed = "move";
       }}
       className={cn(
         "group/card space-y-1.5 rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-3",
-        "shadow-xs transition-shadow hover:shadow-sm",
-        canEdit && "cursor-grab active:cursor-grabbing",
+        "shadow-xs transition-shadow duration-150 hover:shadow-sm cursor-pointer",
+        canEdit && "active:cursor-grabbing",
         busy && "opacity-60",
       )}
     >
@@ -85,8 +100,10 @@ export function LeadCard({
         {/* inline-block: the pointer + underline stay on the text, not across
             the whole card. */}
         <Link
-          href={`/conversations/${encodeURIComponent(card.waId)}`}
-          className="inline-block w-fit max-w-full flex-1 truncate text-[13.5px] font-medium text-[var(--ink)] hover:underline underline-offset-2"
+          href={detailHref}
+          scroll={false}
+          data-testid="lead-open"
+          className="inline-block w-fit max-w-full flex-1 truncate text-[13.5px] font-medium text-[var(--ink)] hover:underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2 rounded-sm"
         >
           {card.displayName}
         </Link>
@@ -106,10 +123,18 @@ export function LeadCard({
         ) : null}
       </div>
 
-      {card.sourceLabel || card.priority ? (
+      {card.sourceLabel || card.priority || card.intentLabel ? (
         <div className="flex flex-wrap items-center gap-1">
           {card.priority ? (
             <LeadPriorityChip label={card.priority.label} tone={card.priority.tone} />
+          ) : null}
+          {card.intentLabel ? (
+            <span
+              data-testid="lead-intent"
+              className="inline-flex h-[18px] items-center rounded-full bg-[var(--info-soft)] px-1.5 text-[10.5px] font-medium text-[var(--info)]"
+            >
+              {card.intentLabel}
+            </span>
           ) : null}
           {card.sourceLabel ? (
             <span
@@ -153,7 +178,12 @@ export function LeadCard({
           )}
         >
           <BellRing className="size-3 shrink-0" aria-hidden />
-          {card.reminderText}
+          <span className="min-w-0 truncate">
+            {card.reminderText}
+            {card.reminderNote ? (
+              <span className="font-normal text-[var(--muted-ink)]"> · {card.reminderNote}</span>
+            ) : null}
+          </span>
         </p>
       ) : null}
 

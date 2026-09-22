@@ -7,6 +7,7 @@
 //   H registered by hand (dashboard.manual_leads, walk-in, asesor@) — no
 //     WhatsApp conversation yet
 // Priorities: A alta, B media (the Resumen and the priority e2e count them).
+// Budget: B has a manual USD 90.000. Intent: C is "Alquileres", the rest "Ventas".
 // Plus: the seed's most recent business handoff gets qualification columns and
 // a session_memory snapshot, so the "Lo que captó el bot" card has data
 // without adding a 13th business escalation (the e2e expects exactly 12).
@@ -63,20 +64,21 @@ export async function seedCrmState(sql: Sql): Promise<void> {
     INSERT INTO dashboard.lead_state
       (contact_wa_id, stage, stage_changed_at, stage_changed_by,
        owner_email, owner_assigned_at, owner_assigned_by,
-       next_action_at, next_action_note, next_action_set_by, priority)
+       next_action_at, next_action_note, next_action_set_by, priority,
+       budget_amount, budget_currency)
     VALUES
       (${f.visita.wa_id}, 'visita', ${ago(1)}, 'dev@botargento.com.ar',
-       'dev@botargento.com.ar', ${ago(2)}, 'dev@botargento.com.ar', NULL, '', '', 'alta'),
+       'dev@botargento.com.ar', ${ago(2)}, 'dev@botargento.com.ar', NULL, '', '', 'alta', NULL, ''),
       (${f.reserva.wa_id}, 'reserva', ${ago(1)}, 'asesor@cliente.com',
-       'asesor@cliente.com', ${ago(3)}, 'asesor@cliente.com', NULL, '', '', 'media'),
+       'asesor@cliente.com', ${ago(3)}, 'asesor@cliente.com', NULL, '', '', 'media', 90000, 'USD'),
       (${f.overdue.wa_id}, NULL, NULL, '',
        'dev@botargento.com.ar', ${ago(4)}, 'dev@botargento.com.ar',
-       ${ago(1)}, 'Llamar para coordinar la visita', 'dev@botargento.com.ar', ''),
+       ${ago(1)}, 'Llamar para coordinar la visita', 'dev@botargento.com.ar', '', NULL, ''),
       (${f.upcoming.wa_id}, NULL, NULL, '',
        'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com',
-       ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com', ''),
+       ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com', '', NULL, ''),
       (${f.manual.wa_id}, NULL, NULL, '',
-       'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com', NULL, '', '', '')
+       'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com', NULL, '', '', '', NULL, '')
   `;
 
   await sql`
@@ -124,7 +126,7 @@ export async function seedCrm(sql: Sql): Promise<void> {
   const logRows = [
     inbound(f.visita, ago(2), "Quiero ver el depto de Palermo"),
     inbound(f.reserva, ago(3), "Me interesa reservar"),
-    inbound(f.atRisk, ago(25), "Consulta por un PH"),
+    { ...inbound(f.atRisk, ago(25), "Consulta por un PH"), intent: "Alquileres" },
     inbound(f.lost, ago(40), "Info de alquiler"),
     inbound(f.overdue, ago(4), "Busco 3 ambientes"),
     inbound(f.upcoming, ago(1), "Tienen algo en Belgrano?"),

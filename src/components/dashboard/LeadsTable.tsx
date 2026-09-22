@@ -16,6 +16,7 @@ export type LeadTableRow = {
   view: LeadView;
   // Origin of a lead registered by hand; null = came through WhatsApp.
   sourceLabel: string | null;
+  intentLabel: string | null;
 };
 
 type Props = {
@@ -44,6 +45,14 @@ export function LeadsTable({ rows, labels, pagination }: Props) {
             {r.sourceLabel ? (
               <span className="ml-2 font-[var(--font-geist-sans)] text-[var(--muted-ink)]">
                 · {r.sourceLabel}
+              </span>
+            ) : null}
+            {r.intentLabel ? (
+              <span
+                data-testid="lead-intent"
+                className="ml-2 font-[var(--font-geist-sans)] font-medium text-[var(--info)]"
+              >
+                · {r.intentLabel}
               </span>
             ) : null}
           </p>

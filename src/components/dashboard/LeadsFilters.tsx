@@ -6,7 +6,7 @@
 
 import { useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LEAD_FIELD_CLASS } from "@/components/dashboard/lead-field-class";
 import type { CrmLabels, CrmPriorityKey } from "@/config/verticals/_types";
@@ -17,6 +17,7 @@ type Props = {
   labels: CrmLabels;
   stages: ReadonlyArray<{ key: string; label: string; count: number }>;
   owners: ReadonlyArray<{ email: string; label: string }>;
+  intents: ReadonlyArray<{ key: string; label: string }>;
   current: {
     q: string;
     stage: string;
@@ -24,6 +25,7 @@ type Props = {
     filter: LeadListFilter | "";
     mine: boolean;
     priority: CrmPriorityKey | "";
+    intent: string;
     view: "list" | "board";
   };
   showOwnerFilter: boolean;
@@ -37,7 +39,7 @@ const CHIP_ON =
 const CHIP_OFF =
   "border-[var(--rule)] bg-[var(--canvas-2)] text-[var(--muted-ink)] hover:text-[var(--ink)] hover:border-[var(--rule-strong)]";
 
-export function LeadsFilters({ labels, stages, owners, current, showOwnerFilter, showMine }: Props) {
+export function LeadsFilters({ labels, stages, owners, intents, current, showOwnerFilter, showMine }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -65,6 +67,13 @@ export function LeadsFilters({ labels, stages, owners, current, showOwnerFilter,
     setSearch(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => navigate({ q: value.trim() || null }), 300);
+  }
+
+  const activeCount = [current.q, current.stage, current.owner, current.filter, current.priority, current.intent]
+    .filter(Boolean).length + (current.mine ? 1 : 0);
+  function clearAll() {
+    setSearch("");
+    navigate({ q: null, stage: null, owner: null, mine: null, filter: null, priority: null, intent: null });
   }
 
   const quick: ReadonlyArray<{ key: LeadListFilter; label: string }> = [
@@ -108,6 +117,36 @@ export function LeadsFilters({ labels, stages, owners, current, showOwnerFilter,
               </option>
             ))}
           </select>
+        ) : null}
+
+        {intents.length > 0 ? (
+          <select
+            aria-label={labels.intentLabel}
+            data-testid="leads-intent-filter"
+            value={current.intent}
+            onChange={(e) => navigate({ intent: e.target.value || null })}
+            className={cn(LEAD_FIELD_CLASS, "h-9 w-auto min-w-[180px]")}
+          >
+            <option value="">{labels.filterAllIntents}</option>
+            {intents.map((i) => (
+              <option key={i.key} value={i.key}>
+                {i.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
+
+        {activeCount > 0 ? (
+          <button
+            type="button"
+            data-testid="leads-clear-filters"
+            onClick={clearAll}
+            className={cn(CHIP, CHIP_OFF, "h-9 text-[var(--ink)]")}
+          >
+            <X className="size-3.5" aria-hidden />
+            {labels.clearFilters}
+            <span className="tabular-nums text-[11px] text-[var(--soft-ink)]">{activeCount}</span>
+          </button>
         ) : null}
 
       </div>

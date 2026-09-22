@@ -29,6 +29,7 @@ function row(over: Partial<EffectiveLead> & { firstSeen?: Date | null; origin?: 
     handoffCount: 0,
     budget: null,
     manual: origin ? { source: origin, createdBy: "ana@x.com", createdAt: firstSeen ?? NOW } : null,
+    lastIntent: null,
     lead: {
       stage: "nuevo",
       source: "auto",
