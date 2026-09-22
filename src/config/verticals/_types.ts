@@ -317,6 +317,11 @@ export type CrmLabels = {
   openConversation: string;
   close: string;
 
+  // Inline editing (Details list)
+  editFieldTemplate: string; // {field}
+  addValue: string;
+  confirm: string;
+
   // Guía tab: how the stages and the rules work, in the vertical's words.
   guide: {
     view: string;
