@@ -3,7 +3,12 @@
 // dashboard-side CRM state is reset to the seed baseline before every test
 // (scripts/seed-crm.ts → seedCrmState), so tests don't leak moves.
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect as baseExpect, test, type Page } from "@playwright/test";
+
+// The CRM controls save then router.refresh(): the board and the modal
+// re-render server-side, which on a cold dev server (and on CI) can take
+// more than the 5s default before an assertion sees the new state.
+const expect = baseExpect.configure({ timeout: 15_000 });
 import path from "node:path";
 import postgres from "postgres";
 import { loginAsDevViaLog, resetAuthState } from "./helpers";
@@ -179,10 +184,13 @@ test("Lead card: take the lead, log a call and schedule a reminder", async ({ pa
 
   const tomorrow = new Date(Date.now() + 86_400_000);
   const local = `${tomorrow.toISOString().slice(0, 10)}T10:30`;
+  await card.getByTestId("lead-field-reminder").click();
   await card.locator('input[type="datetime-local"]').fill(local);
   await card.getByPlaceholder("Ej.: llamar para coordinar la visita").fill("Confirmar visita");
   await card.getByRole("button", { name: "Guardar recordatorio" }).click();
   await expect(card.getByTestId("lead-reminder")).toContainText("Confirmar visita");
+  // The editor closed and the row reads the reminder back.
+  await expect(card.locator('input[type="datetime-local"]')).toHaveCount(0);
 
   const state = await withSql(
     (sql) => sql`SELECT owner_email, next_action_note FROM dashboard.lead_state WHERE contact_wa_id = ${F.atRisk.wa_id}`,
@@ -211,6 +219,7 @@ test("Asesor manages leads but cannot touch Settings or someone else's lead", as
   await expect(page.getByTestId("crm-alert-banner")).toHaveCount(0);
 
   await page.goto(`/conversations/${F.reserva.wa_id}`);
+  await page.getByTestId("lead-field-stage").click();
   await expect(page.getByTestId("lead-stage-select")).toBeVisible();
 
   // On the board: can claim an unassigned lead, but a colleague's lead shows
@@ -246,6 +255,7 @@ test("Viewer reads leads without controls and the API refuses writes", async ({ 
   await page.goto(`/conversations/${F.visita.wa_id}`);
   await expect(page.getByTestId("lead-crm-card")).toContainText("Visita");
   await expect(page.getByTestId("lead-stage-select")).toHaveCount(0);
+  await expect(page.locator('[data-testid^="lead-field-"]')).toHaveCount(0);
 
   const res = await page.request.post("/api/leads/set-stage", {
     data: { contactWaId: F.visita.wa_id, stage: "cerrado" },
@@ -441,8 +451,10 @@ test("Priority from the lead card is logged in its history", async ({ page }) =>
   await page.goto(`/conversations/${F.reserva.wa_id}`);
   const card = page.getByTestId("lead-crm-card");
   await expect(card.getByTestId("lead-priority")).toHaveText("Media");
+  await card.getByTestId("lead-field-priority").click();
   await card.getByTestId("lead-priority-select").selectOption("baja");
   await expect(card.getByTestId("lead-priority")).toHaveText("Baja");
+  await expect(card.getByTestId("lead-priority-select")).toHaveCount(0);
   const activity = page.getByTestId("lead-activity");
   await expect(activity).toContainText("Prioridad");
   await expect(activity).toContainText("→ Baja");
@@ -483,6 +495,7 @@ test("Board card opens the lead modal; edits refresh the board; Esc and navigati
   await expect(page.locator("[data-board-column]")).toHaveCount(7);
 
   // An edit inside the modal reaches the card behind it (router.refresh()).
+  await modal.getByTestId("lead-field-priority").click();
   await modal.getByTestId("lead-priority-select").selectOption("baja");
   await expect(modal.getByTestId("lead-priority").first()).toHaveText("Baja");
   await expect(card.getByTestId("lead-priority")).toHaveText("Baja");
@@ -514,10 +527,11 @@ test("Budget typed by hand wins over the bot's figure and can be cleared", async
   const modal = page.getByTestId("lead-detail-modal");
   await expect(modal.getByTestId("lead-budget-value")).toHaveText("USD 90.000");
 
+  await modal.getByTestId("lead-field-budget").click();
   await modal.getByTestId("lead-budget-amount").fill("120000");
   await modal.getByTestId("lead-budget-currency").selectOption("ARS");
   await modal.getByTestId("lead-budget-save").click();
-  await expect(modal.getByTestId("lead-budget-value")).toHaveText("ARS 120.000");
+  await expect(modal.getByTestId("lead-budget-value")).toHaveText("ARS 120.000", { timeout: 15_000 });
   await expect(card.getByTestId("lead-budget")).toHaveText("ARS 120.000");
   await expect(modal.getByTestId("lead-activity")).toContainText("→ ARS 120.000");
   await expect.poll(() => lastAudit("lead_set_budget")).toMatchObject({
@@ -527,8 +541,9 @@ test("Budget typed by hand wins over the bot's figure and can be cleared", async
     ok: true,
   });
 
+  await modal.getByTestId("lead-field-budget").click();
   await modal.getByTestId("lead-budget-clear").click();
-  await expect(modal.getByTestId("lead-budget-section")).toContainText("Sin presupuesto");
+  await expect(modal.getByTestId("lead-budget-section")).toContainText("Sin presupuesto", { timeout: 15_000 });
   await expect(card.getByTestId("lead-budget")).toHaveCount(0);
   await page.keyboard.press("Escape");
 
@@ -540,11 +555,13 @@ test("Budget typed by hand wins over the bot's figure and can be cleared", async
   await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 150.000");
   await botCard.getByTestId("lead-open").click();
   await expect(modal.getByTestId("lead-budget-section")).toContainText("Captado por el bot");
+  await modal.getByTestId("lead-field-budget").click();
   await modal.getByTestId("lead-budget-amount").fill("180000");
   await modal.getByTestId("lead-budget-save").click();
-  await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 180.000");
+  await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 180.000", { timeout: 15_000 });
+  await modal.getByTestId("lead-field-budget").click();
   await modal.getByTestId("lead-budget-clear").click();
-  await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 150.000");
+  await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 150.000", { timeout: 15_000 });
 });
 
 test("Intent shows on cards and filters the board; one click clears every filter", async ({ page }) => {
@@ -583,8 +600,51 @@ test("Viewer opens the lead modal read-only and cannot set a budget", async ({ p
   await expect(modal.getByTestId("lead-budget-value")).toHaveText("USD 90.000");
   await expect(modal.getByTestId("lead-budget-save")).toHaveCount(0);
   await expect(modal.getByTestId("lead-priority-select")).toHaveCount(0);
+  await expect(modal.locator('[data-testid^="lead-field-"]')).toHaveCount(0);
   const res = await page.request.post("/api/leads/set-budget", {
     data: { contactWaId: F.reserva.wa_id, amount: 1000, currency: "USD" },
   });
   expect(res.status()).toBe(403);
+});
+
+test("Inline editing: keyboard, one row at a time, click outside, and losing a lead with a motive", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto(`/conversations/${F.reserva.wa_id}`);
+  const card = page.getByTestId("lead-crm-card");
+
+  // Enter opens, Esc closes and the focus returns to the value.
+  const priorityRow = card.getByTestId("lead-field-priority");
+  await priorityRow.focus();
+  await page.keyboard.press("Enter");
+  await expect(card.getByTestId("lead-priority-select")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(card.getByTestId("lead-priority-select")).toHaveCount(0);
+  await expect(priorityRow).toBeFocused();
+
+  // Only one row edits at a time.
+  await priorityRow.click();
+  await expect(card.getByTestId("lead-priority-select")).toBeVisible();
+  await card.getByTestId("lead-field-budget").click();
+  await expect(card.getByTestId("lead-priority-select")).toHaveCount(0);
+  await expect(card.getByTestId("lead-budget-amount")).toBeVisible();
+
+  // A click outside with a valid change commits; without one it just closes.
+  await card.getByTestId("lead-budget-amount").fill("95000");
+  await page.getByRole("heading", { level: 1 }).click();
+  await expect(card.getByTestId("lead-budget-value")).toHaveText("USD 95.000", { timeout: 15_000 });
+  await expect.poll(() => lastAudit("lead_set_budget")).toMatchObject({ to: { amount: 95000, currency: "USD" }, ok: true });
+  await card.getByTestId("lead-field-budget").click();
+  await page.getByRole("heading", { level: 1 }).click();
+  await expect(card.getByTestId("lead-budget-amount")).toHaveCount(0);
+  await expect(card.getByTestId("lead-budget-value")).toHaveText("USD 95.000");
+
+  // Losing a lead asks for the motive first, then ✓ saves it.
+  await card.getByTestId("lead-field-stage").click();
+  await card.getByTestId("lead-stage-select").selectOption("perdido");
+  await expect(card.locator(`#lost-reason-${F.reserva.wa_id}`)).toBeVisible();
+  await card.locator(`#lost-reason-${F.reserva.wa_id}`).selectOption("No responde");
+  await card.getByTestId("lead-field-confirm").click();
+  await expect(card).toContainText("Perdido");
+  await expect(card.getByTestId("lead-status")).toContainText("No responde");
+  await expect.poll(() => lastAudit("lead_set_stage")).toMatchObject({ to: "perdido", ok: true });
 });

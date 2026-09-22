@@ -179,6 +179,10 @@ export const CRM_LABELS_ES: CrmLabels = {
   openConversation: "Ver conversación",
   close: "Cerrar",
 
+  editFieldTemplate: "Editar {field}",
+  addValue: "Agregar…",
+  confirm: "Confirmar",
+
   guide: {
     view: "Guía",
     title: "Cómo funciona el seguimiento",
