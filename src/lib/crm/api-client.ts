@@ -7,7 +7,8 @@ export type LeadApiPath =
   | "event"
   | "reminder-set"
   | "reminder-done"
-  | "set-priority";
+  | "set-priority"
+  | "set-budget";
 
 export async function postLead(
   path: LeadApiPath,

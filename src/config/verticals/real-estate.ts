@@ -189,6 +189,7 @@ export const realEstate: VerticalConfig = {
     autoStages: { new: "nuevo", contacted: "contactado", qualified: "calificado", lost: "perdido" },
     autoLostDays: 30,
     warnDays: 7,
+    currencies: ["USD", "ARS"],
     qualificationFields: [
       { source: "snapshot", key: "selected_flow", label: "Consulta por" },
       { source: "escalation", key: "target_zone", label: "Zona" },

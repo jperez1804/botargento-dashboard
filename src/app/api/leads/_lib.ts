@@ -14,11 +14,13 @@ import {
   addLeadActivity,
   assignLead,
   completeLeadReminder,
+  setLeadBudget,
   setLeadPriority,
   setLeadReminder,
   setLeadStage,
 } from "@/lib/queries/lead-writes";
 import type { CrmConfig, CrmPriorityKey } from "@/config/verticals/_types";
+import { crmCurrencies } from "@/lib/crm/budget";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
 import { logger } from "@/lib/logger";
@@ -29,7 +31,8 @@ export type LeadAction =
   | "event"
   | "reminder-set"
   | "reminder-done"
-  | "set-priority";
+  | "set-priority"
+  | "set-budget";
 
 const WaId = z.string().regex(/^[0-9]{8,15}$/, "contactWaId must be 8-15 digits");
 const DAY_MS = 86_400_000;
@@ -61,6 +64,12 @@ const Bodies = {
   "reminder-done": z.object({ contactWaId: WaId }),
   // "" clears the priority.
   "set-priority": z.object({ contactWaId: WaId, priority: z.enum(["", "alta", "media", "baja"]) }),
+  // null amount clears the manual budget (the bot's figure shows again).
+  "set-budget": z.object({
+    contactWaId: WaId,
+    amount: z.number().int().min(1).max(1_000_000_000).nullable(),
+    currency: z.string().trim().toUpperCase().max(8).optional(),
+  }),
 } as const;
 
 type Outcome = { status: number; body: Record<string, unknown>; audit: Record<string, unknown> };
@@ -88,6 +97,22 @@ async function apply(
       stage === config.autoStages.lost ? String(data.lostReason ?? "").trim() : "";
     await setLeadStage(waId, stage, lostReason, session.email, lead.lead.stage);
     return { status: 200, body: { ok: true }, audit: { from: lead.lead.stage, to: stage } };
+  }
+
+  if (action === "set-budget") {
+    // Same rule as set-stage: any asesor may edit any lead's budget.
+    const amount = data.amount as number | null;
+    const currency = amount === null ? "" : String(data.currency ?? "");
+    if (amount !== null && !crmCurrencies(config).includes(currency)) {
+      return fail(400, "invalid_currency", { currency });
+    }
+    const from =
+      lead.budget?.source === "manual" && lead.budget.amount !== null
+        ? { amount: lead.budget.amount, currency: lead.budget.currency }
+        : null;
+    const to = amount === null ? null : { amount, currency };
+    await setLeadBudget(waId, to, session.email, from);
+    return { status: 200, body: { ok: true }, audit: { from, to } };
   }
 
   if (action === "set-priority") {

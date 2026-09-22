@@ -101,12 +101,21 @@ export type LeadView = {
   statusTone: "danger" | "warning" | null;
   ownerEmail: string | null;
   ownerLabel: string;
-  reminder: { atIso: string; note: string; status: ReminderStatus; text: string } | null;
+  reminder: {
+    atIso: string;
+    note: string;
+    status: ReminderStatus;
+    text: string;
+    // "Vencido hace 2 días" / "Vence mañana" — the callout's headline.
+    relativeText: string;
+  } | null;
   lastActivityText: string;
   lastActivityRelative: string;
   budgetText: string | null;
   daysInStageText: string | null;
   priority: PriorityView | null;
+  // The resolved budget (manual or bot), for controls that need the source.
+  budget: LeadBudget | null;
 };
 
 export function buildLeadView(
@@ -143,6 +152,7 @@ export function buildLeadView(
   let reminder: LeadView["reminder"] = null;
   if (lead.reminder) {
     const when = formatDayTime(lead.reminder.at, locale, timezone);
+    const relative = formatRelative(lead.reminder.at, now, locale);
     reminder = {
       atIso: lead.reminder.at.toISOString(),
       note: lead.reminder.note,
@@ -151,6 +161,10 @@ export function buildLeadView(
         lead.reminder.status === "overdue"
           ? fillTemplate(labels.reminderOverdueTemplate, { date: when })
           : fillTemplate(labels.reminderUpcomingTemplate, { date: when }),
+      relativeText:
+        lead.reminder.status === "overdue"
+          ? fillTemplate(labels.reminderOverdueRelativeTemplate, { relative })
+          : fillTemplate(labels.reminderDueRelativeTemplate, { relative }),
     };
   }
 
@@ -173,6 +187,7 @@ export function buildLeadView(
     budgetText: formatBudget(budget, locale),
     daysInStageText: daysInStage(lead.stageSince, now, labels),
     priority: priorityView(lead.priority, labels),
+    budget,
   };
 }
 

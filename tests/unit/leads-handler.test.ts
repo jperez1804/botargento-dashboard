@@ -19,6 +19,7 @@ const writes = {
   setLeadReminder: vi.fn(async () => undefined),
   completeLeadReminder: vi.fn(async () => true),
   setLeadPriority: vi.fn(async () => undefined),
+  setLeadBudget: vi.fn(async () => undefined),
 };
 
 vi.mock("@/lib/role-guard", () => ({ requireRoleApi: async () => authResult }));
@@ -56,6 +57,7 @@ function makeLead(overrides: Partial<LeadRow["lead"]> = {}): LeadRow {
     handoffCount: 0,
     budget: null,
     manual: null,
+    lastIntent: "Ventas",
     lead: {
       stage: "contactado",
       source: "auto",
@@ -240,5 +242,41 @@ describe("set-priority", () => {
     const res = await call("set-priority", { contactWaId: WA, priority: "baja" });
     expect(res.status).toBe(500);
     expect(auditCalls[0]).toMatchObject({ action: "lead_set_priority", metadata: { ok: false, error: "internal_error" } });
+  });
+});
+
+describe("set-budget", () => {
+  it("rejects a zero, decimal or oversized amount, and an unknown currency", async () => {
+    for (const amount of [0, 1500.5, 1_000_000_001]) {
+      expect((await call("set-budget", { contactWaId: WA, amount, currency: "USD" })).status).toBe(400);
+    }
+    const res = await call("set-budget", { contactWaId: WA, amount: 100, currency: "EUR" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_currency" });
+    expect(writes.setLeadBudget).not.toHaveBeenCalled();
+  });
+
+  it("writes the manual budget and audits from → to", async () => {
+    const res = await call("set-budget", { contactWaId: WA, amount: 150000, currency: "usd" });
+    expect(res.status).toBe(200);
+    expect(writes.setLeadBudget).toHaveBeenCalledWith(WA, { amount: 150000, currency: "USD" }, "asesor@cliente.com", null);
+    expect(auditCalls[0]).toMatchObject({
+      action: "lead_set_budget",
+      metadata: { contact_wa_id: WA, from: null, to: { amount: 150000, currency: "USD" }, ok: true },
+    });
+  });
+
+  it("clears a manual budget with a null amount (the bot's figure shows again)", async () => {
+    lead = { ...makeLead(), budget: { amount: 90000, currency: "USD", text: "", source: "manual" } };
+    const res = await call("set-budget", { contactWaId: WA, amount: null });
+    expect(res.status).toBe(200);
+    expect(writes.setLeadBudget).toHaveBeenCalledWith(WA, null, "asesor@cliente.com", { amount: 90000, currency: "USD" });
+    expect(auditCalls[0]).toMatchObject({ metadata: { from: { amount: 90000, currency: "USD" }, to: null, ok: true } });
+  });
+
+  it("does not report a bot budget as the previous manual one", async () => {
+    lead = { ...makeLead(), budget: { amount: 150000, currency: "USD", text: "", source: "bot" } };
+    await call("set-budget", { contactWaId: WA, amount: 200000, currency: "ARS" });
+    expect(writes.setLeadBudget).toHaveBeenCalledWith(WA, { amount: 200000, currency: "ARS" }, "asesor@cliente.com", null);
   });
 });

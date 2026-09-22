@@ -40,7 +40,15 @@ const INBOX_NAV_ITEM: NavItemDef = {
   icon: "inbox",
 };
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode;
+  // Parallel slot (@modal): the lead card over the board, empty otherwise.
+  // Optional: Next regenerates LayoutProps once the slot exists.
+  modal?: React.ReactNode;
+}) {
   // The /proxy.ts guard already redirects unauthenticated requests, so this
   // session() call is a safe source of truth for user-facing chrome.
   const session = await auth();
@@ -108,6 +116,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </main>
       </div>
+      {modal}
     </div>
   );
 }

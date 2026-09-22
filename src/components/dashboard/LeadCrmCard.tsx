@@ -10,6 +10,8 @@ import { LeadOwnerControl } from "@/components/dashboard/LeadOwnerControl";
 import { LeadReminderControl } from "@/components/dashboard/LeadReminderControl";
 import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
 import { LeadPriorityControl } from "@/components/dashboard/LeadPriorityControl";
+import { LeadBudgetControl } from "@/components/dashboard/LeadBudgetControl";
+import { crmCurrencies } from "@/lib/crm/budget";
 import { LEAD_CAPTION_CLASS } from "@/components/dashboard/lead-field-class";
 import type { CrmConfig } from "@/config/verticals/_types";
 import type { LeadView } from "@/lib/crm/view-model";
@@ -26,6 +28,19 @@ type Props = {
 
 export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin, canEdit }: Props) {
   const labels = config.labels;
+  const manualBudget =
+    view.budget?.source === "manual" && view.budget.amount !== null
+      ? { amount: view.budget.amount, currency: view.budget.currency }
+      : null;
+  // An open reminder is the first thing an asesor needs to see: it moves up
+  // right under the stage. Otherwise "Próximo paso" keeps its place at the end.
+  const reminderOpen = view.reminder !== null && view.reminder.status !== "done";
+  const reminderSection = (
+    <section className="space-y-2 border-t border-[var(--rule)] pt-3">
+      <span className="text-[12.5px] text-[var(--soft-ink)]">{labels.nextStepLabel}</span>
+      <LeadReminderControl waId={waId} reminder={view.reminder} canEdit={canEdit} labels={labels} />
+    </section>
+  );
   return (
     <Card data-testid="lead-crm-card">
       <CardContent className="px-5 py-4 space-y-4">
@@ -66,6 +81,8 @@ export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin
           ) : null}
         </section>
 
+        {reminderOpen ? reminderSection : null}
+
         <section className="space-y-2 border-t border-[var(--rule)] pt-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[12.5px] text-[var(--soft-ink)]">{labels.priority.label}</span>
@@ -77,6 +94,31 @@ export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin
           </div>
           {canEdit ? (
             <LeadPriorityControl waId={waId} current={view.priority?.key ?? ""} labels={labels} />
+          ) : null}
+        </section>
+
+        <section className="space-y-2 border-t border-[var(--rule)] pt-3" data-testid="lead-budget-section">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12.5px] text-[var(--soft-ink)]">{labels.budget.label}</span>
+            {view.budgetText ? (
+              <span data-testid="lead-budget-value" className="text-[13px] font-medium tabular-nums text-[var(--ink)]">
+                {view.budgetText}
+              </span>
+            ) : (
+              <span className="text-[12.5px] italic text-[var(--soft-ink)]">{labels.budget.none}</span>
+            )}
+          </div>
+          {view.budget && view.budget.source === "bot" ? (
+            <p className="text-[11.5px] leading-snug text-[var(--soft-ink)]">{labels.budget.fromBot}</p>
+          ) : null}
+          {canEdit ? (
+            <LeadBudgetControl
+              key={manualBudget ? `${manualBudget.amount}-${manualBudget.currency}` : "none"}
+              waId={waId}
+              manual={manualBudget}
+              currencies={crmCurrencies(config)}
+              labels={labels}
+            />
           ) : null}
         </section>
 
@@ -99,10 +141,7 @@ export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin
           ) : null}
         </section>
 
-        <section className="space-y-2 border-t border-[var(--rule)] pt-3">
-          <span className="text-[12.5px] text-[var(--soft-ink)]">{labels.nextStepLabel}</span>
-          <LeadReminderControl waId={waId} reminder={view.reminder} canEdit={canEdit} labels={labels} />
-        </section>
+        {reminderOpen ? null : reminderSection}
       </CardContent>
     </Card>
   );

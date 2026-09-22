@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -63,9 +64,9 @@ export default async function LoginPage({ searchParams }: PageProps) {
                 (y la carpeta de spam por las dudas).
               </p>
               <p>
-                <a href="/login" className="text-primary underline-offset-4 hover:underline">
+                <Link href="/login" className="text-primary underline-offset-4 hover:underline">
                   Enviar otro link
-                </a>
+                </Link>
               </p>
             </div>
           ) : (

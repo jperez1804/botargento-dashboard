@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BellRing, Check, Loader2 } from "lucide-react";
+import { BellRing, Check, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,9 @@ export function LeadReminderControl({ waId, reminder, canEdit, labels }: Props) 
   const [busy, setBusy] = useState(false);
   const [when, setWhen] = useState("");
   const [note, setNote] = useState("");
+  // With an open reminder the form hides behind "Cambiar" so the callout is
+  // what the eye lands on.
+  const [editing, setEditing] = useState(false);
 
   async function run(path: "reminder-set" | "reminder-done", body: Record<string, unknown>) {
     setBusy(true);
@@ -37,6 +40,7 @@ export function LeadReminderControl({ waId, reminder, canEdit, labels }: Props) 
       toast.success(labels.saved);
       setWhen("");
       setNote("");
+      setEditing(false);
       router.refresh();
     } else {
       toast.error(errorText(labels.errors, res.error));
@@ -53,41 +57,61 @@ export function LeadReminderControl({ waId, reminder, canEdit, labels }: Props) 
   }
 
   const open = reminder && reminder.status !== "done" ? reminder : null;
+  const showForm = canEdit && (!open || editing);
 
   return (
     <div className="space-y-2.5">
       {open ? (
         <div
           data-testid="lead-reminder"
+          data-reminder-status={open.status}
           className={cn(
-            "flex items-start gap-2 rounded-md border px-2.5 py-2 text-[12.5px]",
+            "flex items-start gap-2 rounded-md border px-3 py-2.5 text-[12.5px]",
             open.status === "overdue"
               ? "border-[color-mix(in_oklch,var(--danger)_35%,var(--rule))] bg-[var(--danger-soft)] text-[var(--danger)]"
-              : "border-[var(--rule)] bg-[var(--canvas-2)] text-[var(--ink)]",
+              : open.status === "upcoming"
+                ? "border-[color-mix(in_oklch,var(--warning)_45%,var(--rule))] bg-[var(--warning-soft)] text-[color-mix(in_oklch,var(--warning)_65%,var(--ink))]"
+                : "border-[var(--rule)] bg-[var(--canvas-2)] text-[var(--ink)]",
           )}
         >
-          <BellRing className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="font-medium tabular-nums">{open.text}</p>
-            {open.note ? <p className="text-[var(--muted-ink)] break-words">{open.note}</p> : null}
+          <BellRing className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="text-[13px] font-semibold">{open.relativeText}</p>
+            <p className="font-[var(--font-geist-mono)] text-[11.5px] tabular-nums opacity-80">{open.text}</p>
+            {open.note ? (
+              <p className="pt-0.5 text-[13px] leading-snug text-[var(--ink)] break-words">{open.note}</p>
+            ) : null}
           </div>
           {canEdit ? (
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              disabled={busy}
-              onClick={() => void run("reminder-done", {})}
-              className="shrink-0"
-            >
-              <Check className="size-3" aria-hidden />
-              {labels.markDone}
-            </Button>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => void run("reminder-done", {})}
+              >
+                <Check className="size-3" aria-hidden />
+                {labels.markDone}
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={busy}
+                aria-expanded={editing}
+                onClick={() => setEditing((v) => !v)}
+                className="text-[var(--muted-ink)]"
+              >
+                <Pencil className="size-3" aria-hidden />
+                {labels.reminderChange}
+              </Button>
+            </div>
           ) : null}
         </div>
       ) : null}
 
-      {canEdit ? (
+      {showForm ? (
         <div className="space-y-1.5">
           <label htmlFor={`reminder-at-${waId}`} className={LEAD_CAPTION_CLASS}>
             {labels.whenLabel}

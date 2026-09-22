@@ -166,7 +166,9 @@ export type CrmEventKind =
   // A person registered a lead that did not come in through WhatsApp.
   | "created"
   // A person set or cleared the manual priority.
-  | "priority";
+  | "priority"
+  // A person typed (or cleared) the budget by hand.
+  | "budget";
 
 export type CrmLabels = {
   nav: string;
@@ -288,6 +290,33 @@ export type CrmLabels = {
     empty: string;
   };
 
+  // Manual budget (lead card) — wins over what the bot captured.
+  budget: {
+    label: string;
+    none: string;
+    amountLabel: string;
+    currencyLabel: string;
+    amountPlaceholder: string;
+    save: string;
+    clear: string;
+    clearHint: string;
+    fromBot: string;
+  };
+
+  // Filters
+  clearFilters: string;
+  intentLabel: string;
+  filterAllIntents: string;
+
+  // Reminder callout: {relative} = "hace 2 días" / "mañana"
+  reminderOverdueRelativeTemplate: string;
+  reminderDueRelativeTemplate: string;
+  reminderChange: string;
+
+  // Lead detail modal
+  openConversation: string;
+  close: string;
+
   // Guía tab: how the stages and the rules work, in the vertical's words.
   guide: {
     view: string;
@@ -350,6 +379,8 @@ export type CrmConfig = {
   // Origins offered when someone registers a lead by hand. Empty = no manual
   // lead creation for this vertical.
   manualLeadSources: ReadonlyArray<CrmLeadSourceDef>;
+  // Currencies offered when a person types a budget. Default: USD, ARS.
+  currencies?: ReadonlyArray<string>;
   labels: CrmLabels;
 };
 
