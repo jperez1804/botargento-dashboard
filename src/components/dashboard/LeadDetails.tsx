@@ -44,8 +44,9 @@ const SELECT_CLASS = cn(LEAD_FIELD_CLASS, "h-8");
 
 /**
  * A native select that commits on a real choice: mouse pick → onChange
- * commits; arrow keys only move a pending value, Enter (or blur) commits it.
- * Without this every ArrowDown would fire a save.
+ * commits; arrow keys only move a pending value and Enter commits it.
+ * Leaving the field (blur, Esc, click outside) never saves — arrowing down
+ * to peek at the options must not change the lead.
  */
 function CommitSelect({
   value,
@@ -74,9 +75,6 @@ function CommitSelect({
         setPending(e.target.value);
         if (!viaKeyboard.current) onCommit(e.target.value);
         viaKeyboard.current = false;
-      }}
-      onBlur={() => {
-        if (pending !== value) onCommit(pending);
       }}
       className={SELECT_CLASS}
     >
@@ -396,17 +394,6 @@ export function LeadDetails({
 
   return (
     <div className="space-y-3">
-      {openReminder ? (
-        <ReminderCallout
-          reminder={openReminder}
-          canEdit={canEdit}
-          busy={busy}
-          labels={labels}
-          onDone={() => void save("reminder-done", {})}
-          onChange={() => open("reminder")}
-        />
-      ) : null}
-
       <dl className="space-y-1">
         <InlineField
           fieldKey="stage"
@@ -532,20 +519,29 @@ export function LeadDetails({
           label={labels.nextStepLabel}
           editLabel={editLabel(labels.nextStepLabel)}
           placeholder={labels.addValue}
-          value={
+          value={null}
+          fixed={
             openReminder ? (
-              <span className="tabular-nums">
-                {openReminder.text}
-                {openReminder.note ? <span className="text-[var(--muted-ink)]"> · {openReminder.note}</span> : null}
-              </span>
-            ) : null
+              <ReminderCallout
+                reminder={openReminder}
+                canEdit={canEdit}
+                busy={busy}
+                labels={labels}
+                onDone={() => void save("reminder-done", {})}
+                onChange={() => open("reminder")}
+              />
+            ) : undefined
           }
           canEdit={canEdit}
           editing={editing === "reminder"}
           busy={busy && editing === "reminder"}
           onOpen={() => open("reminder")}
           onCancel={close}
-          onOutside={() => (when ? saveReminder() : close())}
+          onOutside={() => {
+            const at = new Date(when);
+            if (when && !Number.isNaN(at.getTime())) saveReminder();
+            else close();
+          }}
           editor={reminderEditor}
         />
       </dl>

@@ -368,6 +368,9 @@ export type CrmQualificationField = {
   // links: newline/comma separated URLs rendered as links.
   format?: "text" | "money" | "links";
   currencyKey?: string;
+  // Raw value (lower-cased) → label, for keys the bot stores as tokens
+  // ("rents" → "Alquileres"). Unmapped values show as they are.
+  valueLabels?: Record<string, string>;
 };
 
 export type CrmConfig = {

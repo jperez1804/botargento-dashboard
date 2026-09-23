@@ -18,7 +18,7 @@ export function LeadPriorityChip({ label, tone, className }: Props) {
       data-testid="lead-priority"
       data-priority-tone={tone}
       className={cn(
-        "inline-flex h-[18px] items-center gap-1 rounded-full px-1.5 text-[10.5px] font-medium whitespace-nowrap",
+        "inline-flex h-[20px] items-center gap-1 rounded-full px-1.5 text-[11.5px] font-medium whitespace-nowrap",
         TONE_CLASS[tone],
         className,
       )}

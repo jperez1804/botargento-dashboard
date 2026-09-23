@@ -40,26 +40,26 @@ export function ReminderCallout({ reminder, canEdit, busy, labels, onDone, onCha
         {reminder.note ? (
           <p className="pt-0.5 text-[13px] leading-snug text-[var(--ink)] break-words">{reminder.note}</p>
         ) : null}
+        {canEdit ? (
+          <div className="flex justify-end gap-1 pt-1">
+            <Button type="button" size="xs" variant="ghost" disabled={busy} onClick={onDone}>
+              <Check className="size-3" aria-hidden />
+              {labels.markDone}
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              disabled={busy}
+              onClick={onChange}
+              className="text-[var(--muted-ink)]"
+            >
+              <Pencil className="size-3" aria-hidden />
+              {labels.reminderChange}
+            </Button>
+          </div>
+        ) : null}
       </div>
-      {canEdit ? (
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Button type="button" size="xs" variant="ghost" disabled={busy} onClick={onDone}>
-            <Check className="size-3" aria-hidden />
-            {labels.markDone}
-          </Button>
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            disabled={busy}
-            onClick={onChange}
-            className="text-[var(--muted-ink)]"
-          >
-            <Pencil className="size-3" aria-hidden />
-            {labels.reminderChange}
-          </Button>
-        </div>
-      ) : null}
     </div>
   );
 }

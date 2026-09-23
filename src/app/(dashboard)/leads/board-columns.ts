@@ -24,18 +24,24 @@ export function buildBoardColumns(
   crm: CrmConfig,
   locale: string,
 ): BoardColumn[] {
-  return crm.stages.map((s) => {
+  // Budget totals mean something once the bot has qualified the lead; under
+  // Nuevo/Contactado (and Perdido) they are noise.
+  const qualifiedRank = crm.stages.findIndex((s) => s.key === crm.autoStages.qualified);
+  return crm.stages.map((s, rank) => {
     const inStage = views.filter((v) => v.view.stageKey === s.key);
     const cap = s.key === crm.autoStages.lost ? BOARD_LOST_CARDS : BOARD_CARDS_PER_COLUMN;
+    const showTotal = rank >= qualifiedRank && s.key !== crm.autoStages.lost;
     return {
       key: s.key,
       label: s.label,
       tone: s.tone,
       total: inStage.length,
-      budgetTotal: sumBudgets(
-        inStage.map((v) => v.budget),
-        locale,
-      ),
+      budgetTotal: showTotal
+        ? sumBudgets(
+            inStage.map((v) => v.budget),
+            locale,
+          )
+        : null,
       cards: inStage.slice(0, cap).map((v) => ({
         waId: v.waId,
         displayName: v.displayName,
@@ -45,8 +51,9 @@ export function buildBoardColumns(
         ownerLabel: v.view.ownerLabel,
         statusText: v.view.statusText,
         statusTone: v.view.statusTone,
+        // "Vence mañana" / "Vencido ayer" reads faster than a bare timestamp.
         reminderText:
-          v.view.reminder && v.view.reminder.status !== "done" ? v.view.reminder.text : null,
+          v.view.reminder && v.view.reminder.status !== "done" ? v.view.reminder.relativeText : null,
         reminderNote:
           v.view.reminder && v.view.reminder.status !== "done" && v.view.reminder.note
             ? v.view.reminder.note

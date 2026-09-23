@@ -131,7 +131,7 @@ export function LeadCard({
           {card.intentLabel ? (
             <span
               data-testid="lead-intent"
-              className="inline-flex h-[18px] items-center rounded-full bg-[var(--info-soft)] px-1.5 text-[10.5px] font-medium text-[var(--info)]"
+              className="inline-flex h-[20px] items-center rounded-full bg-[var(--info-soft)] px-1.5 text-[11.5px] font-medium text-[color-mix(in_oklch,var(--info)_75%,var(--ink))]"
             >
               {card.intentLabel}
             </span>
@@ -139,7 +139,7 @@ export function LeadCard({
           {card.sourceLabel ? (
             <span
               data-testid="lead-source"
-              className="inline-flex h-[18px] items-center rounded-full border border-[var(--rule)] px-1.5 text-[10.5px] text-[var(--muted-ink)]"
+              className="inline-flex h-[20px] items-center rounded-full border border-[var(--rule)] px-1.5 text-[11.5px] text-[var(--muted-ink)]"
             >
               {card.sourceLabel}
             </span>
@@ -188,7 +188,7 @@ export function LeadCard({
       ) : null}
 
       <div className="flex items-end justify-between gap-2 pt-0.5">
-        <div className="min-w-0 space-y-0.5 text-[11.5px] text-[var(--soft-ink)]">
+        <div className="min-w-0 space-y-0.5 text-[11.5px] text-[var(--muted-ink)]">
           <p className="flex items-center gap-1 font-[var(--font-geist-mono)] tabular-nums">
             <MessageCircle className="size-3 shrink-0" aria-hidden />
             {card.waId}
@@ -197,7 +197,7 @@ export function LeadCard({
             <Clock3 className="size-3 shrink-0" aria-hidden />
             {card.lastActivity}
             {card.daysInStage ? (
-              <span className="text-[var(--faint-ink)]">· {card.daysInStage}</span>
+              <span>· {card.daysInStage}</span>
             ) : null}
           </p>
         </div>
