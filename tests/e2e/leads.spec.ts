@@ -436,10 +436,13 @@ test("Header search finds leads by name and by phone", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads");
 
-  // "/" focuses the field from anywhere.
-  await page.keyboard.press("/");
+  // "/" focuses the field from anywhere. The listener mounts on hydration,
+  // which on CI can land after the first keypress: retry the pair.
   const search = page.getByTestId("global-search");
-  await expect(search).toBeFocused();
+  await expect(async () => {
+    await page.keyboard.press("/");
+    await expect(search).toBeFocused({ timeout: 2000 });
+  }).toPass({ timeout: 30_000 });
   await search.fill("agustina");
   await search.press("Enter");
   await page.waitForURL(/\/buscar\?q=agustina/);
