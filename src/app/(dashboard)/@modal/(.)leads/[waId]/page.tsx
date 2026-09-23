@@ -22,13 +22,18 @@ import { LeadQualificationCard } from "@/components/dashboard/LeadQualificationC
 import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
 import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
 
-type Props = { params: Promise<{ waId: string }> };
+type Props = {
+  params: Promise<{ waId: string }>;
+  // ?edit=reminder opens the "Próximo paso" editor (Nuevo lead lands here).
+  searchParams: Promise<{ edit?: string | string[] }>;
+};
 
 const CHIP =
   "inline-flex h-[22px] items-center rounded-full border border-[var(--rule)] px-2 text-[11.5px] text-[var(--muted-ink)]";
 
-export default async function LeadModalPage({ params }: Props) {
-  const { waId } = await params;
+export default async function LeadModalPage({ params, searchParams }: Props) {
+  const [{ waId }, { edit }] = await Promise.all([params, searchParams]);
+  const initialField = edit === "reminder" ? ("reminder" as const) : undefined;
   const crm = crmConfig();
   const session = await getSessionRole();
   if (!crm || !session) return null;
@@ -62,7 +67,7 @@ export default async function LeadModalPage({ params }: Props) {
           <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">
             {labels.pageTitle}
           </span>
-          <LeadStageChip label={view.stageLabel} tone={view.tone} auto={view.auto} autoTitle={labels.autoStageHint} />
+          <LeadStageChip label={view.stageLabel} tone={view.tone} auto={view.auto} autoTitle={labels.autoStageDetail} />
           {view.priority ? <LeadPriorityChip label={view.priority.label} tone={view.priority.tone} /> : null}
           {intent ? (
             <span data-testid="lead-intent" className={CHIP}>
@@ -106,7 +111,12 @@ export default async function LeadModalPage({ params }: Props) {
               {waId}
             </a>
           </div>
-          <LeadQualificationCard title={labels.qualificationTitle} items={qualification} locale={tenant.locale} />
+          <LeadQualificationCard
+            title={labels.qualificationTitle}
+            items={qualification}
+            locale={tenant.locale}
+            labels={labels}
+          />
           <LeadActivityFeed
             waId={waId}
             events={events}
@@ -115,6 +125,7 @@ export default async function LeadModalPage({ params }: Props) {
             canEdit={canEdit}
             locale={tenant.locale}
             timezone={tenant.timezone}
+            stageKey={view.stageKey}
           />
         </section>
         <aside className="order-1 lg:order-2">
@@ -126,6 +137,7 @@ export default async function LeadModalPage({ params }: Props) {
             sessionEmail={session.email}
             isAdmin={session.role === "admin"}
             canEdit={canEdit}
+            initialField={initialField}
           />
         </aside>
       </div>

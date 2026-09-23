@@ -69,7 +69,7 @@ export function LeadsTable({ rows, labels, pagination }: Props) {
             label={r.view.stageLabel}
             tone={r.view.tone}
             auto={r.view.auto}
-            autoTitle={labels.autoStageHint}
+            autoTitle={labels.autoStageDetail}
           />
           {r.view.priority ? (
             <LeadPriorityChip label={r.view.priority.label} tone={r.view.priority.tone} />

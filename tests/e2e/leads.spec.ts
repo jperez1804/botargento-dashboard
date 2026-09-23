@@ -34,6 +34,11 @@ async function withSql<T>(fn: (sql: ReturnType<typeof postgres>) => Promise<T>):
 
 const leadRows = (page: Page) => page.locator('a[aria-label^="Leads: "]');
 
+// What <input type="date"> holds for a Date, in the browser's local calendar
+// (the runner and the browser share the machine, so local here = local there).
+const localDateInput = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 // The audit row is written after the handler's transaction commits, so a test
 // that just saw the state change must poll for it rather than read once.
 const lastAudit = (action: string) =>
@@ -165,37 +170,80 @@ test("Lead card: take the lead, log a call and schedule a reminder", async ({ pa
   await expect(card).toContainText("Nuevo");
   await expect(card.getByTestId("lead-status")).toContainText("Se pierde el");
 
-  // "Tomar" is a two-click confirm whose pill auto-reverts after 4s — on a
-  // cold dev server the second click can miss that window, so retry the pair.
+  // "Tomar" saves at once; the toast offers Deshacer, which gives it back.
+  // On a cold dev server the first click can land before hydration, so the
+  // pair (click → owner shown) is retried.
   await expect(async () => {
     const take = card.getByTestId("lead-take");
     if (await take.isVisible()) await take.click();
-    await card.getByRole("button", { name: "¿Tomar este lead?" }).click({ timeout: 3000 });
     await expect(card.getByTestId("lead-owner")).toHaveText("Dev Admin", { timeout: 5000 });
   }).toPass({ timeout: 30_000 });
+  const taken = page.locator("[data-sonner-toast]").filter({ hasText: "Es tuyo" });
+  await taken.getByRole("button", { name: "Deshacer" }).click();
+  await expect(card.getByTestId("lead-owner")).toHaveCount(0);
+  await expect(card.getByTestId("lead-take")).toBeVisible();
+  await card.getByTestId("lead-take").click();
+  await expect(card.getByTestId("lead-owner")).toHaveText("Dev Admin");
 
+  // The kind comes first; the button and the placeholder follow it.
   const activity = page.getByTestId("lead-activity");
+  await expect(activity.getByTestId("lead-activity-submit")).toHaveText("Guardar nota");
+  await activity.getByTestId("activity-kind-call").click();
+  await expect(activity.getByTestId("lead-activity-submit")).toHaveText("Guardar llamada");
+  await expect(activity.getByTestId("lead-activity-body")).toHaveAttribute("placeholder", /Qué hablaron/);
   await activity.getByTestId("lead-activity-body").fill("Le ofrecí dos PH en Villa Crespo");
-  await activity.getByRole("combobox").selectOption("call");
   await activity.getByTestId("lead-activity-submit").click();
   await expect(activity).toContainText("Le ofrecí dos PH en Villa Crespo");
+  await expect(activity).toContainText("Llamada");
   // Logging activity restarts the inactivity clock: no longer "por vencer".
   await expect(card.getByTestId("lead-status")).toHaveCount(0);
 
-  const tomorrow = new Date(Date.now() + 86_400_000);
-  const local = `${tomorrow.toISOString().slice(0, 10)}T10:30`;
+  // Reminder: a preset fills the date (09:00 by default), then the note.
   await card.getByTestId("lead-field-reminder").click();
-  await card.locator('input[type="datetime-local"]').fill(local);
-  await card.getByPlaceholder("Ej.: llamar para coordinar la visita").fill("Confirmar visita");
+  await expect(card.getByTestId("reminder-note")).toHaveCount(0);
+  await card.getByTestId("reminder-preset-tomorrow").click();
+  await expect(card.getByTestId("reminder-preset-tomorrow")).toHaveAttribute("aria-pressed", "true");
+  await expect(card.getByTestId("reminder-date")).toHaveValue(localDateInput(new Date(Date.now() + 86_400_000)));
+  await expect(card.getByTestId("reminder-time")).toHaveValue("09:00");
+  await expect(card.getByTestId("reminder-note")).toBeFocused();
+  await card.getByTestId("reminder-note").fill("Confirmar visita");
   await card.getByRole("button", { name: "Guardar recordatorio" }).click();
   await expect(card.getByTestId("lead-reminder")).toContainText("Confirmar visita");
+  await expect(card.getByTestId("lead-reminder")).toContainText("Vence mañana");
   // The editor closed and the row reads the reminder back.
-  await expect(card.locator('input[type="datetime-local"]')).toHaveCount(0);
+  await expect(card.getByTestId("reminder-date")).toHaveCount(0);
 
   const state = await withSql(
     (sql) => sql`SELECT owner_email, next_action_note FROM dashboard.lead_state WHERE contact_wa_id = ${F.atRisk.wa_id}`,
   );
   expect(state[0]).toMatchObject({ owner_email: ADMIN, next_action_note: "Confirmar visita" });
+});
+
+test("Logging a visit offers to move the lead to Visita", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto(`/conversations/${F.atRisk.wa_id}`);
+  const card = page.getByTestId("lead-crm-card");
+  await expect(card).toContainText("Nuevo");
+  const activity = page.getByTestId("lead-activity");
+  await activity.getByTestId("activity-kind-visit").click();
+  await activity.getByTestId("lead-activity-body").fill("Vimos el 2 ambientes de Gurruchaga");
+  await activity.getByTestId("lead-activity-submit").click();
+  await expect(activity).toContainText("Vimos el 2 ambientes de Gurruchaga");
+  const saved = page.locator("[data-sonner-toast]").filter({ hasText: "Guardado" });
+  await saved.getByRole("button", { name: "Pasar a Visita" }).click();
+  await expect(card.getByTestId("lead-field-stage")).toContainText("Visita");
+  await expect.poll(() => lastAudit("lead_set_stage")).toMatchObject({
+    contact_wa_id: F.atRisk.wa_id,
+    from: "nuevo",
+    to: "visita",
+    ok: true,
+  });
+  // A note on a lead already at Visita offers nothing.
+  await activity.getByTestId("activity-kind-note").click();
+  await activity.getByTestId("lead-activity-body").fill("Sin novedades");
+  await activity.getByTestId("lead-activity-submit").click();
+  await expect(activity).toContainText("Sin novedades");
+  await expect(page.locator("[data-sonner-toast]").getByRole("button", { name: /Pasar a/ })).toHaveCount(0);
 });
 
 test("Qualification card shows what the bot captured", async ({ page }) => {
@@ -205,9 +253,16 @@ test("Qualification card shows what the bot captured", async ({ page }) => {
   );
   await page.goto(`/conversations/${rows[0]?.contact_wa_id}`);
   const qual = page.getByTestId("lead-qualification");
-  await expect(qual).toContainText("Palermo");
-  await expect(qual).toContainText("USD 150.000");
-  await expect(qual).toContainText("USD 120k – 160k");
+  await expect(qual.getByTestId("lead-qualification-summary")).toContainText("Busca 3 ambientes en Palermo");
+  const chips = qual.getByTestId("lead-qualification-chips");
+  await expect(chips).toContainText("Palermo");
+  await expect(chips).toContainText("USD 150.000");
+  // The price range is a detail: folded until "Ver todo".
+  await expect(qual.getByText("USD 120k – 160k")).toBeHidden();
+  await expect(qual.getByTestId("lead-qualification-more")).toContainText("Ver todo (");
+  await qual.getByTestId("lead-qualification-more").click();
+  await expect(qual.getByText("USD 120k – 160k")).toBeVisible();
+  await expect(qual.getByTestId("lead-qualification-more")).toContainText("Ver menos");
   await expect(page.getByTestId("lead-crm-card")).toContainText("Calificado");
 });
 
@@ -221,6 +276,11 @@ test("Asesor manages leads but cannot touch Settings or someone else's lead", as
   await page.goto(`/conversations/${F.reserva.wa_id}`);
   await page.getByTestId("lead-field-stage").click();
   await expect(page.getByTestId("lead-stage-select")).toBeVisible();
+
+  // A colleague's lead: no owner editor, and the row says why.
+  await page.goto(`/conversations/${F.visita.wa_id}`);
+  await expect(page.getByTestId("lead-field-owner")).toHaveCount(0);
+  await expect(page.getByTestId("lead-owner-locked")).toHaveText("Solo un admin puede reasignar este lead.");
 
   // On the board: can claim an unassigned lead, but a colleague's lead shows
   // a plain avatar with no assign menu (mirrors the API's not_owner rule).
@@ -275,12 +335,21 @@ test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ 
   await page.locator("#new-lead-note").fill("Llamó por el PH de Caballito");
   await page.getByRole("button", { name: "Cargar lead" }).click();
 
-  // Lands on the lead's page, which exists without a WhatsApp conversation.
-  await page.waitForURL(/\/conversations\/5491144447777/);
+  // Lands on the lead modal over the board, "Próximo paso" already open and
+  // the lead assigned to whoever registered it.
+  await page.waitForURL(/\/leads\/5491144447777\?edit=reminder$/);
+  const modal = page.getByTestId("lead-detail-modal");
+  await expect(modal).toBeVisible();
+  await expect(modal.getByTestId("lead-crm-card")).toContainText("Nuevo");
+  await expect(modal.getByTestId("lead-owner")).toHaveText("Dev Admin");
+  await expect(modal.getByTestId("reminder-preset-tomorrow")).toBeVisible();
+  await expect(modal.getByTestId("lead-activity")).toContainText("Llamó por el PH de Caballito");
+  await page.keyboard.press("Escape");
+  await expect(modal).toHaveCount(0);
+
+  // Its page exists without a WhatsApp conversation.
+  await page.goto("/conversations/5491144447777");
   await expect(page.getByTestId("no-conversation")).toContainText("Teléfono");
-  await expect(page.getByTestId("lead-crm-card")).toContainText("Nuevo");
-  await expect(page.getByTestId("lead-owner")).toHaveText("Dev Admin");
-  await expect(page.getByTestId("lead-activity")).toContainText("Llamó por el PH de Caballito");
 
   // On the board: Nuevo column, origin chip.
   await page.goto("/leads");
@@ -299,7 +368,7 @@ test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ 
   await expect(alert).toContainText("Ese teléfono ya es un lead.");
   await expect(alert.getByRole("link", { name: "Abrir el existente" })).toHaveAttribute(
     "href",
-    "/conversations/5491144447777",
+    "/leads/5491144447777",
   );
 
   const res = await page.request.post("/api/leads/create", {

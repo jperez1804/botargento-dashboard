@@ -147,11 +147,13 @@ export default async function ConversationDetailPage({ params }: Props) {
                 canEdit={canEdit}
                 locale={tenant.locale}
                 timezone={tenant.timezone}
+                stageKey={lead.lead.stage}
               />
               <LeadQualificationCard
                 title={crm.labels.qualificationTitle}
                 items={qualification}
                 locale={tenant.locale}
+                labels={crm.labels}
               />
             </>
           ) : null}

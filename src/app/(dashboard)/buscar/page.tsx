@@ -92,7 +92,7 @@ export default async function SearchPage({ searchParams }: Props) {
                   label={r.stage.label}
                   tone={r.stage.tone}
                   auto={r.stage.auto}
-                  autoTitle={crm.labels.autoStageHint}
+                  autoTitle={crm.labels.autoStageDetail}
                 />
               ) : null,
           },

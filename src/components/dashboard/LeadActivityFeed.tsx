@@ -7,6 +7,7 @@ import { LeadActivityComposer } from "@/components/dashboard/LeadActivityCompose
 import { LEAD_CAPTION_CLASS } from "@/components/dashboard/lead-field-class";
 import { formatDayTime } from "@/lib/crm/view-model";
 import { describeLeadEvent, eventKindLabel } from "@/lib/crm/event-text";
+import { stageOffers } from "@/lib/crm/activity-stage";
 import type { CrmConfig } from "@/config/verticals/_types";
 import type { LeadEvent } from "@/lib/queries/lead-detail";
 
@@ -18,16 +19,20 @@ type Props = {
   canEdit: boolean;
   locale: string;
   timezone: string;
+  // The lead's current stage: decides whether logging a visit offers the move.
+  stageKey: string;
 };
 
-export function LeadActivityFeed({ waId, events, config, memberLabel, canEdit, locale, timezone }: Props) {
+export function LeadActivityFeed({ waId, events, config, memberLabel, canEdit, locale, timezone, stageKey }: Props) {
   const labels = config.labels;
   const kindLabel = (kind: string) => eventKindLabel(config, kind);
   return (
     <Card data-testid="lead-activity">
       <CardContent className="px-5 py-4 space-y-3">
         <p className={LEAD_CAPTION_CLASS}>{labels.activityTitle}</p>
-        {canEdit ? <LeadActivityComposer waId={waId} labels={labels} /> : null}
+        {canEdit ? (
+          <LeadActivityComposer waId={waId} labels={labels} offers={stageOffers(config, stageKey)} />
+        ) : null}
         {events.length === 0 ? (
           <p className="text-[12.5px] text-[var(--soft-ink)] italic">{labels.emptyActivity}</p>
         ) : (

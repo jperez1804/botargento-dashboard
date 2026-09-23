@@ -194,13 +194,18 @@ export type CrmLabels = {
   nextStepLabel: string;
   unassigned: string;
   takeLead: string;
-  takeLeadConfirm: string;
+  takenToast: string; // "Es tuyo" — the toast after Tomar, with Deshacer
+  ownerLockedHint: string; // asesor on a colleague's lead: only an admin reassigns
   moveTo: string;
   setReminder: string;
   reminderNotePlaceholder: string;
   markDone: string;
   addActivity: string;
-  activityPlaceholder: string;
+  addActivityTemplate: string; // {kind} — "Guardar llamada"
+  activityKindLabel: string;
+  activityPlaceholders: Record<CrmActivityKind, string>;
+  shortcutHintTemplate: string; // {keys} — "Ctrl+↵ para guardar"
+  moveToStageOfferTemplate: string; // {stage} — toast action after a visit is logged
   activityTitle: string;
   remindersTitle: string;
   qualificationTitle: string;
@@ -212,7 +217,8 @@ export type CrmLabels = {
   saved: string;
   whenLabel: string;
   // Templates: {date}, {reason}, {n}, {days} are substituted at render time.
-  autoStageHint: string;
+  autoStageHint: string; // one line under the stage row
+  autoStageDetail: string; // the full explanation, as the chip's tooltip
   lostSinceTemplate: string;
   atRiskTemplate: string;
   daysInactiveTemplate: string;
@@ -312,6 +318,14 @@ export type CrmLabels = {
   reminderOverdueRelativeTemplate: string;
   reminderDueRelativeTemplate: string;
   reminderChange: string;
+  // Reminder editor: preset chips, then note, then date + time (09:00 default).
+  reminderPresets: Record<"tomorrow" | "in3days" | "nextWeek" | "custom", string>;
+  dateLabel: string;
+  timeLabel: string;
+
+  // "Lo que captó el bot": summary paragraph, chips, and the rest folded.
+  showAllTemplate: string; // {n}
+  showLess: string;
 
   // Lead detail modal
   openConversation: string;
@@ -388,6 +402,10 @@ export type CrmQualificationField = {
   // Raw value (lower-cased) → label, for keys the bot stores as tokens
   // ("rents" → "Alquileres"). Unmapped values show as they are.
   valueLabels?: Record<string, string>;
+  // Where the field shows on the lead card: `summary` as a paragraph on top
+  // (the bot's transcript summary), `chip` on the one-line chip strip, and
+  // `detail` (default) inside "Ver todo".
+  display?: "summary" | "chip" | "detail";
 };
 
 export type CrmConfig = {
@@ -406,6 +424,9 @@ export type CrmConfig = {
   manualLeadSources: ReadonlyArray<CrmLeadSourceDef>;
   // Currencies offered when a person types a budget. Default: USD, ARS.
   currencies?: ReadonlyArray<string>;
+  // Activities that imply a stage: logging a `visit` on a lead that is still
+  // before the "visita" stage makes the composer offer the move.
+  activityStages?: Partial<Record<CrmActivityKind, string>>;
   labels: CrmLabels;
 };
 
