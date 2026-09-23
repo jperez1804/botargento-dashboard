@@ -5,6 +5,7 @@ import { intentOptions, leadIntent } from "@/lib/crm/intent";
 import { crmConfig } from "@/lib/crm/enabled";
 import { buildLeadView } from "@/lib/crm/view-model";
 import { buildLeadsSummary, closedStageKeys } from "@/lib/crm/summary";
+import { leadAttention } from "@/lib/crm/attention";
 import { hasRole, requireRole } from "@/lib/role-guard";
 import { listLeads, type ListLeadsResult } from "@/lib/queries/leads";
 import { listTeam, memberLabel } from "@/lib/queries/team";
@@ -32,7 +33,7 @@ const PAGE_SIZE = 25;
 
 type Props = { searchParams: Promise<LeadsSearchParams> };
 
-const EMPTY: ListLeadsResult = { rows: [], stageCounts: {} };
+const EMPTY: ListLeadsResult = { rows: [], stageCounts: {}, todayCount: 0 };
 
 export default async function LeadsPage({ searchParams }: Props) {
   const crm = crmConfig();
@@ -63,6 +64,7 @@ export default async function LeadsPage({ searchParams }: Props) {
               intent: p.intent || undefined,
               q: p.q || undefined,
               includeLost: view === "board",
+              viewer: { email: session.email, isAdmin: session.role === "admin" },
             },
             now,
           ),
@@ -83,6 +85,7 @@ export default async function LeadsPage({ searchParams }: Props) {
     // otherwise WhatsApp.
     sourceLabel: r.manual ? sourceLabel(r.manual.source) : labels.sourceWhatsapp,
     intentLabel: leadIntent(r.lastIntent, intents)?.label ?? null,
+    attention: leadAttention(r.lead, labels, tenant.locale, tenant.timezone, now),
     view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now, r.budget),
   }));
 
@@ -163,6 +166,7 @@ export default async function LeadsPage({ searchParams }: Props) {
             }))}
             owners={owners}
             intents={intentOptions(intents)}
+            todayCount={result.todayCount}
             current={{
               q: p.q,
               stage: p.stage,
@@ -205,6 +209,10 @@ export default async function LeadsPage({ searchParams }: Props) {
           canEdit={canEdit}
           isAdmin={session.role === "admin"}
           sessionEmail={session.email}
+          lostKey={crm.autoStages.lost}
+          openKeys={p.open}
+          filtersActive={Boolean(p.q || p.owner || p.filter || p.priority || p.intent || p.mine)}
+          clearHref="/leads"
         />
       ) : (
         <LeadsTable

@@ -322,6 +322,23 @@ export type CrmLabels = {
   addValue: string;
   confirm: string;
 
+  // Board (round 7)
+  filterToday: string;
+  attentionOverdueTemplate: string; // {relative}
+  attentionTodayTemplate: string; // {time}
+  attentionAtRiskTemplate: string; // {date}
+  attentionUpcomingTemplate: string; // {relative}
+  expandColumnTemplate: string; // {stage}
+  collapseColumn: string;
+  undo: string;
+  markLost: string;
+  markLostTitleTemplate: string; // {name}
+  movedToastTemplate: string; // {name} {stage}
+  assignedToastTemplate: string; // {name} {owner}
+  priorityToastTemplate: string; // {name} {priority}
+  emptyFiltered: string;
+  emptyFirstRun: string;
+
   // Guía tab: how the stages and the rules work, in the vertical's words.
   guide: {
     view: string;

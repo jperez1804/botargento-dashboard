@@ -1,19 +1,21 @@
 "use client";
 
-// One card on the /leads board, Jira-style: the name (or the card body) opens
-// the lead's card as a modal over the board (/leads/[waId], intercepted),
-// the state lines flag what needs attention, and the actions hide behind the ⋯
-// menu (move) and the owner avatar (assign). Dragging between columns still
-// works; the menu is the keyboard and touch path.
+// One card on the /leads board, Jira-style: one attention strip on top (what
+// this lead needs from a person, if anything), the name (or the card body)
+// opens the lead card as a modal over the board (/leads/[waId], intercepted),
+// and the actions hide behind the ⋯ menu (move) and the owner avatar
+// (assign). Dragging between columns still works; the menu is the keyboard
+// and touch path.
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BellRing, Clock3, MessageCircle, Wallet } from "lucide-react";
+import { BellRing, Clock3, Hourglass, MessageCircle, Wallet, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LeadAvatar } from "@/components/dashboard/LeadAvatar";
 import { LeadCardMenu } from "@/components/dashboard/LeadCardMenu";
 import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
 import type { CrmLabels, CrmPriorityKey } from "@/config/verticals/_types";
+import type { Attention } from "@/lib/crm/attention";
 import type { PriorityView } from "@/lib/crm/priority";
 
 export type BoardCard = {
@@ -23,11 +25,9 @@ export type BoardCard = {
   auto: boolean;
   ownerEmail: string | null;
   ownerLabel: string;
-  statusText: string | null;
-  statusTone: "danger" | "warning" | null;
-  reminderText: string | null;
-  reminderNote: string | null;
-  reminderOverdue: boolean;
+  // The one line that needs a person: overdue / today / about to be lost /
+  // upcoming reminder, or the lost reason. null = nothing pending.
+  attention: Attention | null;
   lastActivity: string;
   budgetText: string | null;
   daysInStage: string | null;
@@ -50,6 +50,20 @@ type Props = {
   onMove: (waId: string, stage: string) => void;
   onAssign: (waId: string, ownerEmail: string | null) => void;
   onSetPriority: (waId: string, priority: CrmPriorityKey | "") => void;
+};
+
+const STRIP_CLASS: Record<Attention["tone"], string> = {
+  danger: "bg-[var(--danger-soft)] text-[var(--danger)]",
+  warning: "bg-[var(--warning-soft)] text-[color-mix(in_oklch,var(--warning)_65%,var(--ink))]",
+  neutral: "bg-[var(--canvas-2)] text-[var(--muted-ink)]",
+};
+
+const STRIP_ICON: Record<Attention["kind"], typeof BellRing> = {
+  overdue: BellRing,
+  today: BellRing,
+  at_risk: Hourglass,
+  upcoming: BellRing,
+  lost: XCircle,
 };
 
 export function LeadCard({
@@ -79,6 +93,7 @@ export function LeadCard({
   // and their own; reassigning a colleague's lead is an admin call.
   const canAssign =
     canEdit && (isAdmin || card.ownerEmail === null || card.ownerEmail === sessionEmail);
+  const Strip = card.attention ? STRIP_ICON[card.attention.kind] : null;
 
   return (
     <article
@@ -96,6 +111,20 @@ export function LeadCard({
         busy && "opacity-60",
       )}
     >
+      {card.attention && Strip ? (
+        <p
+          data-testid="lead-attention"
+          data-attention={card.attention.kind}
+          className={cn(
+            "-mx-1.5 -mt-1 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-medium",
+            STRIP_CLASS[card.attention.tone],
+          )}
+        >
+          <Strip className="size-3.5 shrink-0" aria-hidden />
+          <span className="min-w-0 truncate">{card.attention.text}</span>
+        </p>
+      ) : null}
+
       <div className="flex items-start gap-1.5">
         {/* inline-block: the pointer + underline stay on the text, not across
             the whole card. */}
@@ -157,36 +186,6 @@ export function LeadCard({
         </p>
       ) : null}
 
-      {card.statusText ? (
-        <p
-          className={cn(
-            "text-[11.5px] font-medium",
-            card.statusTone === "danger"
-              ? "text-[var(--danger)]"
-              : "text-[color-mix(in_oklch,var(--warning)_70%,var(--ink))]",
-          )}
-        >
-          {card.statusText}
-        </p>
-      ) : null}
-
-      {card.reminderText ? (
-        <p
-          className={cn(
-            "flex items-center gap-1 text-[11.5px] tabular-nums",
-            card.reminderOverdue ? "font-medium text-[var(--danger)]" : "text-[var(--muted-ink)]",
-          )}
-        >
-          <BellRing className="size-3 shrink-0" aria-hidden />
-          <span className="min-w-0 truncate">
-            {card.reminderText}
-            {card.reminderNote ? (
-              <span className="font-normal text-[var(--muted-ink)]"> · {card.reminderNote}</span>
-            ) : null}
-          </span>
-        </p>
-      ) : null}
-
       <div className="flex items-end justify-between gap-2 pt-0.5">
         <div className="min-w-0 space-y-0.5 text-[11.5px] text-[var(--muted-ink)]">
           <p className="flex items-center gap-1 font-[var(--font-geist-mono)] tabular-nums">
@@ -196,9 +195,7 @@ export function LeadCard({
           <p className="flex flex-wrap items-center gap-x-1">
             <Clock3 className="size-3 shrink-0" aria-hidden />
             {card.lastActivity}
-            {card.daysInStage ? (
-              <span>· {card.daysInStage}</span>
-            ) : null}
+            {card.daysInStage ? <span>· {card.daysInStage}</span> : null}
           </p>
         </div>
         {canAssign ? (
