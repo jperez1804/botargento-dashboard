@@ -25,6 +25,10 @@ type Props = {
   // whether that commits or cancels).
   onOutside?: () => void;
   editor: ReactNode;
+  // Rendered instead of the value button while not editing (e.g. the open
+  // reminder's callout, which carries its own actions). The editor still
+  // replaces it while editing.
+  fixed?: ReactNode;
   hint?: ReactNode; // small line under the row
   extra?: ReactNode; // quick action beside the value that does not open the editor
 };
@@ -42,6 +46,7 @@ export function InlineField({
   onCancel,
   onOutside,
   editor,
+  fixed,
   hint,
   extra,
 }: Props) {
@@ -69,7 +74,14 @@ export function InlineField({
 
   return (
     <div className="space-y-1" data-field={fieldKey} aria-busy={busy || undefined}>
-      <div className="grid grid-cols-[104px_minmax(0,1fr)] items-start gap-2">
+      {/* A fixed block (the reminder callout) needs the whole width: the label
+          sits above it instead of beside it. */}
+      <div
+        className={cn(
+          "grid items-start gap-2",
+          fixed && !editing ? "grid-cols-1 gap-1" : "grid-cols-[104px_minmax(0,1fr)]",
+        )}
+      >
         <dt className="pt-1.5 text-[12.5px] leading-snug text-[var(--soft-ink)]">{label}</dt>
         <dd className="min-w-0">
           {editing ? (
@@ -85,6 +97,8 @@ export function InlineField({
             >
               {editor}
             </div>
+          ) : fixed ? (
+            fixed
           ) : canEdit ? (
             <div className="flex items-center gap-1.5">
               <button
@@ -119,7 +133,7 @@ export function InlineField({
           )}
         </dd>
       </div>
-      {hint ? <div className="pl-[112px] text-[11.5px] leading-snug text-[var(--soft-ink)]">{hint}</div> : null}
+      {hint ? <div className="pl-[112px] text-[11.5px] leading-snug text-[var(--muted-ink)]">{hint}</div> : null}
     </div>
   );
 }

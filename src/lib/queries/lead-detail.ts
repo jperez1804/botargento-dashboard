@@ -141,7 +141,8 @@ export async function getLeadQualification(
   const items: QualificationItem[] = [];
   for (const field of config.qualificationFields) {
     const data = sources[field.source];
-    const value = asText(data[field.key]);
+    const raw = asText(data[field.key]);
+    const value = field.valueLabels?.[raw.toLowerCase()] ?? raw;
     if (!value) continue;
     items.push({
       label: field.label,

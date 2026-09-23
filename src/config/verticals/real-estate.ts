@@ -191,7 +191,20 @@ export const realEstate: VerticalConfig = {
     warnDays: 7,
     currencies: ["USD", "ARS"],
     qualificationFields: [
-      { source: "snapshot", key: "selected_flow", label: "Consulta por" },
+      {
+        source: "snapshot",
+        key: "selected_flow",
+        label: "Consulta por",
+        valueLabels: {
+          sales: "Ventas",
+          rents: "Alquileres",
+          tasaciones: "Tasaciones",
+          emprendimientos: "Emprendimientos",
+          admin: "Administración",
+          hipotecas: "Hipotecas",
+          otras: "Otras",
+        },
+      },
       { source: "escalation", key: "target_zone", label: "Zona" },
       { source: "escalation", key: "property_type", label: "Tipo de propiedad" },
       { source: "escalation", key: "bedrooms", label: "Ambientes" },
