@@ -745,7 +745,9 @@ test("Board: nothing matches the filters → one empty state with a clear link",
   await page.goto("/leads?view=board&q=zzzz-nadie");
   await expect(page.locator("[data-board-column]")).toHaveCount(0);
   await expect(page.getByText("Ningún lead coincide con estos filtros.")).toBeVisible();
-  await page.getByRole("link", { name: "Limpiar filtros" }).click();
+  // The empty-state link is a Base UI Button rendered as <a> (role=button),
+  // so it is addressed by testid, not by role.
+  await page.getByTestId("board-clear-filters").click();
   await page.waitForURL(/\/leads$/);
   await expect(page.locator("[data-board-column]")).toHaveCount(5);
 });
