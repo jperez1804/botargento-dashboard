@@ -3,7 +3,9 @@
 // "Nuevo lead": register someone who did not come through WhatsApp (phone
 // call, walk-in, portal, referral). The phone is the lead's identity — the form
 // previews the WhatsApp id it will be saved as, and if that person is already
-// a lead the dialog offers to open it instead of creating a duplicate.
+// a lead the dialog offers to open it instead of creating a duplicate. Both
+// land on the lead modal over the board (/leads/[waId]), the new one with the
+// "Próximo paso" editor already open.
 
 import { useState } from "react";
 import Link from "next/link";
@@ -71,7 +73,7 @@ export function NewLeadDialog({ labels, sources }: Props) {
       toast.success(labels.leadCreated);
       setOpen(false);
       reset();
-      router.push(`/conversations/${encodeURIComponent(data.contactWaId)}`);
+      router.push(`/leads/${encodeURIComponent(data.contactWaId)}?edit=reminder`);
       return;
     }
     if (data.error === "already_exists" && data.contactWaId) {
@@ -191,7 +193,7 @@ export function NewLeadDialog({ labels, sources }: Props) {
             <p role="alert" className="text-[12.5px] text-[var(--danger)]">
               {labels.errors.already_exists}{" "}
               <Link
-                href={`/conversations/${encodeURIComponent(existing)}`}
+                href={`/leads/${encodeURIComponent(existing)}`}
                 className="font-medium underline underline-offset-2"
                 onClick={() => setOpen(false)}
               >

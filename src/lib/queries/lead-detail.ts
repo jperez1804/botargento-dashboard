@@ -90,10 +90,12 @@ export async function listTeamLeadEvents(
 }
 
 export type QualificationItem = {
+  key: string;
   label: string;
   value: string;
   format: "text" | "money" | "links";
   currency: string;
+  display: "summary" | "chip" | "detail";
 };
 
 function asText(v: unknown): string {
@@ -145,10 +147,12 @@ export async function getLeadQualification(
     const value = field.valueLabels?.[raw.toLowerCase()] ?? raw;
     if (!value) continue;
     items.push({
+      key: field.key,
       label: field.label,
       value,
       format: field.format ?? "text",
       currency: field.currencyKey ? asText(data[field.currencyKey]) : "",
+      display: field.display ?? "detail",
     });
   }
   return items;

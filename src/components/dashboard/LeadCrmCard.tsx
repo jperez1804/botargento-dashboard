@@ -1,11 +1,11 @@
-// The CRM card on /conversations/[waId] and in the board modal: stage, owner,
-// budget, priority and next step as a Jira-style "Details" list with inline
-// editing (LeadDetails). Server Component: it only derives the props from the
-// LeadView and the vertical config; viewers get the same list without
-// editors.
+// The CRM card on /conversations/[waId] and in the board modal: owner, next
+// step, stage, priority and budget as a Jira-style "Details" list with
+// inline editing (LeadDetails). Server Component: it only derives the props
+// from the LeadView and the vertical config; viewers get the same list
+// without editors.
 
 import { Card, CardContent } from "@/components/ui/card";
-import { LeadDetails } from "@/components/dashboard/LeadDetails";
+import { LeadDetails, type LeadDetailField } from "@/components/dashboard/LeadDetails";
 import { LEAD_CAPTION_CLASS } from "@/components/dashboard/lead-field-class";
 import { crmCurrencies } from "@/lib/crm/budget";
 import type { CrmConfig } from "@/config/verticals/_types";
@@ -19,9 +19,10 @@ type Props = {
   sessionEmail: string;
   isAdmin: boolean;
   canEdit: boolean;
+  initialField?: LeadDetailField;
 };
 
-export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin, canEdit }: Props) {
+export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin, canEdit, initialField }: Props) {
   return (
     <Card data-testid="lead-crm-card">
       <CardContent className="space-y-3 px-4 py-4">
@@ -37,6 +38,7 @@ export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin
           sessionEmail={sessionEmail}
           isAdmin={isAdmin}
           canEdit={canEdit}
+          initialField={initialField}
         />
       </CardContent>
     </Card>
