@@ -226,7 +226,13 @@ export function LeadsBoard({
         title={filtersActive ? labels.emptyFiltered : labels.emptyFirstRun}
         action={
           filtersActive ? (
-            <Button size="sm" variant="outline" nativeButton={false} render={<Link href={clearHref} />}>
+            <Button
+              size="sm"
+              variant="outline"
+              nativeButton={false}
+              data-testid="board-clear-filters"
+              render={<Link href={clearHref} />}
+            >
               {labels.clearFilters}
             </Button>
           ) : undefined
