@@ -58,7 +58,7 @@ test("Banner surfaces at-risk leads and overdue reminders for the admin", async 
   await page.waitForURL(/filter=at_risk/);
   await expect(leadRows(page)).toHaveCount(1);
   await expect(leadRows(page).first()).toContainText(F.atRisk.name);
-  await expect(leadRows(page).first()).toContainText("Pasa a perdido el");
+  await expect(leadRows(page).first()).toContainText("Se pierde el");
 });
 
 test("Seguimiento lists open reminders, overdue first", async ({ page }) => {
@@ -92,7 +92,7 @@ test("Leads list derives stages, hides lost leads and filters by owner", async (
 test("Leads opens on the board and the tabs switch views", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads");
-  await expect(page.locator("[data-board-column]")).toHaveCount(7);
+  await expect(page.locator("[data-board-column]")).toHaveCount(5);
 
   const tabs = page.getByTestId("leads-view-tabs");
   await expect(tabs.getByRole("link", { name: "Tablero" })).toHaveAttribute("aria-current", "page");
@@ -107,13 +107,13 @@ test("Leads opens on the board and the tabs switch views", async ({ page }) => {
   await page.goto("/leads?view=list&mine=1");
   await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Tablero" }).click();
   await page.waitForURL(/mine=1/);
-  await expect(page.locator("[data-board-column]")).toHaveCount(7);
+  await expect(page.locator("[data-board-column]")).toHaveCount(5);
 });
 
 test("Board moves a lead from the ⋯ menu and audits the change", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
-  await expect(page.locator("[data-board-column]")).toHaveCount(7);
+  await expect(page.locator("[data-board-column]")).toHaveCount(5);
 
   const card = page.locator(`[data-lead-card="${F.contacted.wa_id}"]`);
   await expect(page.locator('[data-board-column="contactado"]')).toContainText(F.contacted.name);
@@ -163,7 +163,7 @@ test("Lead card: take the lead, log a call and schedule a reminder", async ({ pa
   await page.goto(`/conversations/${F.atRisk.wa_id}`);
   const card = page.getByTestId("lead-crm-card");
   await expect(card).toContainText("Nuevo");
-  await expect(card.getByTestId("lead-status")).toContainText("Pasa a perdido el");
+  await expect(card.getByTestId("lead-status")).toContainText("Se pierde el");
 
   // "Tomar" is a two-click confirm whose pill auto-reverts after 4s — on a
   // cold dev server the second click can miss that window, so retry the pair.
@@ -492,7 +492,7 @@ test("Board card opens the lead modal; edits refresh the board; Esc and navigati
   await expect(modal.getByTestId("lead-crm-card")).toContainText("Reserva");
   await expect(modal.getByTestId("lead-activity")).toBeVisible();
   // The board is still mounted behind the modal.
-  await expect(page.locator("[data-board-column]")).toHaveCount(7);
+  await expect(page.locator("[data-board-column]")).toHaveCount(5);
 
   // An edit inside the modal reaches the card behind it (router.refresh()).
   await modal.getByTestId("lead-field-priority").click();
@@ -647,4 +647,105 @@ test("Inline editing: keyboard, one row at a time, click outside, and losing a l
   await expect(card).toContainText("Perdido");
   await expect(card.getByTestId("lead-status")).toContainText("No responde");
   await expect.poll(() => lastAudit("lead_set_stage")).toMatchObject({ to: "perdido", ok: true });
+});
+
+test("Board: attention strip first, Hoy filter, rails, column subtitles", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board");
+
+  // The overdue reminder is the first card of its column even without priority.
+  const nuevo = page.locator('[data-board-column="nuevo"]');
+  await expect(nuevo.locator("[data-lead-card]").first()).toHaveAttribute("data-lead-card", F.overdue.wa_id);
+  const strip = page.locator(`[data-lead-card="${F.overdue.wa_id}"]`).getByTestId("lead-attention");
+  await expect(strip).toHaveAttribute("data-attention", "overdue");
+  await expect(strip).toContainText("Vencido");
+  await expect(strip).toContainText("Llamar para coordinar la visita");
+  await expect(page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`).getByTestId("lead-attention")).toHaveAttribute("data-attention", "at_risk");
+  await expect(page.locator(`[data-lead-card="${F.contacted.wa_id}"]`).getByTestId("lead-attention")).toHaveCount(0);
+
+  // Who moves the stage: subtitle, lock on manual-only columns, bot glyph on auto chips.
+  await expect(nuevo.locator("[data-column-mover]")).toHaveText("La mueve el bot");
+  await expect(page.locator('[data-board-column="visita"] [data-column-lock]')).toHaveCount(1);
+  await expect(page.locator('[data-board-column="nuevo"] [data-column-lock]')).toHaveCount(0);
+
+  // Terminal columns are rails; opening one is URL state.
+  await expect(page.locator("[data-board-rail]")).toHaveCount(2);
+  await page.locator('[data-board-rail="perdido"]').click();
+  await page.waitForURL(/open=perdido/);
+  await expect(page.locator('[data-board-column="perdido"]')).toContainText(F.lost.name);
+  await expect(page.locator("[data-board-rail]")).toHaveCount(1);
+
+  // Hoy: overdue + at-risk (admin sees everyone's) + unassigned in Nuevo/Calificado.
+  const today = page.getByTestId("filter-today");
+  const n = Number((await today.textContent())?.replace(/\D/g, ""));
+  expect(n).toBeGreaterThanOrEqual(2);
+  await today.click();
+  await page.waitForURL(/filter=today/);
+  await expect(page.locator(`[data-lead-card="${F.overdue.wa_id}"]`)).toBeVisible();
+  await expect(page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`)).toBeVisible();
+  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`)).toHaveCount(0);
+  await expect(page.locator("[data-lead-card]")).toHaveCount(n);
+});
+
+test("Board: losing a lead asks for the motive; stage moves can be undone", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board");
+  const card = page.locator(`[data-lead-card="${F.contacted.wa_id}"]`);
+
+  // ⋯ → Perdido lands the card in the (now open) column and asks why.
+  await card.getByTestId("lead-menu").click();
+  await page.getByRole("menuitem", { name: "Perdido", exact: true }).click();
+  const panel = page.getByTestId("lost-reason-panel");
+  await expect(panel).toBeVisible();
+  await expect(page.locator('[data-board-column="perdido"]')).toContainText(F.contacted.name);
+  await panel.getByRole("button", { name: "Cancelar" }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.locator('[data-board-column="contactado"]')).toContainText(F.contacted.name);
+  await expect
+    .poll(() =>
+      withSql(async (sql) => {
+        const rows = await sql`SELECT stage FROM dashboard.lead_state WHERE contact_wa_id = ${F.contacted.wa_id}`;
+        return rows[0]?.stage ?? null;
+      }),
+    )
+    .toBeNull();
+
+  await card.getByTestId("lead-menu").click();
+  await page.getByRole("menuitem", { name: "Perdido", exact: true }).click();
+  await page.locator("#lost-reason-board").selectOption("No responde");
+  await page.getByTestId("lost-reason-confirm").click();
+  await expect(page.getByTestId("lost-reason-panel")).toHaveCount(0);
+  await expect.poll(() => lastAudit("lead_set_stage")).toMatchObject({
+    contact_wa_id: F.contacted.wa_id,
+    to: "perdido",
+    ok: true,
+  });
+  await expect(page.locator(`[data-lead-card="${F.contacted.wa_id}"]`).getByTestId("lead-attention")).toContainText("No responde");
+
+  // Move Reserva → Visita, then Deshacer from the toast.
+  const reserva = page.locator(`[data-lead-card="${F.reserva.wa_id}"]`);
+  await reserva.getByTestId("lead-menu").click();
+  await page.getByRole("menuitem", { name: "Visita", exact: true }).click();
+  await expect(page.locator('[data-board-column="visita"]')).toContainText(F.reserva.name);
+  // Scope to the toast of this move (the Perdido toast above may still be visible).
+  await page.locator("[data-sonner-toast]", { hasText: F.reserva.name }).getByRole("button", { name: "Deshacer" }).click();
+  await expect(page.locator('[data-board-column="reserva"]')).toContainText(F.reserva.name);
+  await expect
+    .poll(() =>
+      withSql(async (sql) => {
+        const rows = await sql`SELECT stage FROM dashboard.lead_state WHERE contact_wa_id = ${F.reserva.wa_id}`;
+        return rows[0]?.stage ?? null;
+      }),
+    )
+    .toBe("reserva");
+});
+
+test("Board: nothing matches the filters → one empty state with a clear link", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board&q=zzzz-nadie");
+  await expect(page.locator("[data-board-column]")).toHaveCount(0);
+  await expect(page.getByText("Ningún lead coincide con estos filtros.")).toBeVisible();
+  await page.getByRole("link", { name: "Limpiar filtros" }).click();
+  await page.waitForURL(/\/leads$/);
+  await expect(page.locator("[data-board-column]")).toHaveCount(5);
 });

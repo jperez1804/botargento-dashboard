@@ -20,6 +20,7 @@ export type LeadsSearchParams = {
   by?: string;
   priority?: string;
   intent?: string;
+  open?: string;
 };
 
 export type ParsedLeadsParams = {
@@ -32,6 +33,7 @@ export type ParsedLeadsParams = {
   q: string;
   priority: CrmPriorityKey | "";
   intent: string; // Vertical intent key, "" = all.
+  open: string[]; // Terminal board columns expanded (stage keys).
   pageNum: number;
   activityKind: string;
   activityBy: string;
@@ -62,6 +64,10 @@ export function parseLeadsSearchParams(
     q: sp.q?.trim() ?? "",
     priority: parsePriority(sp.priority) ?? "",
     intent: sp.intent && intentKeys.includes(sp.intent) ? sp.intent : "",
+    open: (sp.open ?? "")
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => crm.stages.some((s) => s.key === k && s.terminal)),
     pageNum: Math.max(1, Number(sp.page) || 1),
     activityKind: sp.kind && sp.kind in crm.labels.eventKinds ? sp.kind : "",
     activityBy: (sp.by ?? "").trim().toLowerCase(),
@@ -87,6 +93,7 @@ export function buildLeadsHref(
   if (p.priority) params.set("priority", p.priority);
   if (p.intent) params.set("intent", p.intent);
   if (p.q) params.set("q", p.q);
+  if (view === "board" && p.open.length) params.set("open", p.open.join(","));
   if (overrides.page && overrides.page > 1) params.set("page", String(overrides.page));
   const qs = params.toString();
   return `/leads${qs ? `?${qs}` : ""}`;

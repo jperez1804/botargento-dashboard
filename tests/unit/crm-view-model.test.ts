@@ -67,7 +67,7 @@ describe("buildLeadView", () => {
       stageLabel: "Nuevo",
       tone: "neutral",
       auto: true,
-      statusText: "Pasa a perdido el 24/09",
+      statusText: "Se pierde el 24/09",
       statusTone: "warning",
       ownerLabel: "Sin asignar",
     });

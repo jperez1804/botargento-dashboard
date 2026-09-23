@@ -18,6 +18,7 @@ type Props = {
   stages: ReadonlyArray<{ key: string; label: string; count: number }>;
   owners: ReadonlyArray<{ email: string; label: string }>;
   intents: ReadonlyArray<{ key: string; label: string }>;
+  todayCount: number;
   current: {
     q: string;
     stage: string;
@@ -39,7 +40,16 @@ const CHIP_ON =
 const CHIP_OFF =
   "border-[var(--rule)] bg-[var(--canvas-2)] text-[var(--muted-ink)] hover:text-[var(--ink)] hover:border-[var(--rule-strong)]";
 
-export function LeadsFilters({ labels, stages, owners, intents, current, showOwnerFilter, showMine }: Props) {
+export function LeadsFilters({
+  labels,
+  stages,
+  owners,
+  intents,
+  todayCount,
+  current,
+  showOwnerFilter,
+  showMine,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -178,6 +188,25 @@ export function LeadsFilters({ labels, stages, owners, intents, current, showOwn
       ) : null}
 
       <div role="group" aria-label={labels.pageTitle} className="flex flex-wrap gap-2">
+        {showMine ? (
+          <button
+            type="button"
+            data-testid="filter-today"
+            aria-pressed={current.filter === "today"}
+            onClick={() => navigate({ filter: current.filter === "today" ? null : "today" })}
+            className={cn(
+              CHIP,
+              current.filter === "today"
+                ? CHIP_ON
+                : todayCount > 0
+                  ? "border-[color-mix(in_oklch,var(--client-primary)_45%,var(--rule))] bg-[var(--surface)] text-[var(--ink)]"
+                  : CHIP_OFF,
+            )}
+          >
+            {labels.filterToday}
+            <span className="tabular-nums text-[11px] text-[var(--soft-ink)]">{todayCount}</span>
+          </button>
+        ) : null}
         {showMine ? (
           <button
             type="button"

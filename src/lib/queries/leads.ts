@@ -23,6 +23,8 @@ import { hasLeadLogSentBy, hasOutreachSuppression, hasSessionMemory } from "@/li
 import { priceRangeText } from "@/lib/crm/price-range";
 import { priorityRank } from "@/lib/crm/priority";
 import { leadIntentForTenant } from "@/lib/crm/intent";
+import { attentionKind, attentionRank } from "@/lib/crm/attention";
+import { tenantConfig } from "@/config/tenant";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
 
 // What the lead can spend. A person's figure (lead_state) wins; otherwise the
@@ -245,13 +247,49 @@ async function selectLeadRows(
   });
 }
 
-export type LeadListFilter = "at_risk" | "overdue" | "unassigned";
+export type LeadListFilter = "today" | "at_risk" | "overdue" | "unassigned";
 
 export const LEAD_LIST_FILTERS: ReadonlyArray<LeadListFilter> = [
+  "today",
   "at_risk",
   "overdue",
   "unassigned",
 ];
+
+export type LeadViewer = { email: string; isAdmin: boolean };
+
+/**
+ * "Hoy": what this person should act on today — their leads with a reminder
+ * overdue or due today, their leads about to be lost, and unassigned leads
+ * still in the bot's early stages (someone has to pick them up). An admin's
+ * "their" is everyone's. Pure.
+ */
+export function isTodayLead(
+  row: LeadRow,
+  viewer: LeadViewer,
+  config: CrmConfig,
+  now: Date,
+  timezone: string,
+): boolean {
+  const lead = row.lead;
+  if (lead.lost) return false;
+  const mine = viewer.isAdmin || lead.owner === viewer.email;
+  const kind = attentionKind(lead, now, timezone);
+  if (mine && (kind === "overdue" || kind === "today" || lead.atRisk !== null)) return true;
+  return (
+    lead.owner === null &&
+    (lead.stage === config.autoStages.new || lead.stage === config.autoStages.qualified)
+  );
+}
+
+/** Board/list order: what needs attention first, then priority, then recency. */
+export function compareLeads(a: LeadRow, b: LeadRow, now: Date, timezone: string): number {
+  return (
+    attentionRank(a.lead, now, timezone) - attentionRank(b.lead, now, timezone) ||
+    priorityRank(a.lead.priority) - priorityRank(b.lead.priority) ||
+    (b.lead.lastActivityAt?.getTime() ?? 0) - (a.lead.lastActivityAt?.getTime() ?? 0)
+  );
+}
 
 export type ListLeadsParams = {
   stage?: string;
@@ -264,6 +302,8 @@ export type ListLeadsParams = {
   priority?: CrmPriorityKey | "none";
   // Vertical intent key ("Ventas"); matched against the lead's last intent bucket.
   intent?: string;
+  // Who is looking (for the "today" filter and its count).
+  viewer?: LeadViewer;
 };
 
 export type ListLeadsResult = {
@@ -271,6 +311,8 @@ export type ListLeadsResult = {
   // Per-stage counts over the unfiltered-by-stage set, for the stage chips
   // and the board column headers.
   stageCounts: Record<string, number>;
+  // Size of the viewer's "Hoy" set over every lead (for the chip), 0 without a viewer.
+  todayCount: number;
 };
 
 function matchesQuery(row: LeadRow, q: string): boolean {
@@ -286,8 +328,12 @@ export async function listLeads(
 ): Promise<ListLeadsResult> {
   const all = await selectLeadRows(config, now);
   const lostKey = config.autoStages.lost;
+  const timezone = tenantConfig().timezone;
+  const viewer = params.viewer;
+  const todayCount = viewer ? all.filter((r) => isTodayLead(r, viewer, config, now, timezone)).length : 0;
 
   const base = all.filter((row) => {
+    if (params.filter === "today" && (!viewer || !isTodayLead(row, viewer, config, now, timezone))) return false;
     if (params.owner === "none" && row.lead.owner !== null) return false;
     if (params.owner && params.owner !== "none" && row.lead.owner !== params.owner) return false;
     if (params.filter === "at_risk" && !row.lead.atRisk) return false;
@@ -309,15 +355,11 @@ export async function listLeads(
       if (params.stage) return row.lead.stage === params.stage;
       return params.includeLost === true || row.lead.stage !== lostKey;
     })
-    // Prioritized leads first (an "Alta" must never sink under untouched
-    // leads), then most recent activity — one sort for the board and the list.
-    .sort(
-      (a, b) =>
-        priorityRank(a.lead.priority) - priorityRank(b.lead.priority) ||
-        (b.lead.lastActivityAt?.getTime() ?? 0) - (a.lead.lastActivityAt?.getTime() ?? 0),
-    );
+    // One sort for the board and the list: attention first, then priority,
+    // then recency (see compareLeads).
+    .sort((a, b) => compareLeads(a, b, now, timezone));
 
-  return { rows, stageCounts };
+  return { rows, stageCounts, todayCount };
 }
 
 export async function getLead(

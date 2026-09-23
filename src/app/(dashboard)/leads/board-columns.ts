@@ -3,6 +3,8 @@
 
 import type { CrmConfig } from "@/config/verticals/_types";
 import { sumBudgets, type LeadView } from "@/lib/crm/view-model";
+import { buildStageGuide } from "@/lib/crm/guide";
+import type { Attention } from "@/lib/crm/attention";
 import type { LeadBudget } from "@/lib/queries/leads";
 import type { BoardColumn } from "@/components/dashboard/LeadsBoard";
 
@@ -16,6 +18,7 @@ export type LeadViewRow = {
   budget: LeadBudget | null;
   sourceLabel: string | null;
   intentLabel: string | null;
+  attention: Attention | null;
   view: LeadView;
 };
 
@@ -27,6 +30,7 @@ export function buildBoardColumns(
   // Budget totals mean something once the bot has qualified the lead; under
   // Nuevo/Contactado (and Perdido) they are noise.
   const qualifiedRank = crm.stages.findIndex((s) => s.key === crm.autoStages.qualified);
+  const guide = buildStageGuide(crm);
   return crm.stages.map((s, rank) => {
     const inStage = views.filter((v) => v.view.stageKey === s.key);
     const cap = s.key === crm.autoStages.lost ? BOARD_LOST_CARDS : BOARD_CARDS_PER_COLUMN;
@@ -36,6 +40,9 @@ export function buildBoardColumns(
       label: s.label,
       tone: s.tone,
       total: inStage.length,
+      moverLabel: guide.find((g) => g.key === s.key)?.moverLabel ?? "",
+      manualOnly: s.manualOnly === true,
+      terminal: s.terminal === true,
       budgetTotal: showTotal
         ? sumBudgets(
             inStage.map((v) => v.budget),
@@ -49,16 +56,7 @@ export function buildBoardColumns(
         auto: v.view.auto,
         ownerEmail: v.view.ownerEmail,
         ownerLabel: v.view.ownerLabel,
-        statusText: v.view.statusText,
-        statusTone: v.view.statusTone,
-        // "Vence mañana" / "Vencido ayer" reads faster than a bare timestamp.
-        reminderText:
-          v.view.reminder && v.view.reminder.status !== "done" ? v.view.reminder.relativeText : null,
-        reminderNote:
-          v.view.reminder && v.view.reminder.status !== "done" && v.view.reminder.note
-            ? v.view.reminder.note
-            : null,
-        reminderOverdue: v.view.reminder?.status === "overdue",
+        attention: v.attention,
         lastActivity: v.view.lastActivityRelative,
         budgetText: v.view.budgetText,
         daysInStage: v.view.daysInStageText,
