@@ -91,7 +91,10 @@ export default async function LeadsPage({ searchParams }: Props) {
 
   const buildHref = (overrides: { page?: number; view?: LeadsView } = {}) =>
     buildLeadsHref(p, overrides);
-  const columns = view === "board" ? buildBoardColumns(views, crm, tenant.locale) : [];
+  const columns =
+    view === "board"
+      ? buildBoardColumns(views, crm, tenant.locale, (stage) => buildLeadsHref({ ...p, stage }, { view: "list" }))
+      : [];
   const summary = view === "summary" ? buildLeadsSummary(result.rows, crm, team, now) : null;
   const closedKey = closedStageKeys(crm)[0];
 
@@ -133,7 +136,7 @@ export default async function LeadsPage({ searchParams }: Props) {
           }
           actions={
             canEdit && crm.manualLeadSources.length > 0 ? (
-              <NewLeadDialog labels={labels} sources={crm.manualLeadSources} />
+              <NewLeadDialog labels={labels} sources={crm.manualLeadSources} intents={intentOptions(intents)} />
             ) : null
           }
           divider={false}

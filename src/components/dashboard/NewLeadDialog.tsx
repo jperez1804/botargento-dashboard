@@ -28,14 +28,20 @@ import { fillTemplate } from "@/lib/crm/view-model";
 import { cn } from "@/lib/utils";
 import type { CrmLabels, CrmLeadSourceDef } from "@/config/verticals/_types";
 
-type Props = { labels: CrmLabels; sources: ReadonlyArray<CrmLeadSourceDef> };
+type Props = {
+  labels: CrmLabels;
+  sources: ReadonlyArray<CrmLeadSourceDef>;
+  // The vertical's intents ("Ventas", "Alquileres"…), optional on the form.
+  intents: ReadonlyArray<{ key: string; label: string }>;
+};
 
-export function NewLeadDialog({ labels, sources }: Props) {
+export function NewLeadDialog({ labels, sources, intents }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [source, setSource] = useState(sources[0]?.key ?? "");
+  const [intent, setIntent] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [existing, setExisting] = useState<string | null>(null);
@@ -47,6 +53,7 @@ export function NewLeadDialog({ labels, sources }: Props) {
     setName("");
     setPhone("");
     setSource(sources[0]?.key ?? "");
+    setIntent("");
     setNote("");
     setExisting(null);
   }
@@ -61,7 +68,7 @@ export function NewLeadDialog({ labels, sources }: Props) {
       const res = await fetch("/api/leads/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, source, note }),
+        body: JSON.stringify({ name, phone, source, intent, note }),
       });
       data = await res.json().catch(() => ({}));
     } catch {
@@ -73,6 +80,8 @@ export function NewLeadDialog({ labels, sources }: Props) {
       toast.success(labels.leadCreated);
       setOpen(false);
       reset();
+      // The modal refreshes the board underneath once it has opened
+      // (RefreshOnce): the board was rendered before this lead existed.
       router.push(`/leads/${encodeURIComponent(data.contactWaId)}?edit=reminder`);
       return;
     }
@@ -173,6 +182,28 @@ export function NewLeadDialog({ labels, sources }: Props) {
               ))}
             </select>
           </div>
+
+          {intents.length > 0 ? (
+            <div className="space-y-1.5">
+              <label htmlFor="new-lead-intent" className={LEAD_CAPTION_CLASS}>
+                {labels.intentLabel}
+              </label>
+              <select
+                id="new-lead-intent"
+                value={intent}
+                disabled={busy}
+                onChange={(e) => setIntent(e.target.value)}
+                className={cn(LEAD_FIELD_CLASS, "cursor-pointer")}
+              >
+                <option value="">{labels.intentNone}</option>
+                {intents.map((i) => (
+                  <option key={i.key} value={i.key}>
+                    {i.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           <div className="space-y-1.5">
             <label htmlFor="new-lead-note" className={LEAD_CAPTION_CLASS}>

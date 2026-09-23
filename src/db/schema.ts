@@ -99,6 +99,8 @@ export const manualLeads = dashboardSchema.table("manual_leads", {
   contactWaId: text("contact_wa_id").primaryKey(),
   displayName: text("display_name").notNull(),
   source: text("source").notNull(),
+  // Intent key from the vertical's list, chosen at registration ('' = none).
+  intent: text("intent").notNull().default(""),
   createdBy: text("created_by").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -21,6 +21,7 @@ import { LeadActivityFeed } from "@/components/dashboard/LeadActivityFeed";
 import { LeadQualificationCard } from "@/components/dashboard/LeadQualificationCard";
 import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
 import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
+import { RefreshOnce } from "@/components/dashboard/RefreshOnce";
 
 type Props = {
   params: Promise<{ waId: string }>;
@@ -62,6 +63,8 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
 
   return (
     <div className="flex max-h-[calc(100dvh-3rem)] flex-col">
+      {/* Opened right after "Nuevo lead": the board behind predates the lead. */}
+      {initialField ? <RefreshOnce /> : null}
       <header className="flex items-center gap-3 border-b border-[var(--rule)] px-5 py-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--soft-ink)]">

@@ -26,6 +26,8 @@ export function buildBoardColumns(
   views: ReadonlyArray<LeadViewRow>,
   crm: CrmConfig,
   locale: string,
+  // Lista URL for one stage, keeping the current filters.
+  listHrefFor: (stageKey: string) => string,
 ): BoardColumn[] {
   // Budget totals mean something once the bot has qualified the lead; under
   // Nuevo/Contactado (and Perdido) they are noise.
@@ -43,6 +45,7 @@ export function buildBoardColumns(
       moverLabel: guide.find((g) => g.key === s.key)?.moverLabel ?? "",
       manualOnly: s.manualOnly === true,
       terminal: s.terminal === true,
+      moreHref: listHrefFor(s.key),
       budgetTotal: showTotal
         ? sumBudgets(
             inStage.map((v) => v.budget),

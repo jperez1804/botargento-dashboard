@@ -235,6 +235,7 @@ export async function createManualLead(input: {
   waId: string;
   name: string;
   source: string;
+  intent: string; // vertical intent key, '' = none
   note: string;
   by: string;
 }): Promise<CreateManualLeadResult> {
@@ -245,14 +246,17 @@ export async function createManualLead(input: {
     if (known.length > 0) return { ok: false as const, error: "already_exists" as const };
 
     const inserted = await tx`
-      INSERT INTO dashboard.manual_leads (contact_wa_id, display_name, source, created_by)
-      VALUES (${input.waId}, ${input.name}, ${input.source}, ${input.by})
+      INSERT INTO dashboard.manual_leads (contact_wa_id, display_name, source, intent, created_by)
+      VALUES (${input.waId}, ${input.name}, ${input.source}, ${input.intent}, ${input.by})
       ON CONFLICT (contact_wa_id) DO NOTHING
       RETURNING contact_wa_id
     `;
     if (inserted.length === 0) return { ok: false as const, error: "already_exists" as const };
 
-    await appendEvent(tx, input.waId, "created", "", input.by, { source: input.source });
+    await appendEvent(tx, input.waId, "created", "", input.by, {
+      source: input.source,
+      ...(input.intent ? { intent: input.intent } : {}),
+    });
     if (input.note) await appendEvent(tx, input.waId, "note", input.note, input.by);
     await tx`
       INSERT INTO dashboard.lead_state

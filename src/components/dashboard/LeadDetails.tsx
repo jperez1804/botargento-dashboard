@@ -207,6 +207,7 @@ export function LeadDetails({
       return;
     }
     toast.success(labels.takenToast, {
+      duration: 8000,
       action: {
         label: labels.undo,
         onClick: () => {

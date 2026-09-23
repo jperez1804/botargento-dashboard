@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRoleApi } from "@/lib/role-guard";
+import { verticalConfig } from "@/config/verticals";
 import { crmConfig } from "@/lib/crm/enabled";
 import { normalizeLeadPhone } from "@/lib/crm/phone";
 import { createManualLead } from "@/lib/queries/lead-writes";
@@ -17,6 +18,8 @@ const Body = z.object({
   phone: z.string().trim().min(1).max(40),
   name: z.string().trim().min(1).max(80),
   source: z.string().trim().min(1).max(40),
+  // A key from the vertical's intents; "" or absent = none.
+  intent: z.string().trim().max(60).optional(),
   note: z.string().trim().max(2000).optional(),
 });
 
@@ -41,6 +44,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_body", issues: z.flattenError(parsed.error) }, { status: 400 });
   }
   const { name, source, note = "" } = parsed.data;
+  const intentDef = parsed.data.intent
+    ? verticalConfig().intents.find((i) => i.key.toLowerCase() === parsed.data.intent!.toLowerCase())
+    : null;
+  const intent = intentDef?.key ?? "";
 
   const phone = normalizeLeadPhone(parsed.data.phone);
   let status: number;
@@ -53,9 +60,12 @@ export async function POST(request: Request) {
   } else if (!config.manualLeadSources.some((s) => s.key === source)) {
     status = 400;
     body = { error: "invalid_source" };
+  } else if (parsed.data.intent && !intentDef) {
+    status = 400;
+    body = { error: "invalid_intent" };
   } else {
     try {
-      const result = await createManualLead({ waId: phone.waId, name, source, note, by: session.email });
+      const result = await createManualLead({ waId: phone.waId, name, source, intent, note, by: session.email });
       if (result.ok) {
         status = 200;
         body = { ok: true, contactWaId: phone.waId };
@@ -79,6 +89,7 @@ export async function POST(request: Request) {
       metadata: {
         contact_wa_id: waId,
         source,
+        ...(intent ? { intent } : {}),
         ok: status === 200,
         ...(status === 200 ? {} : { error: body.error }),
       },

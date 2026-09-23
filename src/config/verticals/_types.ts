@@ -313,6 +313,7 @@ export type CrmLabels = {
   clearFilters: string;
   intentLabel: string;
   filterAllIntents: string;
+  intentNone: string; // Nuevo lead: the "no intent" option
 
   // Reminder callout: {relative} = "hace 2 días" / "mañana"
   reminderOverdueRelativeTemplate: string;
@@ -338,6 +339,9 @@ export type CrmLabels = {
 
   // Board (round 7)
   filterToday: string;
+  filterGroupMine: string; // kicker over Hoy · Mis leads
+  filterGroupUrgency: string; // kicker over Vencidos · Se pierden pronto · Sin responsable
+  moreInListTemplate: string; // {n} — under a capped board column, links to the list
   attentionOverdueTemplate: string; // {relative}
   attentionTodayTemplate: string; // {time}
   attentionAtRiskTemplate: string; // {date}
