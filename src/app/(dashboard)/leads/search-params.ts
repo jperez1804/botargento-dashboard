@@ -89,7 +89,10 @@ export function buildLeadsHref(
   const view = overrides.view ?? p.view;
   if (FILTERLESS.includes(view)) return `/leads?view=${view}`;
   const params = new URLSearchParams();
-  if (view === "list") params.set("view", "list");
+  // Always name the view. To the filter memory (lib/crm/filter-memory) a bare
+  // /leads means "reopen my last filters", so the tabs must never produce one:
+  // clicking Tablero with no filters active bounced straight back to the list.
+  params.set("view", view);
   if (p.stage) params.set("stage", p.stage);
   if (p.ownerParam && !p.mine) params.set("owner", p.ownerParam);
   if (p.mine) params.set("mine", "1");

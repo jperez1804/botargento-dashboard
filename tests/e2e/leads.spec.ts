@@ -872,6 +872,23 @@ test("Board: losing a lead asks for the motive; stage moves can be undone", asyn
     .toBe("reserva");
 });
 
+test("The tabs always win over the remembered filters", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  // Being on the list saves it as the remembered view…
+  await page.goto("/leads?view=list");
+  await expect(page.getByTestId("leads-group-toggle")).toBeVisible();
+
+  // …and clicking Tablero must land on the board and STAY there. A tab that
+  // built a bare /leads used to read as "reopen my last filters" and bounced
+  // right back to the list.
+  await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Tablero" }).click();
+  await page.waitForURL(/view=board/);
+  await expect(page.locator("[data-board-column]").first()).toBeVisible();
+  await page.waitForTimeout(1000);
+  await expect(page).toHaveURL(/view=board/);
+  await expect(page.getByTestId("leads-group-toggle")).toHaveCount(0);
+});
+
 test("Board remembers the last filters until they are cleared", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?filter=overdue&priority=alta");
