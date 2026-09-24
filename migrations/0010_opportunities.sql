@@ -42,29 +42,59 @@ UPDATE dashboard.contacts SET first_seen_at = created_at WHERE first_seen_at IS 
 
 -- Everyone the dashboard or the bot already knows becomes a contact, so the
 -- foreign keys below can be created and the CRM can key on this table alone.
-INSERT INTO dashboard.contacts (contact_wa_id, display_name, source, first_seen_at, created_by, created_at)
-SELECT p.contact_wa_id,
-       '',
-       'whatsapp',
-       LEAST(msgs.first_seen, ev.first_event),
-       '',
-       COALESCE(LEAST(msgs.first_seen, ev.first_event), NOW())
-FROM (
-  SELECT contact_wa_id FROM automation.lead_log WHERE contact_wa_id <> ''
-  UNION
-  SELECT contact_wa_id FROM dashboard.lead_state
-  UNION
-  SELECT contact_wa_id FROM dashboard.lead_events
-) p
-LEFT JOIN LATERAL (
-  SELECT MIN(l.log_timestamp) AS first_seen FROM automation.lead_log l
-  WHERE l.contact_wa_id = p.contact_wa_id
-) msgs ON true
-LEFT JOIN LATERAL (
-  SELECT MIN(e.occurred_at) AS first_event FROM dashboard.lead_events e
-  WHERE e.contact_wa_id = p.contact_wa_id
-) ev ON true
-ON CONFLICT (contact_wa_id) DO NOTHING;
+-- automation.* belongs to the tenant runtime and may not exist yet on a fresh
+-- database (provisioning attaches it later), so the bot side is optional.
+DO $do$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'automation' AND table_name = 'lead_log'
+  ) THEN
+    EXECUTE $mig$
+      INSERT INTO dashboard.contacts
+        (contact_wa_id, display_name, source, first_seen_at, created_by, created_at)
+      SELECT p.contact_wa_id,
+             '',
+             'whatsapp',
+             LEAST(msgs.first_seen, ev.first_event),
+             '',
+             COALESCE(LEAST(msgs.first_seen, ev.first_event), NOW())
+      FROM (
+        SELECT contact_wa_id FROM automation.lead_log WHERE contact_wa_id <> ''
+        UNION
+        SELECT contact_wa_id FROM dashboard.lead_state
+        UNION
+        SELECT contact_wa_id FROM dashboard.lead_events
+      ) p
+      LEFT JOIN LATERAL (
+        SELECT MIN(l.log_timestamp) AS first_seen FROM automation.lead_log l
+        WHERE l.contact_wa_id = p.contact_wa_id
+      ) msgs ON true
+      LEFT JOIN LATERAL (
+        SELECT MIN(e.occurred_at) AS first_event FROM dashboard.lead_events e
+        WHERE e.contact_wa_id = p.contact_wa_id
+      ) ev ON true
+      ON CONFLICT (contact_wa_id) DO NOTHING
+    $mig$;
+  ELSE
+    RAISE NOTICE 'automation.lead_log not present — only the people the dashboard already tracks become contacts.';
+    EXECUTE $mig$
+      INSERT INTO dashboard.contacts
+        (contact_wa_id, display_name, source, first_seen_at, created_by, created_at)
+      SELECT p.contact_wa_id, '', 'whatsapp', ev.first_event, '', COALESCE(ev.first_event, NOW())
+      FROM (
+        SELECT contact_wa_id FROM dashboard.lead_state
+        UNION
+        SELECT contact_wa_id FROM dashboard.lead_events
+      ) p
+      LEFT JOIN LATERAL (
+        SELECT MIN(e.occurred_at) AS first_event FROM dashboard.lead_events e
+        WHERE e.contact_wa_id = p.contact_wa_id
+      ) ev ON true
+      ON CONFLICT (contact_wa_id) DO NOTHING
+    $mig$;
+  END IF;
+END $do$;
 
 CREATE INDEX IF NOT EXISTS idx_contacts_source ON dashboard.contacts (source);
 CREATE INDEX IF NOT EXISTS idx_contacts_first_seen ON dashboard.contacts (first_seen_at DESC);
