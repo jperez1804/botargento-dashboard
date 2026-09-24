@@ -177,7 +177,7 @@ describe("describeLeadEvent", () => {
 
 describe("budget precedence and events", () => {
   it("prefers the manual figure over the bot's amount and range", async () => {
-    const { toBudget } = await import("@/lib/queries/leads");
+    const { toBudget } = await import("@/lib/crm/budget");
     expect(toBudget("90000", "usd", "150000", "USD", { min: 1, max: 2 })).toEqual({
       amount: 90000,
       currency: "USD",

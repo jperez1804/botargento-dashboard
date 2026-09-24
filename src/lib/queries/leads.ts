@@ -27,22 +27,17 @@ import {
   type LeadStateRow,
 } from "@/lib/crm/effective-stage";
 import { hasLeadLogSentBy, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
-import { priceRangeText } from "@/lib/crm/price-range";
+import { toBudget, type LeadBudget } from "@/lib/crm/budget";
 import { priorityRank } from "@/lib/crm/priority";
 import { attentionKind, attentionRank } from "@/lib/crm/attention";
 import { tenantConfig } from "@/config/tenant";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
 import { getIntentMap, syncOpportunities } from "@/lib/queries/opportunity-sync";
 
-// What the lead can spend. A person's figure wins; otherwise the amount of the
-// latest real handoff of this opportunity that carried one, or — if the bot
-// only captured a range — that range text.
-export type LeadBudget = {
-  amount: number | null;
-  currency: string;
-  text: string;
-  source: "manual" | "bot";
-};
+// Budget logic is pure and lives in lib/crm/budget; re-exported because the
+// whole CRM imports it from here.
+export { toBudget };
+export type { LeadBudget };
 
 /** The person behind the opportunity (dashboard.contacts). */
 export type ContactInfo = {
@@ -81,29 +76,6 @@ export type OpportunityRow = {
 
 /** Kept while the UI finishes moving to opportunities. */
 export type LeadRow = OpportunityRow;
-
-const positive = (raw: unknown): number | null => {
-  // NUMERIC arrives as a string from postgres.js.
-  const n = raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : null;
-};
-const upper = (raw: unknown) => String(raw ?? "").trim().toUpperCase();
-
-/** Precedence: manual amount → bot amount → bot range. Pure. */
-export function toBudget(
-  manualAmount: unknown,
-  manualCurrency: unknown,
-  botAmount: unknown,
-  botCurrency: unknown,
-  rangeRaw: unknown,
-): LeadBudget | null {
-  const m = positive(manualAmount);
-  if (m !== null) return { amount: m, currency: upper(manualCurrency), text: "", source: "manual" };
-  const b = positive(botAmount);
-  if (b !== null) return { amount: b, currency: upper(botCurrency), text: "", source: "bot" };
-  const range = priceRangeText(rangeRaw);
-  return range ? { amount: null, currency: "", text: range, source: "bot" } : null;
-}
 
 const toDate = (v: unknown): Date | null =>
   v === null || v === undefined ? null : new Date(v as string | Date);
@@ -495,11 +467,9 @@ export async function getPerson(
   const head = contact[0];
   if (!head && rows.length === 0) return null;
 
-  const opportunities = [...rows].sort(
-    (a, b) =>
-      Number(a.closedAt !== null) - Number(b.closedAt !== null) ||
-      b.openedAt.getTime() - a.openedAt.getTime(),
-  );
+  // Opening order, oldest first: the list reads like the history it is, and
+  // the ordinal on each row matches its position ("2ª" is the second row).
+  const opportunities = [...rows].sort((a, b) => a.seq - b.seq);
 
   if (!head) {
     const first = opportunities[0]!;
@@ -544,12 +514,17 @@ export function pickDefaultOpportunity(
 ): OpportunityRow | null {
   const asked = opParam ? person.opportunities.find((o) => o.id === opParam) : undefined;
   if (asked) return asked;
-  const open = person.opportunities.filter((o) => o.closedAt === null);
+  // The list is in opening order, so the default is chosen explicitly: what
+  // needs attention today, else the newest open one, else the newest of all.
+  const newestFirst = [...person.opportunities].sort(
+    (a, b) => b.openedAt.getTime() - a.openedAt.getTime(),
+  );
+  const open = newestFirst.filter((o) => o.closedAt === null);
   const urgent = open.find((o) => {
     const kind = attentionKind(o.lead, now, timezone);
     return kind === "overdue" || kind === "today";
   });
-  return urgent ?? open[0] ?? person.opportunities[0] ?? null;
+  return urgent ?? open[0] ?? newestFirst[0] ?? null;
 }
 
 /** Rows grouped by person, keeping each group's best-ranked row first. */
@@ -567,6 +542,9 @@ export function groupByPerson(
         rows: [row],
       });
   }
+  // Inside a group the opportunities read in opening order, like the list on
+  // the person's card.
+  for (const g of groups.values()) g.rows.sort((a, b) => a.seq - b.seq);
   return [...groups.values()];
 }
 

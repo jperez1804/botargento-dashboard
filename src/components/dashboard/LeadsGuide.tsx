@@ -41,6 +41,17 @@ export function LeadsGuide({ config }: Props) {
         <p className="text-[var(--muted-ink)]">{g.intro}</p>
       </header>
 
+      <Section title={g.opportunitiesTitle}>
+        <p>{g.opportunitiesIntro}</p>
+        <ul className="list-disc space-y-1 pl-5 text-[var(--muted-ink)]">
+          <li>{g.opportunitiesHandoff}</li>
+          <li>{g.opportunitiesSameKind}</li>
+          <li>{g.opportunitiesMessages}</li>
+          <li>{g.opportunitiesManual}</li>
+          <li>{g.opportunitiesUnderived}</li>
+        </ul>
+      </Section>
+
       <Section title={g.stagesTitle}>
         <ol className="divide-y divide-[var(--rule)] rounded-xl border border-[var(--rule)] bg-[var(--surface)]">
           {stages.map((s) => (

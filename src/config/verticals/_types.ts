@@ -347,6 +347,7 @@ export type CrmLabels = {
     create: string;
     createdToast: string;
     ofTotalTemplate: string; // {n} {total}
+    ordinalTemplate: string; // {n} — names one opportunity ("5ª")
     openedTemplate: string; // {date}
     closedTemplate: string; // {date}
     openedByBot: string;
@@ -358,6 +359,12 @@ export type CrmLabels = {
     underivedCountTemplate: string; // {n}
     underivedCountOne: string;
     underivedHint: string;
+    underivedEmpty: string;
+    allConversations: string;
+    // Lista, grouped by contact.
+    groupByContact: string;
+    oneOpportunity: string;
+    manyOpportunities: string; // {n}
   };
 
   // Lead detail modal
@@ -416,6 +423,14 @@ export type CrmLabels = {
     priorityMeaning: Record<CrmPriorityKey, string>;
     sourcesTitle: string;
     sourcesBody: string;
+    // Opportunities: what opens one, and where the rest end up.
+    opportunitiesTitle: string;
+    opportunitiesIntro: string;
+    opportunitiesHandoff: string;
+    opportunitiesSameKind: string;
+    opportunitiesMessages: string;
+    opportunitiesManual: string;
+    opportunitiesUnderived: string;
   };
 };
 
