@@ -18,8 +18,10 @@ const team = [
 ];
 
 let n = 0;
-function row(over: Partial<EffectiveLead> & { firstSeen?: Date | null; origin?: string } = {}): LeadRow {
-  const { firstSeen = daysAgo(20), origin, ...lead } = over;
+function row(
+  over: Partial<EffectiveLead> & { firstSeen?: Date | null; origin?: string; openedAt?: Date } = {},
+): LeadRow {
+  const { firstSeen = daysAgo(20), origin, openedAt, ...lead } = over;
   n += 1;
   return {
     contactWaId: `549110000${String(n).padStart(4, "0")}`,
@@ -28,8 +30,21 @@ function row(over: Partial<EffectiveLead> & { firstSeen?: Date | null; origin?: 
     lastMessageAt: null,
     handoffCount: 0,
     budget: null,
-    manual: origin ? { source: origin, intent: "", createdBy: "ana@x.com", createdAt: firstSeen ?? NOW } : null,
-    lastIntent: null,
+    contact: {
+      source: origin ?? "whatsapp",
+      createdBy: origin ? "ana@x.com" : "",
+      createdAt: firstSeen ?? NOW,
+      firstSeenAt: firstSeen,
+    },
+    openedAt: openedAt ?? firstSeen ?? NOW,
+    id: n,
+    seq: 1,
+    ofTotal: 1,
+    kind: "",
+    title: "",
+    openedBy: "",
+    closedAt: lead.closedAt ?? null,
+    newIntent: null,
     lead: {
       stage: "nuevo",
       source: "auto",
@@ -41,6 +56,7 @@ function row(over: Partial<EffectiveLead> & { firstSeen?: Date | null; origin?: 
       reminder: null,
       owner: null,
       priority: null,
+      closedAt: null,
       ...lead,
     },
   };
@@ -53,9 +69,9 @@ describe("buildLeadsSummary", () => {
 
   it("counts the 7-day KPIs on their boundaries", () => {
     const rows = [
-      row({ stage: "cerrado", stageSince: daysAgo(6) }),
-      row({ stage: "cerrado", stageSince: daysAgo(8) }), // outside the window
-      row({ stage: "perdido", stageSince: daysAgo(1) }), // terminal but not closed
+      row({ stage: "cerrado", closedAt: daysAgo(6) }),
+      row({ stage: "cerrado", closedAt: daysAgo(8) }), // outside the window
+      row({ stage: "perdido", closedAt: daysAgo(1) }), // terminal but not "cerrado"
       row({ lastActivityAt: daysAgo(7) }), // 7 days: inclusive
       row({ lastActivityAt: daysAgo(8) }),
       row({ firstSeen: daysAgo(2) }),

@@ -27,7 +27,7 @@ const MENU_CLASS = "w-auto min-w-[220px] max-w-[280px]";
 type Props = {
   variant: "move" | "assign";
   card: {
-    waId: string;
+    id: number;
     displayName: string;
     stageKey: string;
     ownerEmail: string | null;
@@ -39,9 +39,9 @@ type Props = {
   sessionEmail: string;
   labels: CrmLabels;
   disabled?: boolean;
-  onMove: (waId: string, stage: string) => void;
-  onAssign: (waId: string, ownerEmail: string | null) => void;
-  onSetPriority: (waId: string, priority: CrmPriorityKey | "") => void;
+  onMove: (id: number, stage: string) => void;
+  onAssign: (id: number, ownerEmail: string | null) => void;
+  onSetPriority: (id: number, priority: CrmPriorityKey | "") => void;
 };
 
 export function LeadCardMenu({
@@ -94,7 +94,7 @@ export function LeadCardMenu({
             {members.map((m) => (
               <DropdownMenuItem
                 key={m.email}
-                onClick={() => onAssign(card.waId, m.email)}
+                onClick={() => onAssign(card.id, m.email)}
                 className="gap-2"
               >
                 <LeadAvatar label={m.label} seed={m.email} emptyLabel={labels.unassigned} />
@@ -107,7 +107,7 @@ export function LeadCardMenu({
               </DropdownMenuItem>
             ))}
             {card.ownerEmail ? (
-              <DropdownMenuItem onClick={() => onAssign(card.waId, null)} className="gap-2">
+              <DropdownMenuItem onClick={() => onAssign(card.id, null)} className="gap-2">
                 <LeadAvatar label={null} emptyLabel={labels.unassigned} />
                 <span className="flex-1 truncate">{labels.unassigned}</span>
               </DropdownMenuItem>
@@ -120,7 +120,7 @@ export function LeadCardMenu({
               {stages
                 .filter((s) => s.key !== card.stageKey)
                 .map((s) => (
-                  <DropdownMenuItem key={s.key} onClick={() => onMove(card.waId, s.key)}>
+                  <DropdownMenuItem key={s.key} onClick={() => onMove(card.id, s.key)}>
                     {s.label}
                   </DropdownMenuItem>
                 ))}
@@ -133,7 +133,7 @@ export function LeadCardMenu({
               {priorityOptions(labels).map((p) => (
                 <DropdownMenuItem
                   key={p.key}
-                  onClick={() => onSetPriority(card.waId, p.key)}
+                  onClick={() => onSetPriority(card.id, p.key)}
                   className="gap-2"
                 >
                   <span className="flex-1">{p.label}</span>
@@ -141,7 +141,7 @@ export function LeadCardMenu({
                 </DropdownMenuItem>
               ))}
               {card.priorityKey ? (
-                <DropdownMenuItem onClick={() => onSetPriority(card.waId, "")}>
+                <DropdownMenuItem onClick={() => onSetPriority(card.id, "")}>
                   {labels.priority.none}
                 </DropdownMenuItem>
               ) : null}

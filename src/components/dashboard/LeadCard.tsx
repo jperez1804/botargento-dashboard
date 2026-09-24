@@ -9,17 +9,31 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BellRing, Clock3, Hourglass, MessageCircle, Wallet, XCircle } from "lucide-react";
+import {
+  BellRing,
+  Clock3,
+  Hourglass,
+  MessageCircle,
+  MessageCircleQuestion,
+  Wallet,
+  XCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LeadAvatar } from "@/components/dashboard/LeadAvatar";
 import { LeadCardMenu } from "@/components/dashboard/LeadCardMenu";
 import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
 import type { CrmLabels, CrmPriorityKey } from "@/config/verticals/_types";
+import { fillTemplate } from "@/lib/crm/view-model";
 import type { Attention } from "@/lib/crm/attention";
 import type { PriorityView } from "@/lib/crm/priority";
 
 export type BoardCard = {
+  // The opportunity. The phone stays for links to the person.
+  id: number;
   waId: string;
+  seq: number;
+  ofTotal: number;
+  title: string;
   displayName: string;
   stageKey: string;
   auto: boolean;
@@ -34,8 +48,11 @@ export type BoardCard = {
   // Origin of a lead registered by hand ("Portal inmobiliario"); null = WhatsApp.
   sourceLabel: string | null;
   priority: PriorityView | null;
-  // WhatsApp intent bucket ("Ventas"); null for leads that never wrote.
+  // Rubro of this opportunity ("Ventas"); null while nobody labelled it.
   intentLabel: string | null;
+  // Rubro of an enquiry nobody is working yet.
+  newIntentKey: string | null;
+  newIntentLabel: string | null;
 };
 
 type Props = {
@@ -47,9 +64,11 @@ type Props = {
   isAdmin: boolean;
   sessionEmail: string;
   busy: boolean;
-  onMove: (waId: string, stage: string) => void;
-  onAssign: (waId: string, ownerEmail: string | null) => void;
-  onSetPriority: (waId: string, priority: CrmPriorityKey | "") => void;
+  onMove: (id: number, stage: string) => void;
+  onAssign: (id: number, ownerEmail: string | null) => void;
+  onSetPriority: (id: number, priority: CrmPriorityKey | "") => void;
+  // Opens an opportunity for the rubro of a new enquiry (newIntentLabel).
+  onOpenIntent?: (waId: string, kindLabel: string) => void;
 };
 
 const STRIP_CLASS: Record<Attention["tone"], string> = {
@@ -78,10 +97,11 @@ export function LeadCard({
   onMove,
   onAssign,
   onSetPriority,
+  onOpenIntent,
 }: Props) {
   const router = useRouter();
   const menuCard = { ...card, priorityKey: card.priority?.key ?? null };
-  const detailHref = `/leads/${encodeURIComponent(card.waId)}`;
+  const detailHref = `/leads/${card.id}`;
   // Clicking the card body (not a link, button or menu) opens the modal too;
   // scroll: false keeps the board where it is.
   function openFromBody(e: React.MouseEvent<HTMLElement>) {
@@ -97,11 +117,12 @@ export function LeadCard({
 
   return (
     <article
-      data-lead-card={card.waId}
+      data-lead-card={card.id}
+      data-lead-wa={card.waId}
       draggable={canEdit && !busy}
       onClick={openFromBody}
       onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", card.waId);
+        e.dataTransfer.setData("text/plain", String(card.id));
         e.dataTransfer.effectAllowed = "move";
       }}
       className={cn(
@@ -152,7 +173,32 @@ export function LeadCard({
         ) : null}
       </div>
 
-      {card.sourceLabel || card.priority || card.intentLabel ? (
+      {/* The person asked about a rubro nobody has open. A message is not a
+          handoff, so nothing opened on its own — the advisor decides. */}
+      {card.newIntentLabel && card.newIntentKey ? (
+        <div
+          data-testid="lead-new-intent"
+          className="flex flex-wrap items-center gap-1.5 rounded-md bg-[var(--canvas-2)] px-1.5 py-1 text-[11.5px] text-[var(--muted-ink)]"
+        >
+          <MessageCircleQuestion className="size-3.5 shrink-0" aria-hidden />
+          <span className="min-w-0 truncate">
+            {fillTemplate(labels.opportunity.newIntentTemplate, { kind: card.newIntentLabel })}
+          </span>
+          {canEdit && onOpenIntent ? (
+            <button
+              type="button"
+              data-testid="lead-open-intent"
+              disabled={busy}
+              onClick={() => onOpenIntent(card.waId, card.newIntentKey!)}
+              className="ml-auto cursor-pointer font-medium text-[var(--ink)] underline-offset-2 hover:underline disabled:cursor-default disabled:opacity-60"
+            >
+              {labels.opportunity.openFromIntent}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {card.sourceLabel || card.priority || card.intentLabel || card.ofTotal > 1 ? (
         <div className="flex flex-wrap items-center gap-1">
           {card.priority ? (
             <LeadPriorityChip label={card.priority.label} tone={card.priority.tone} />
@@ -163,6 +209,15 @@ export function LeadCard({
               className="inline-flex h-[20px] items-center rounded-full bg-[var(--info-soft)] px-1.5 text-[11.5px] font-medium text-[color-mix(in_oklch,var(--info)_75%,var(--ink))]"
             >
               {card.intentLabel}
+            </span>
+          ) : null}
+          {card.ofTotal > 1 ? (
+            <span
+              data-testid="lead-of-total"
+              title={labels.opportunity.listTitle}
+              className="inline-flex h-[20px] items-center rounded-full border border-[var(--rule-strong)] px-1.5 text-[11.5px] font-medium tabular-nums text-[var(--muted-ink)]"
+            >
+              {fillTemplate(labels.opportunity.ofTotalTemplate, { n: card.seq, total: card.ofTotal })}
             </span>
           ) : null}
           {card.sourceLabel ? (

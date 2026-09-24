@@ -57,12 +57,15 @@ export function buildLeadsSummary(
   const open = rows.filter((r) => isOpenLead(r.lead, config));
 
   const kpis = {
+    // Closed = an advisor closed this opportunity inside the window. The
+    // person may well be back with another one by now, and that is fine.
     closed: rows.filter(
-      (r) => closedKeys.has(r.lead.stage) && r.lead.stageSince !== null && r.lead.stageSince.getTime() >= since,
+      (r) => closedKeys.has(r.lead.stage) && r.closedAt !== null && r.closedAt.getTime() >= since,
     ).length,
     active: rows.filter((r) => r.lead.lastActivityAt !== null && r.lead.lastActivityAt.getTime() >= since)
       .length,
-    new: rows.filter((r) => r.firstSeen !== null && r.firstSeen.getTime() >= since).length,
+    // New = opportunities opened in the window, not people first seen.
+    new: rows.filter((r) => r.openedAt.getTime() >= since).length,
     dueSoon: rows.filter((r) => {
       const rem = r.lead.reminder;
       return (
@@ -135,22 +138,26 @@ export function buildLeadsSummary(
     ],
   };
 
+  // Origin describes PEOPLE, not opportunities: somebody with a rental and a
+  // sale came in through one door, and counting them twice would inflate it.
+  const sourceOfPerson = new Map<string, string>();
+  for (const r of rows) sourceOfPerson.set(r.contactWaId, r.contact.source || "whatsapp");
   const sourceCount = new Map<string, number>();
-  for (const r of rows) {
-    const k = r.manual?.source ?? "whatsapp";
-    sourceCount.set(k, (sourceCount.get(k) ?? 0) + 1);
+  for (const source of sourceOfPerson.values()) {
+    sourceCount.set(source, (sourceCount.get(source) ?? 0) + 1);
   }
+  const people = sourceOfPerson.size;
   const sourceDefs = [
     { key: "whatsapp", label: labels.sourceWhatsapp },
     ...config.manualLeadSources,
   ];
   const sources = {
-    total: rows.length,
+    total: people,
     rows: sourceDefs.map((s) => ({
       key: s.key,
       label: s.label,
       count: sourceCount.get(s.key) ?? 0,
-      pct: pctOf(sourceCount.get(s.key) ?? 0, rows.length),
+      pct: pctOf(sourceCount.get(s.key) ?? 0, people),
     })),
   };
 

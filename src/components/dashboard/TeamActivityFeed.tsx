@@ -68,7 +68,7 @@ export function TeamActivityFeed({ events, config, memberLabel, locale, timezone
               <p className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
                 <span className="font-medium text-[var(--ink)]">{eventKindLabel(config, e.kind)}</span>
                 <Link
-                  href={`/conversations/${encodeURIComponent(e.contactWaId)}`}
+                  href={`/conversations/${encodeURIComponent(e.contactWaId)}${e.opportunityId ? `?op=${e.opportunityId}` : ""}`}
                   className="truncate text-[var(--info)] underline-offset-2 hover:underline"
                 >
                   {e.leadName}

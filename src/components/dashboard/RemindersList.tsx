@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import type { CrmLabels } from "@/config/verticals/_types";
 import type { LeadView } from "@/lib/crm/view-model";
 
-export type ReminderRow = { waId: string; displayName: string; view: LeadView };
+export type ReminderRow = { id: number; waId: string; displayName: string; view: LeadView };
 
 type Props = { rows: ReadonlyArray<ReminderRow>; labels: CrmLabels; title: string };
 
@@ -23,7 +23,7 @@ export function RemindersList({ rows, labels, title }: Props) {
         data-testid="reminders-list"
         className="rounded-xl border border-[var(--rule)] bg-[var(--surface)] divide-y divide-[var(--rule)]"
       >
-        {rows.map(({ waId, displayName, view }) => {
+        {rows.map(({ id, waId, displayName, view }) => {
           const rem = view.reminder;
           if (!rem) return null;
           const overdue = rem.status === "overdue";
@@ -31,7 +31,7 @@ export function RemindersList({ rows, labels, title }: Props) {
             <Link
               key={waId}
               role="listitem"
-              href={`/conversations/${encodeURIComponent(waId)}`}
+              href={`/conversations/${encodeURIComponent(waId)}?op=${id}`}
               className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-[13.5px] hover:bg-[var(--canvas-2)] transition-colors focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-[-2px]"
             >
               <span

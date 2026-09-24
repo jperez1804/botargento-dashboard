@@ -47,9 +47,42 @@ const lastAudit = (action: string) =>
     return rows[0]?.metadata ?? null;
   });
 
+// What the bot writes. A message is a hint; a handoff is a fact, and only a
+// handoff opens an opportunity (docs/crm-oportunidades.md). Both are tagged
+// 'e2e' so the next test starts from the seed baseline.
+const botMessage = (waId: string, intent: string) =>
+  withSql(
+    (sql) => sql`
+      INSERT INTO automation.lead_log
+        (contact_wa_id, lead_name, direction, intent, route, text_body, sent_by, log_timestamp)
+      VALUES (${waId}, 'E2E', 'inbound', ${intent}, 'e2e', 'consulta', '', NOW())
+    `,
+  );
+
+const botHandoff = (waId: string, intent: string) =>
+  withSql(
+    (sql) => sql`
+      INSERT INTO automation.escalations
+        (contact_wa_id, escalation_type, intent, escalation_timestamp, reason)
+      VALUES (${waId}, 'business', ${intent}, NOW(), 'e2e')
+    `,
+  );
+
+const opportunitiesOf = (waId: string) =>
+  withSql(
+    (sql) => sql`
+      SELECT seq, kind, stage, opened_by, closed_at IS NOT NULL AS closed
+      FROM dashboard.opportunities WHERE contact_wa_id = ${waId} ORDER BY seq
+    `,
+  );
+
 test.beforeEach(async () => {
   await resetAuthState();
-  await withSql((sql) => seedCrmState(sql));
+  await withSql(async (sql) => {
+    await sql`DELETE FROM automation.escalations WHERE reason = 'e2e'`;
+    await sql`DELETE FROM automation.lead_log WHERE route = 'e2e'`;
+    await seedCrmState(sql);
+  });
 });
 
 test("Banner surfaces at-risk leads and overdue reminders for the admin", async ({ page }) => {
@@ -120,7 +153,7 @@ test("Board moves a lead from the ⋯ menu and audits the change", async ({ page
   await page.goto("/leads?view=board");
   await expect(page.locator("[data-board-column]")).toHaveCount(5);
 
-  const card = page.locator(`[data-lead-card="${F.contacted.wa_id}"]`);
+  const card = page.locator(`[data-lead-card="${F.contacted.opp}"]`);
   await expect(page.locator('[data-board-column="contactado"]')).toContainText(F.contacted.name);
   await card.getByTestId("lead-menu").click();
   await page.getByRole("menuitem", { name: "Visita", exact: true }).click();
@@ -129,7 +162,7 @@ test("Board moves a lead from the ⋯ menu and audits the change", async ({ page
   await expect
     .poll(() =>
       withSql(async (sql) => {
-        const rows = await sql`SELECT stage FROM dashboard.lead_state WHERE contact_wa_id = ${F.contacted.wa_id}`;
+        const rows = await sql`SELECT stage FROM dashboard.opportunities WHERE id = ${F.contacted.opp}`;
         return rows[0]?.stage ?? null;
       }),
     )
@@ -146,7 +179,7 @@ test("Board assigns an owner from the avatar menu", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
 
-  const card = page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`);
+  const card = page.locator(`[data-lead-card="${F.atRisk.opp}"]`);
   await card.getByTestId("lead-assign").click();
   await page.getByRole("menuitem", { name: "Ana Asesora" }).click();
   // The avatar now carries her initials instead of the unassigned placeholder.
@@ -155,7 +188,7 @@ test("Board assigns an owner from the avatar menu", async ({ page }) => {
   await expect
     .poll(() =>
       withSql(async (sql) => {
-        const rows = await sql`SELECT owner_email FROM dashboard.lead_state WHERE contact_wa_id = ${F.atRisk.wa_id}`;
+        const rows = await sql`SELECT owner_email FROM dashboard.opportunities WHERE id = ${F.atRisk.opp}`;
         return rows[0]?.owner_email ?? null;
       }),
     )
@@ -215,7 +248,7 @@ test("Lead card: take the lead, log a call and schedule a reminder", async ({ pa
   await expect(card.getByTestId("reminder-date")).toHaveCount(0);
 
   const state = await withSql(
-    (sql) => sql`SELECT owner_email, next_action_note FROM dashboard.lead_state WHERE contact_wa_id = ${F.atRisk.wa_id}`,
+    (sql) => sql`SELECT owner_email, next_action_note FROM dashboard.opportunities WHERE id = ${F.atRisk.opp}`,
   );
   expect(state[0]).toMatchObject({ owner_email: ADMIN, next_action_note: "Confirmar visita" });
 });
@@ -287,14 +320,14 @@ test("Asesor manages leads but cannot touch Settings or someone else's lead", as
   // a plain avatar with no assign menu (mirrors the API's not_owner rule).
   await page.goto("/leads?view=board");
   await expect(
-    page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`).getByTestId("lead-assign"),
+    page.locator(`[data-lead-card="${F.atRisk.opp}"]`).getByTestId("lead-assign"),
   ).toBeVisible();
   await expect(
-    page.locator(`[data-lead-card="${F.visita.wa_id}"]`).getByTestId("lead-assign"),
+    page.locator(`[data-lead-card="${F.visita.opp}"]`).getByTestId("lead-assign"),
   ).toHaveCount(0);
 
   const res = await page.request.post("/api/leads/assign", {
-    data: { contactWaId: F.visita.wa_id, ownerEmail: "me" },
+    data: { opportunityId: F.visita.opp, ownerEmail: "me" },
   });
   expect(res.status()).toBe(403);
   expect(await res.json()).toMatchObject({ error: "not_owner" });
@@ -309,7 +342,7 @@ test("Viewer reads leads without controls and the API refuses writes", async ({ 
   await expect(leadRows(page).first()).toBeVisible();
 
   await page.goto("/leads?view=board");
-  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`)).toBeVisible();
+  await expect(page.locator(`[data-lead-card="${F.visita.opp}"]`)).toBeVisible();
   await expect(page.getByTestId("lead-menu")).toHaveCount(0);
   await expect(page.getByTestId("lead-assign")).toHaveCount(0);
 
@@ -319,7 +352,7 @@ test("Viewer reads leads without controls and the API refuses writes", async ({ 
   await expect(page.locator('[data-testid^="lead-field-"]')).toHaveCount(0);
 
   const res = await page.request.post("/api/leads/set-stage", {
-    data: { contactWaId: F.visita.wa_id, stage: "cerrado" },
+    data: { opportunityId: F.visita.opp, stage: "cerrado" },
   });
   expect(res.status()).toBe(403);
 });
@@ -339,7 +372,7 @@ test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ 
 
   // Lands on the lead modal over the board, "Próximo paso" already open and
   // the lead assigned to whoever registered it.
-  await page.waitForURL(/\/leads\/5491144447777\?edit=reminder$/);
+  await page.waitForURL(/\/leads\/\d+\?edit=reminder$/);
   const modal = page.getByTestId("lead-detail-modal");
   await expect(modal).toBeVisible();
   await expect(modal.getByTestId("lead-crm-card")).toContainText("Nuevo");
@@ -352,7 +385,7 @@ test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ 
 
   // The board behind the modal already shows the new card (no reload):
   // Nuevo column, origin chip, and the intent chosen on the form.
-  const card = page.locator('[data-lead-card="5491144447777"]');
+  const card = page.locator('[data-lead-wa="5491144447777"]');
   await expect(page.locator('[data-board-column="nuevo"]')).toContainText("Marta Iglesias");
   await expect(card.getByTestId("lead-source")).toHaveText("Teléfono");
   await expect(card.getByTestId("lead-intent")).toHaveText("Alquileres");
@@ -373,11 +406,11 @@ test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ 
   await expect(alert).toContainText("Ese teléfono ya es un lead.");
   await expect(alert.getByRole("link", { name: "Abrir el existente" })).toHaveAttribute(
     "href",
-    "/leads/5491144447777",
+    "/conversations/5491144447777",
   );
 
   const res = await page.request.post("/api/leads/create", {
-    data: { name: "Ramiro", phone: F.visita.wa_id, source: "otro" },
+    data: { name: "Ramiro", phone: F.visita.wa_id, source: "otro", intent: "Ventas" },
   });
   expect(res.status()).toBe(409);
   expect(await res.json()).toMatchObject({ error: "already_exists", contactWaId: F.visita.wa_id });
@@ -403,19 +436,19 @@ test("Board shows the budget the bot captured and totals it per column", async (
   );
   const waId = rows[0]?.contact_wa_id as string;
   await page.goto("/leads");
-  const card = page.locator(`[data-lead-card="${waId}"]`);
+  const card = page.locator(`[data-lead-wa="${waId}"]`);
   await expect(card.getByTestId("lead-budget")).toHaveText("USD 150.000");
   const column = page.locator('[data-board-column="calificado"]');
-  await expect(column.locator(`[data-lead-card="${waId}"]`)).toHaveCount(1);
+  await expect(column.locator(`[data-lead-wa="${waId}"]`)).toHaveCount(1);
   await expect(column.locator("[data-column-budget]")).toHaveText("USD 150.000");
   // Leads from the bot say so; a range with no amount shows the range itself
   // (engine snapshot object → one line), never raw JSON.
   await expect(card.getByTestId("lead-source")).toHaveText("WhatsApp");
-  const upcoming = page.locator(`[data-lead-card="${F.upcoming.wa_id}"]`);
+  const upcoming = page.locator(`[data-lead-card="${F.upcoming.opp}"]`);
   await expect(upcoming.getByTestId("lead-budget")).toHaveText("USD 90.000 – 110.000");
 
   await page.goto("/leads?view=list");
-  await expect(page.locator(`a[href="/conversations/${waId}"]`).first()).toContainText("USD 150.000");
+  await expect(page.locator(`a[href^="/conversations/${waId}"]`).first()).toContainText("USD 150.000");
 });
 
 test("Activity tab lists the team's events and filters by kind", async ({ page }) => {
@@ -486,7 +519,7 @@ test("Resumen tab shows the 7-day indicators and the breakdowns", async ({ page 
 
   // Closing a lead today shows up under "Cerrados".
   const res = await page.request.post("/api/leads/set-stage", {
-    data: { contactWaId: F.contacted.wa_id, stage: "cerrado" },
+    data: { opportunityId: F.contacted.opp, stage: "cerrado" },
   });
   expect(res.status()).toBe(200);
   await page.reload();
@@ -497,16 +530,16 @@ test("Priority from the board ⋯ menu, on the list, and as a filter", async ({ 
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
   // Seeded: visita = Alta, and prioritized cards come first in their column.
-  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`).getByTestId("lead-priority")).toHaveText("Alta");
+  await expect(page.locator(`[data-lead-card="${F.visita.opp}"]`).getByTestId("lead-priority")).toHaveText("Alta");
 
-  const card = page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`);
+  const card = page.locator(`[data-lead-card="${F.atRisk.opp}"]`);
   await card.getByTestId("lead-menu").click();
   await page.getByRole("menuitem", { name: "Alta", exact: true }).click();
   await expect(card.getByTestId("lead-priority")).toHaveText("Alta");
   await expect
     .poll(() =>
       withSql(async (sql) => {
-        const rows = await sql`SELECT priority FROM dashboard.lead_state WHERE contact_wa_id = ${F.atRisk.wa_id}`;
+        const rows = await sql`SELECT priority FROM dashboard.opportunities WHERE id = ${F.atRisk.opp}`;
         return rows[0]?.priority ?? null;
       }),
     )
@@ -552,7 +585,7 @@ test("Guía documents the stages and rules; the viewer can read it but not prior
   await expect(page.getByTestId("lead-crm-card").getByTestId("lead-priority")).toHaveText("Media");
   await expect(page.getByTestId("lead-priority-select")).toHaveCount(0);
   const res = await page.request.post("/api/leads/set-priority", {
-    data: { contactWaId: F.reserva.wa_id, priority: "alta" },
+    data: { opportunityId: F.reserva.opp, priority: "alta" },
   });
   expect(res.status()).toBe(403);
 });
@@ -560,9 +593,9 @@ test("Guía documents the stages and rules; the viewer can read it but not prior
 test("Board card opens the lead modal; edits refresh the board; Esc and navigating away close it", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
-  const card = page.locator(`[data-lead-card="${F.reserva.wa_id}"]`);
+  const card = page.locator(`[data-lead-card="${F.reserva.opp}"]`);
   await card.getByTestId("lead-open").click();
-  await page.waitForURL(new RegExp(`/leads/${F.reserva.wa_id}$`));
+  await page.waitForURL(new RegExp(`/leads/${F.reserva.opp}$`));
   const modal = page.getByTestId("lead-detail-modal");
   await expect(modal).toBeVisible();
   await expect(modal).toContainText(F.reserva.name);
@@ -591,14 +624,14 @@ test("Board card opens the lead modal; edits refresh the board; Esc and navigati
   await expect(page.getByTestId("lead-crm-card")).toBeVisible();
 
   // A hard load of the modal URL is the full conversation page.
-  await page.goto(`/leads/${F.reserva.wa_id}`);
+  await page.goto(`/leads/${F.reserva.opp}`);
   await page.waitForURL(new RegExp(`/conversations/${F.reserva.wa_id}`));
 });
 
 test("Budget typed by hand wins over the bot's figure and can be cleared", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
-  const card = page.locator(`[data-lead-card="${F.reserva.wa_id}"]`);
+  const card = page.locator(`[data-lead-card="${F.reserva.opp}"]`);
   await expect(card.getByTestId("lead-budget")).toHaveText("USD 90.000"); // seeded manual budget
   await card.getByTestId("lead-open").click();
   const modal = page.getByTestId("lead-detail-modal");
@@ -628,7 +661,7 @@ test("Budget typed by hand wins over the bot's figure and can be cleared", async
   const rows = await withSql(
     (sql) => sql`SELECT contact_wa_id FROM automation.escalations WHERE target_zone = 'Palermo' LIMIT 1`,
   );
-  const botCard = page.locator(`[data-lead-card="${rows[0]?.contact_wa_id}"]`);
+  const botCard = page.locator(`[data-lead-wa="${rows[0]?.contact_wa_id}"]`);
   await expect(botCard.getByTestId("lead-budget")).toHaveText("USD 150.000");
   await botCard.getByTestId("lead-open").click();
   await expect(modal.getByTestId("lead-budget-section")).toContainText("Captado por el bot");
@@ -644,15 +677,18 @@ test("Budget typed by hand wins over the bot's figure and can be cleared", async
 test("Intent shows on cards and filters the board; one click clears every filter", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
-  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`).getByTestId("lead-intent")).toHaveText("Ventas");
-  await expect(page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`).getByTestId("lead-intent")).toHaveText("Alquileres");
-  // A lead registered by hand never wrote: no intent chip.
-  await expect(page.locator(`[data-lead-card="${F.manual.wa_id}"]`).getByTestId("lead-intent")).toHaveCount(0);
+  await expect(page.locator(`[data-lead-card="${F.visita.opp}"]`).getByTestId("lead-intent")).toHaveText("Ventas");
+  await expect(page.locator(`[data-lead-card="${F.atRisk.opp}"]`).getByTestId("lead-intent")).toHaveText("Alquileres");
+  // Every opportunity carries a rubro, including the ones registered by hand:
+  // it is chosen on the form (docs/crm-oportunidades.md, rule 9).
+  await expect(page.locator(`[data-lead-card="${F.manual.opp}"]`).getByTestId("lead-intent")).toHaveText(
+    "Ventas",
+  );
 
   await page.getByTestId("leads-intent-filter").selectOption("Alquileres");
   await page.waitForURL(/intent=Alquileres/);
-  await expect(page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`)).toBeVisible();
-  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-lead-card="${F.atRisk.opp}"]`)).toBeVisible();
+  await expect(page.locator(`[data-lead-card="${F.visita.opp}"]`)).toHaveCount(0);
   // The filter survives the switch to the list.
   await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Lista" }).click();
   await page.waitForURL(/view=list.*intent=Alquileres|intent=Alquileres.*view=list/);
@@ -672,14 +708,14 @@ test("Intent shows on cards and filters the board; one click clears every filter
 test("Viewer opens the lead modal read-only and cannot set a budget", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH, VIEWER);
   await page.goto("/leads?view=board");
-  await page.locator(`[data-lead-card="${F.reserva.wa_id}"]`).getByTestId("lead-open").click();
+  await page.locator(`[data-lead-card="${F.reserva.opp}"]`).getByTestId("lead-open").click();
   const modal = page.getByTestId("lead-detail-modal");
   await expect(modal.getByTestId("lead-budget-value")).toHaveText("USD 90.000");
   await expect(modal.getByTestId("lead-budget-save")).toHaveCount(0);
   await expect(modal.getByTestId("lead-priority-select")).toHaveCount(0);
   await expect(modal.locator('[data-testid^="lead-field-"]')).toHaveCount(0);
   const res = await page.request.post("/api/leads/set-budget", {
-    data: { contactWaId: F.reserva.wa_id, amount: 1000, currency: "USD" },
+    data: { opportunityId: F.reserva.opp, amount: 1000, currency: "USD" },
   });
   expect(res.status()).toBe(403);
 });
@@ -718,8 +754,8 @@ test("Inline editing: keyboard, one row at a time, click outside, and losing a l
   // Losing a lead asks for the motive first, then ✓ saves it.
   await card.getByTestId("lead-field-stage").click();
   await card.getByTestId("lead-stage-select").selectOption("perdido");
-  await expect(card.locator(`#lost-reason-${F.reserva.wa_id}`)).toBeVisible();
-  await card.locator(`#lost-reason-${F.reserva.wa_id}`).selectOption("No responde");
+  await expect(card.locator(`#lost-reason-${F.reserva.opp}`)).toBeVisible();
+  await card.locator(`#lost-reason-${F.reserva.opp}`).selectOption("No responde");
   await card.getByTestId("lead-field-confirm").click();
   await expect(card).toContainText("Perdido");
   await expect(card.getByTestId("lead-status")).toContainText("No responde");
@@ -732,13 +768,13 @@ test("Board: attention strip first, Hoy filter, rails, column subtitles", async 
 
   // The overdue reminder is the first card of its column even without priority.
   const nuevo = page.locator('[data-board-column="nuevo"]');
-  await expect(nuevo.locator("[data-lead-card]").first()).toHaveAttribute("data-lead-card", F.overdue.wa_id);
-  const strip = page.locator(`[data-lead-card="${F.overdue.wa_id}"]`).getByTestId("lead-attention");
+  await expect(nuevo.locator("[data-lead-card]").first()).toHaveAttribute("data-lead-card", String(F.overdue.opp));
+  const strip = page.locator(`[data-lead-card="${F.overdue.opp}"]`).getByTestId("lead-attention");
   await expect(strip).toHaveAttribute("data-attention", "overdue");
   await expect(strip).toContainText("Vencido");
   await expect(strip).toContainText("Llamar para coordinar la visita");
-  await expect(page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`).getByTestId("lead-attention")).toHaveAttribute("data-attention", "at_risk");
-  await expect(page.locator(`[data-lead-card="${F.contacted.wa_id}"]`).getByTestId("lead-attention")).toHaveCount(0);
+  await expect(page.locator(`[data-lead-card="${F.atRisk.opp}"]`).getByTestId("lead-attention")).toHaveAttribute("data-attention", "at_risk");
+  await expect(page.locator(`[data-lead-card="${F.contacted.opp}"]`).getByTestId("lead-attention")).toHaveCount(0);
 
   // Who moves the stage: subtitle, lock on manual-only columns, bot glyph on auto chips.
   await expect(nuevo.locator("[data-column-mover]")).toHaveText("La mueve el bot");
@@ -767,16 +803,16 @@ test("Board: attention strip first, Hoy filter, rails, column subtitles", async 
   expect(n).toBeGreaterThanOrEqual(2);
   await today.click();
   await page.waitForURL(/filter=today/);
-  await expect(page.locator(`[data-lead-card="${F.overdue.wa_id}"]`)).toBeVisible();
-  await expect(page.locator(`[data-lead-card="${F.atRisk.wa_id}"]`)).toBeVisible();
-  await expect(page.locator(`[data-lead-card="${F.visita.wa_id}"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-lead-card="${F.overdue.opp}"]`)).toBeVisible();
+  await expect(page.locator(`[data-lead-card="${F.atRisk.opp}"]`)).toBeVisible();
+  await expect(page.locator(`[data-lead-card="${F.visita.opp}"]`)).toHaveCount(0);
   await expect(page.locator("[data-lead-card]")).toHaveCount(n);
 });
 
 test("Board: losing a lead asks for the motive; stage moves can be undone", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
-  const card = page.locator(`[data-lead-card="${F.contacted.wa_id}"]`);
+  const card = page.locator(`[data-lead-card="${F.contacted.opp}"]`);
 
   // ⋯ → Perdido lands the card in the (now open) column and asks why.
   await card.getByTestId("lead-menu").click();
@@ -790,7 +826,7 @@ test("Board: losing a lead asks for the motive; stage moves can be undone", asyn
   await expect
     .poll(() =>
       withSql(async (sql) => {
-        const rows = await sql`SELECT stage FROM dashboard.lead_state WHERE contact_wa_id = ${F.contacted.wa_id}`;
+        const rows = await sql`SELECT stage FROM dashboard.opportunities WHERE id = ${F.contacted.opp}`;
         return rows[0]?.stage ?? null;
       }),
     )
@@ -806,10 +842,10 @@ test("Board: losing a lead asks for the motive; stage moves can be undone", asyn
     to: "perdido",
     ok: true,
   });
-  await expect(page.locator(`[data-lead-card="${F.contacted.wa_id}"]`).getByTestId("lead-attention")).toContainText("No responde");
+  await expect(page.locator(`[data-lead-card="${F.contacted.opp}"]`).getByTestId("lead-attention")).toContainText("No responde");
 
   // Move Reserva → Visita, then Deshacer from the toast.
-  const reserva = page.locator(`[data-lead-card="${F.reserva.wa_id}"]`);
+  const reserva = page.locator(`[data-lead-card="${F.reserva.opp}"]`);
   await reserva.getByTestId("lead-menu").click();
   await page.getByRole("menuitem", { name: "Visita", exact: true }).click();
   await expect(page.locator('[data-board-column="visita"]')).toContainText(F.reserva.name);
@@ -819,7 +855,7 @@ test("Board: losing a lead asks for the motive; stage moves can be undone", asyn
   await expect
     .poll(() =>
       withSql(async (sql) => {
-        const rows = await sql`SELECT stage FROM dashboard.lead_state WHERE contact_wa_id = ${F.reserva.wa_id}`;
+        const rows = await sql`SELECT stage FROM dashboard.opportunities WHERE id = ${F.reserva.opp}`;
         return rows[0]?.stage ?? null;
       }),
     )
@@ -847,6 +883,97 @@ test("Board remembers the last filters until they are cleared", async ({ page })
   await page.goto("/leads");
   await expect(page.getByTestId("leads-clear-filters")).toHaveCount(0);
   await expect(page).toHaveURL(/\/leads$/);
+});
+
+test("A handoff for another rubro opens a second opportunity; the same rubro does not", async ({
+  page,
+}) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  // Ramiro is being worked on Ventas (Visita). The bot hands him off again for
+  // the same rubro: that is the same process, not a new one.
+  await botHandoff(F.visita.wa_id, "Ventas");
+  await page.goto("/leads?view=board");
+  await expect(page.locator(`[data-lead-wa="${F.visita.wa_id}"]`)).toHaveCount(1);
+
+  // Now he asks about renting. A handoff is a fact: it earns its own card.
+  await botHandoff(F.visita.wa_id, "Alquileres");
+  await page.goto("/leads?view=board");
+  const cards = page.locator(`[data-lead-wa="${F.visita.wa_id}"]`);
+  await expect(cards).toHaveCount(2);
+
+  // The old one stays where the advisor put it; the new one is Calificado.
+  await expect(page.locator(`[data-board-column="visita"] [data-lead-wa="${F.visita.wa_id}"]`)).toHaveCount(1);
+  const fresh = page.locator(`[data-board-column="calificado"] [data-lead-wa="${F.visita.wa_id}"]`);
+  await expect(fresh).toHaveCount(1);
+  await expect(fresh.getByTestId("lead-intent")).toHaveText("Alquileres");
+  await expect(fresh.getByTestId("lead-of-total")).toHaveText("2 de 2");
+
+  expect(await opportunitiesOf(F.visita.wa_id)).toMatchObject([
+    { seq: 1, kind: "Ventas", stage: "visita", opened_by: "" },
+    { seq: 2, kind: "Alquileres", stage: null, opened_by: "", closed: false },
+  ]);
+});
+
+test("A message about another rubro only hints; the advisor opens it in one click", async ({
+  page,
+}) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  // Ramiro starts the rental flow but never gets handed off.
+  await botMessage(F.visita.wa_id, "Alquileres");
+  await page.goto("/leads?view=board");
+
+  const card = page.locator(`[data-lead-card="${F.visita.opp}"]`);
+  await expect(page.locator(`[data-lead-wa="${F.visita.wa_id}"]`)).toHaveCount(1);
+  await expect(card.getByTestId("lead-new-intent")).toContainText("Consulta nueva: Alquileres");
+
+  await card.getByTestId("lead-open-intent").click();
+  await expect(page.locator(`[data-lead-wa="${F.visita.wa_id}"]`)).toHaveCount(2);
+  // Opened by a person, so it starts in Nuevo and belongs to whoever opened it.
+  const fresh = page.locator(`[data-board-column="nuevo"] [data-lead-wa="${F.visita.wa_id}"]`);
+  await expect(fresh.getByTestId("lead-intent")).toHaveText("Alquileres");
+  expect(await opportunitiesOf(F.visita.wa_id)).toMatchObject([
+    { seq: 1, kind: "Ventas" },
+    { seq: 2, kind: "Alquileres", opened_by: "dev@botargento.com.ar" },
+  ]);
+  await expect.poll(() => lastAudit("lead_open")).toMatchObject({
+    contact_wa_id: F.visita.wa_id,
+    kind: "Alquileres",
+    ok: true,
+  });
+});
+
+test("A closed opportunity does not come back: the next handoff opens a new one", async ({
+  page,
+}) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  // This is the case that started all of it: close the lead, then write again.
+  const closed = await page.request.post("/api/leads/set-stage", {
+    data: { opportunityId: F.contacted.opp, stage: "cerrado" },
+  });
+  expect(closed.status()).toBe(200);
+
+  await botHandoff(F.contacted.wa_id, "Ventas");
+  await page.goto("/leads?view=board&open=cerrado");
+
+  const rows = await opportunitiesOf(F.contacted.wa_id);
+  expect(rows).toMatchObject([
+    { seq: 1, stage: "cerrado", closed: true },
+    { seq: 2, kind: "Ventas", stage: null, closed: false, opened_by: "" },
+  ]);
+  await expect(page.locator(`[data-board-column="cerrado"] [data-lead-wa="${F.contacted.wa_id}"]`)).toHaveCount(1);
+  await expect(page.locator(`[data-board-column="calificado"] [data-lead-wa="${F.contacted.wa_id}"]`)).toHaveCount(1);
+});
+
+test("Somebody who wrote but never derived stays off the board, and is counted", async ({
+  page,
+}) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?view=board");
+  // No handoff, no opportunity: the board only shows real processes.
+  await expect(page.locator(`[data-lead-wa="${F.underived.wa_id}"]`)).toHaveCount(0);
+  expect(await opportunitiesOf(F.underived.wa_id)).toHaveLength(0);
+  // But they are not lost: Leads says how many arrived this week.
+  await expect(page.getByTestId("underived-pill")).toContainText("sin derivar");
 });
 
 test("Board: nothing matches the filters → one empty state with a clear link", async ({ page }) => {

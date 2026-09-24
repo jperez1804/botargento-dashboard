@@ -18,9 +18,9 @@ type Props = { ariaLabel: string; children: React.ReactNode };
 export function LeadDetailModal({ ariaLabel, children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useParams<{ waId: string }>();
+  const params = useParams<{ id: string }>();
   const closing = useRef(false);
-  const open = pathname === `/leads/${params.waId}`;
+  const open = pathname === `/leads/${params.id}`;
   // The slot instance can be reused for the next open of the same lead.
   useEffect(() => {
     if (open) closing.current = false;

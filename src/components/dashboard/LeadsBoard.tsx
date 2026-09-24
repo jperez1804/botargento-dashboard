@@ -74,33 +74,33 @@ export function LeadsBoard({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  // waId → value the user just chose, pending server confirmation.
-  const [moved, setMoved] = useState<Record<string, string>>({});
-  const [assigned, setAssigned] = useState<Record<string, string | null>>({});
-  const [prioritized, setPrioritized] = useState<Record<string, CrmPriorityKey | null>>({});
-  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  // opportunity id → value the user just chose, pending server confirmation.
+  const [moved, setMoved] = useState<Record<number, string>>({});
+  const [assigned, setAssigned] = useState<Record<number, string | null>>({});
+  const [prioritized, setPrioritized] = useState<Record<number, CrmPriorityKey | null>>({});
+  const [busy, setBusy] = useState<Record<number, boolean>>({});
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   // A card dropped on Perdido waits here for its motive.
-  const [pendingLost, setPendingLost] = useState<{ waId: string; from: string } | null>(null);
+  const [pendingLost, setPendingLost] = useState<{ id: number; from: string } | null>(null);
   // Expanded terminal columns: the URL plus anything expanded in this session
   // (dropping on a rail expands it so the motive panel is visible).
   const [expanded, setExpanded] = useState<string[]>([...openKeys]);
 
   const stages = columns.map((c) => ({ key: c.key, label: c.label }));
   const allCards = columns.flatMap((c) => c.cards);
-  const stageOf = (card: BoardCard) => moved[card.waId] ?? card.stageKey;
+  const stageOf = (card: BoardCard) => moved[card.id] ?? card.stageKey;
   const ownerOf = (card: BoardCard) =>
-    card.waId in assigned ? (assigned[card.waId] ?? null) : card.ownerEmail;
+    card.id in assigned ? (assigned[card.id] ?? null) : card.ownerEmail;
   const priorityOf = (card: BoardCard) =>
-    card.waId in prioritized ? priorityView(prioritized[card.waId] ?? null, labels) : card.priority;
+    card.id in prioritized ? priorityView(prioritized[card.id] ?? null, labels) : card.priority;
   const stageLabel = (key: string) => stages.find((s) => s.key === key)?.label ?? key;
   const ownerLabelOf = (email: string | null) =>
     email ? (members.find((m) => m.email === email)?.label ?? email) : labels.unassigned;
 
-  function rollback<T>(setter: (fn: (prev: Record<string, T>) => Record<string, T>) => void, waId: string) {
+  function rollback<T>(setter: (fn: (prev: Record<number, T>) => Record<number, T>) => void, id: number) {
     setter((prev) => {
       const next = { ...prev };
-      delete next[waId];
+      delete next[id];
       return next;
     });
   }
@@ -118,15 +118,15 @@ export function LeadsBoard({
   };
 
   async function run(
-    waId: string,
+    id: number,
     body: Record<string, unknown>,
     path: LeadApiPath,
     undoOptimistic: () => void,
     done?: { text: string; revert: () => void },
   ) {
-    setBusy((b) => ({ ...b, [waId]: true }));
-    const res = await postLead(path, { contactWaId: waId, ...body });
-    setBusy((b) => ({ ...b, [waId]: false }));
+    setBusy((b) => ({ ...b, [id]: true }));
+    const res = await postLead(path, { opportunityId: id, ...body });
+    setBusy((b) => ({ ...b, [id]: false }));
     if (res.ok) {
       if (done) toast.success(done.text, { action: { label: labels.undo, onClick: done.revert } });
       else toast.success(labels.saved);
@@ -138,86 +138,94 @@ export function LeadsBoard({
     }
   }
 
-  async function saveStage(waId: string, stage: string, from: string, lostReason?: string) {
-    const card = allCards.find((c) => c.waId === waId);
+  async function saveStage(id: number, stage: string, from: string, lostReason?: string) {
+    const card = allCards.find((c) => c.id === id);
     if (!card) return;
     await run(
-      waId,
+      id,
       { stage, ...(lostReason ? { lostReason } : {}) },
       "set-stage",
-      () => rollback(setMoved, waId),
+      () => rollback(setMoved, id),
       {
         text: fillTemplate(labels.movedToastTemplate, { name: card.displayName, stage: stageLabel(stage) }),
         revert: () => {
-          setMoved((m) => ({ ...m, [waId]: from }));
-          void run(waId, { stage: from }, "set-stage", () => rollback(setMoved, waId));
+          setMoved((m) => ({ ...m, [id]: from }));
+          void run(id, { stage: from }, "set-stage", () => rollback(setMoved, id));
         },
       },
     );
   }
 
-  function move(waId: string, stage: string) {
-    const card = allCards.find((c) => c.waId === waId);
+  function move(id: number, stage: string) {
+    const card = allCards.find((c) => c.id === id);
     if (!card || stageOf(card) === stage) return;
     const from = stageOf(card);
-    setMoved((m) => ({ ...m, [waId]: stage }));
+    setMoved((m) => ({ ...m, [id]: stage }));
     if (stage === lostKey) {
       // Land the card in Perdido and ask for the motive before saving.
       expand(lostKey);
-      setPendingLost({ waId, from });
+      setPendingLost({ id, from });
       return;
     }
-    void saveStage(waId, stage, from);
+    void saveStage(id, stage, from);
   }
 
   function cancelLost() {
-    if (pendingLost) rollback(setMoved, pendingLost.waId);
+    if (pendingLost) rollback(setMoved, pendingLost.id);
     setPendingLost(null);
   }
 
   async function confirmLost(reason: string) {
     if (!pendingLost) return;
-    const { waId, from } = pendingLost;
+    const { id, from } = pendingLost;
     setPendingLost(null);
-    await saveStage(waId, lostKey, from, reason);
+    await saveStage(id, lostKey, from, reason);
   }
 
-  async function assign(waId: string, ownerEmail: string | null) {
-    const card = allCards.find((c) => c.waId === waId);
+  async function assign(id: number, ownerEmail: string | null) {
+    const card = allCards.find((c) => c.id === id);
     if (!card || ownerOf(card) === ownerEmail) return;
     const from = ownerOf(card);
     const claimingUnowned = from === null && ownerEmail === sessionEmail;
-    setAssigned((a) => ({ ...a, [waId]: ownerEmail }));
+    setAssigned((a) => ({ ...a, [id]: ownerEmail }));
     await run(
-      waId,
+      id,
       { ownerEmail, ...(claimingUnowned ? { take: true } : {}) },
       "assign",
-      () => rollback(setAssigned, waId),
+      () => rollback(setAssigned, id),
       {
         text: fillTemplate(labels.assignedToastTemplate, { name: card.displayName, owner: ownerLabelOf(ownerEmail) }),
         revert: () => {
-          setAssigned((a) => ({ ...a, [waId]: from }));
-          void run(waId, { ownerEmail: from }, "assign", () => rollback(setAssigned, waId));
+          setAssigned((a) => ({ ...a, [id]: from }));
+          void run(id, { ownerEmail: from }, "assign", () => rollback(setAssigned, id));
         },
       },
     );
   }
 
-  async function setPriority(waId: string, priority: CrmPriorityKey | "") {
-    const card = allCards.find((c) => c.waId === waId);
+  async function setPriority(id: number, priority: CrmPriorityKey | "") {
+    const card = allCards.find((c) => c.id === id);
     if (!card || (priorityOf(card)?.key ?? null) === (priority || null)) return;
     const from = priorityOf(card)?.key ?? "";
-    setPrioritized((p) => ({ ...p, [waId]: priority || null }));
-    await run(waId, { priority }, "set-priority", () => rollback(setPrioritized, waId), {
+    setPrioritized((p) => ({ ...p, [id]: priority || null }));
+    await run(id, { priority }, "set-priority", () => rollback(setPrioritized, id), {
       text: fillTemplate(labels.priorityToastTemplate, {
         name: card.displayName,
         priority: priority ? labels.priority.names[priority] : labels.priority.none,
       }),
       revert: () => {
-        setPrioritized((p) => ({ ...p, [waId]: from || null }));
-        void run(waId, { priority: from }, "set-priority", () => rollback(setPrioritized, waId));
+        setPrioritized((p) => ({ ...p, [id]: from || null }));
+        void run(id, { priority: from }, "set-priority", () => rollback(setPrioritized, id));
       },
     });
+  }
+
+  // A message is only a hint: opening the opportunity is the advisor's call.
+  async function openForIntent(contactWaId: string, kind: string) {
+    const res = await postLead("open", { contactWaId, kind });
+    if (res.ok) toast.success(labels.opportunity.createdToast);
+    else toast.error(errorText(labels.errors, res.error));
+    router.refresh();
   }
 
   const visibleCards = columns.map((col) => allCards.filter((c) => stageOf(c) === col.key));
@@ -255,8 +263,8 @@ export function LeadsBoard({
     onDrop: (e: React.DragEvent) => {
       e.preventDefault();
       setDropTarget(null);
-      const waId = e.dataTransfer.getData("text/plain");
-      if (waId) move(waId, key);
+      const dragged = Number(e.dataTransfer.getData("text/plain"));
+      if (dragged) move(dragged, key);
     },
   });
   const columnTone = (key: string) =>
@@ -359,9 +367,9 @@ export function LeadsBoard({
 
               {pendingLost && col.key === lostKey ? (
                 <LostReasonPanel
-                  leadName={allCards.find((c) => c.waId === pendingLost.waId)?.displayName ?? ""}
+                  leadName={allCards.find((c) => c.id === pendingLost.id)?.displayName ?? ""}
                   labels={labels}
-                  busy={busy[pendingLost.waId] === true}
+                  busy={busy[pendingLost.id] === true}
                   onConfirm={(reason) => void confirmLost(reason)}
                   onCancel={cancelLost}
                 />
@@ -374,7 +382,7 @@ export function LeadsBoard({
               ) : (
                 cards.map((card) => (
                   <LeadCard
-                    key={card.waId}
+                    key={card.id}
                     card={{
                       ...card,
                       stageKey: stageOf(card),
@@ -388,10 +396,11 @@ export function LeadsBoard({
                     canEdit={canEdit}
                     isAdmin={isAdmin}
                     sessionEmail={sessionEmail}
-                    busy={busy[card.waId] === true}
+                    busy={busy[card.id] === true}
                     onMove={(id, stage) => move(id, stage)}
                     onAssign={(id, owner) => void assign(id, owner)}
                     onSetPriority={(id, p) => void setPriority(id, p)}
+                    onOpenIntent={(wa, kind) => void openForIntent(wa, kind)}
                   />
                 ))
               )}

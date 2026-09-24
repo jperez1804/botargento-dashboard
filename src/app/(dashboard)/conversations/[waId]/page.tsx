@@ -11,8 +11,8 @@ import type { IntentDef } from "@/config/verticals/_types";
 import { crmConfig } from "@/lib/crm/enabled";
 import { buildLeadView } from "@/lib/crm/view-model";
 import { getSessionRole, hasRole } from "@/lib/role-guard";
-import { getLead } from "@/lib/queries/leads";
-import { getLeadQualification, listLeadEvents } from "@/lib/queries/lead-detail";
+import { getPerson, pickDefaultOpportunity } from "@/lib/queries/leads";
+import { getLeadQualification, listOpportunityEvents } from "@/lib/queries/lead-detail";
 import { listTeam, memberLabel } from "@/lib/queries/team";
 import { LeadCrmCard } from "@/components/dashboard/LeadCrmCard";
 import { LeadActivityFeed } from "@/components/dashboard/LeadActivityFeed";
@@ -21,6 +21,8 @@ import { NoConversationYet } from "@/components/dashboard/NoConversationYet";
 
 type Props = {
   params: Promise<{ waId: string }>;
+  // ?op=<id> selects one of the person's opportunities.
+  searchParams: Promise<{ op?: string | string[] }>;
 };
 
 function resolveLastIntent(
@@ -32,32 +34,38 @@ function resolveLastIntent(
   return hit?.label ?? formatAutomationLabel(raw) ?? raw;
 }
 
-export default async function ConversationDetailPage({ params }: Props) {
-  const { waId } = await params;
+export default async function ConversationDetailPage({ params, searchParams }: Props) {
+  const [{ waId }, { op }] = await Promise.all([params, searchParams]);
   const crm = crmConfig();
   const now = new Date();
-  const [contact, entries, session, crmData] = await Promise.all([
+  const tenant = tenantConfig();
+  const [contact, entries, session, person, team] = await Promise.all([
     getContact(waId),
     getConversation(waId),
     getSessionRole(),
-    crm
-      ? Promise.all([
-          getLead(crm, waId, now),
-          listLeadEvents(waId),
-          getLeadQualification(crm, waId),
-          listTeam(),
-        ])
-      : Promise.resolve(null),
+    crm ? getPerson(crm, waId, now) : Promise.resolve(null),
+    crm ? listTeam() : Promise.resolve([]),
   ]);
-  const [lead, events, qualification, team] = crmData ?? [null, [], [], []];
-  // A lead registered by hand may not have written on WhatsApp yet: it has a
-  // CRM record but no conversation, and still gets its page.
-  if (!contact && !lead?.manual) notFound();
+  // The selected opportunity: the one asked for, else the one that needs
+  // attention today, else the newest open one (lib/queries/leads).
+  const lead =
+    crm && person
+      ? pickDefaultOpportunity(person, op ? Number(op) : null, now, tenant.timezone)
+      : null;
+  const [events, qualification] =
+    crm && lead
+      ? await Promise.all([
+          listOpportunityEvents(lead.id, waId),
+          getLeadQualification(crm, lead),
+        ])
+      : [[], []];
+  // Somebody registered by hand may not have written on WhatsApp yet: they
+  // have a CRM record but no conversation, and still get their page.
+  if (!contact && !person) notFound();
 
-  const tenant = tenantConfig();
   const vertical = verticalConfig();
   const lastIntentLabel = contact ? resolveLastIntent(contact.lastIntent, vertical.intents) : null;
-  const contactName = contact?.displayName ?? lead?.displayName ?? waId;
+  const contactName = contact?.displayName ?? person?.displayName ?? waId;
   const labelFor = (email: string | null) => memberLabel(team, email);
   const canEdit = session ? hasRole(session, "asesor") : false;
   const members = team
@@ -115,10 +123,10 @@ export default async function ConversationDetailPage({ params }: Props) {
               locale={tenant.locale}
               timezone={tenant.timezone}
             />
-          ) : crm && lead?.manual ? (
+          ) : crm && person && person.contact.source !== "whatsapp" ? (
             <NoConversationYet
               waId={waId}
-              manual={lead.manual}
+              manual={person.contact}
               config={crm}
               memberLabel={labelFor}
               locale={tenant.locale}
@@ -132,6 +140,7 @@ export default async function ConversationDetailPage({ params }: Props) {
             <>
               <LeadCrmCard
                 waId={waId}
+                opportunityId={lead.id}
                 view={buildLeadView(lead.lead, crm, labelFor, tenant.locale, tenant.timezone, now, lead.budget)}
                 config={crm}
                 members={members}
@@ -141,6 +150,7 @@ export default async function ConversationDetailPage({ params }: Props) {
               />
               <LeadActivityFeed
                 waId={waId}
+                opportunityId={lead.id}
                 events={events}
                 config={crm}
                 memberLabel={labelFor}

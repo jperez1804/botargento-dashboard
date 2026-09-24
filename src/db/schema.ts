@@ -67,8 +67,36 @@ export const teamMembers = dashboardSchema.table("team_members", {
   updatedBy: text("updated_by").notNull().default(""),
 });
 
-export const leadState = dashboardSchema.table("lead_state", {
+// The person (migrations/0010_opportunities.sql, renamed from manual_leads):
+// everyone who wrote to the bot plus everyone registered by hand, keyed by the
+// same contact_wa_id WhatsApp uses. display_name '' = use the WhatsApp profile.
+export const contacts = dashboardSchema.table("contacts", {
   contactWaId: text("contact_wa_id").primaryKey(),
+  displayName: text("display_name").notNull().default(""),
+  // 'whatsapp' | a key from the vertical's crm.manualLeadSources.
+  source: text("source").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }),
+  createdBy: text("created_by").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One commercial process for a person (migrations/0010_opportunities.sql):
+// stage, owner, priority, budget and reminder live here, N rows per contact.
+export const opportunities = dashboardSchema.table("opportunities", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  contactWaId: text("contact_wa_id")
+    .notNull()
+    .references(() => contacts.contactWaId, { onDelete: "cascade" }),
+  seq: smallint("seq").notNull(),
+  // Vertical intent key ("Ventas", "Alquileres"…); '' = not known yet.
+  kind: text("kind").notNull().default(""),
+  title: text("title").notNull().default(""),
+  openedAt: timestamp("opened_at", { withTimezone: true }).notNull(),
+  // '' = opened automatically by a handoff.
+  openedBy: text("opened_by").notNull().default(""),
+  // NULL = open; set when an advisor moves it to a terminal stage.
+  closedAt: timestamp("closed_at", { withTimezone: true }),
   stage: text("stage"),
   stageChangedAt: timestamp("stage_changed_at", { withTimezone: true }),
   stageChangedBy: text("stage_changed_by").notNull().default(""),
@@ -81,11 +109,9 @@ export const leadState = dashboardSchema.table("lead_state", {
   nextActionSetBy: text("next_action_set_by").notNull().default(""),
   nextActionNotifiedAt: timestamp("next_action_notified_at", { withTimezone: true }),
   nextActionDoneAt: timestamp("next_action_done_at", { withTimezone: true }),
-  // Manual priority (migrations/0007_lead_priority.sql): '' | alta | media | baja.
   priority: text("priority").notNull().default(""),
   prioritySetAt: timestamp("priority_set_at", { withTimezone: true }),
   prioritySetBy: text("priority_set_by").notNull().default(""),
-  // Manual budget (migrations/0008_lead_budget.sql); NULL amount = none.
   budgetAmount: numeric("budget_amount"),
   budgetCurrency: text("budget_currency").notNull().default(""),
   budgetSetAt: timestamp("budget_set_at", { withTimezone: true }),
@@ -93,21 +119,15 @@ export const leadState = dashboardSchema.table("lead_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Leads registered by hand (migrations/0006_manual_leads.sql), keyed by the
-// same contact_wa_id WhatsApp uses.
-export const manualLeads = dashboardSchema.table("manual_leads", {
-  contactWaId: text("contact_wa_id").primaryKey(),
-  displayName: text("display_name").notNull(),
-  source: text("source").notNull(),
-  // Intent key from the vertical's list, chosen at registration ('' = none).
-  intent: text("intent").notNull().default(""),
-  createdBy: text("created_by").notNull().default(""),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export const leadEvents = dashboardSchema.table("lead_events", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
-  contactWaId: text("contact_wa_id").notNull(),
+  contactWaId: text("contact_wa_id")
+    .notNull()
+    .references(() => contacts.contactWaId, { onDelete: "cascade" }),
+  // NULL = an event about the person, not about one opportunity.
+  opportunityId: bigint("opportunity_id", { mode: "number" }).references(() => opportunities.id, {
+    onDelete: "cascade",
+  }),
   kind: text("kind").notNull(),
   body: text("body").notNull().default(""),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),

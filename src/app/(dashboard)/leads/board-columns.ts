@@ -13,11 +13,19 @@ const BOARD_CARDS_PER_COLUMN = 50;
 const BOARD_LOST_CARDS = 20;
 
 export type LeadViewRow = {
+  id: number;
   waId: string;
   displayName: string;
+  // Which of the person's opportunities this is, and how many they have.
+  seq: number;
+  ofTotal: number;
+  title: string;
   budget: LeadBudget | null;
   sourceLabel: string | null;
   intentLabel: string | null;
+  // Rubro of an enquiry nobody is working yet: a hint, not an opening.
+  newIntentKey: string | null;
+  newIntentLabel: string | null;
   attention: Attention | null;
   view: LeadView;
 };
@@ -53,8 +61,12 @@ export function buildBoardColumns(
           )
         : null,
       cards: inStage.slice(0, cap).map((v) => ({
+        id: v.id,
         waId: v.waId,
         displayName: v.displayName,
+        seq: v.seq,
+        ofTotal: v.ofTotal,
+        title: v.title,
         stageKey: v.view.stageKey,
         auto: v.view.auto,
         ownerEmail: v.view.ownerEmail,
@@ -66,6 +78,8 @@ export function buildBoardColumns(
         sourceLabel: v.sourceLabel,
         priority: v.view.priority,
         intentLabel: v.intentLabel,
+        newIntentKey: v.newIntentKey,
+        newIntentLabel: v.newIntentLabel,
       })),
     };
   });

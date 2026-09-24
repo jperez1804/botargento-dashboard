@@ -18,8 +18,8 @@ const Body = z.object({
   phone: z.string().trim().min(1).max(40),
   name: z.string().trim().min(1).max(80),
   source: z.string().trim().min(1).max(40),
-  // A key from the vertical's intents; "" or absent = none.
-  intent: z.string().trim().max(60).optional(),
+  // A key from the vertical's intents: the rubro of the first opportunity.
+  intent: z.string().trim().max(60),
   note: z.string().trim().max(2000).optional(),
 });
 
@@ -60,15 +60,22 @@ export async function POST(request: Request) {
   } else if (!config.manualLeadSources.some((s) => s.key === source)) {
     status = 400;
     body = { error: "invalid_source" };
-  } else if (parsed.data.intent && !intentDef) {
+  } else if (!intentDef) {
     status = 400;
     body = { error: "invalid_intent" };
   } else {
     try {
-      const result = await createManualLead({ waId: phone.waId, name, source, intent, note, by: session.email });
+      const result = await createManualLead({
+        waId: phone.waId,
+        name,
+        source,
+        kind: intent,
+        note,
+        by: session.email,
+      });
       if (result.ok) {
         status = 200;
-        body = { ok: true, contactWaId: phone.waId };
+        body = { ok: true, contactWaId: phone.waId, opportunityId: result.opportunityId };
       } else {
         // Same phone = same person: hand back the existing lead to open it.
         status = 409;

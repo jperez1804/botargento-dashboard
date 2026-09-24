@@ -11,8 +11,11 @@ import type { CrmLabels } from "@/config/verticals/_types";
 import type { LeadView } from "@/lib/crm/view-model";
 
 export type LeadTableRow = {
+  id: number;
   waId: string;
   displayName: string;
+  seq: number;
+  ofTotal: number;
   view: LeadView;
   // Origin of a lead registered by hand; null = came through WhatsApp.
   sourceLabel: string | null;
@@ -148,8 +151,8 @@ export function LeadsTable({ rows, labels, pagination }: Props) {
     <DataTable
       columns={columns}
       rows={rows}
-      rowKey={(r) => r.waId}
-      rowHref={(r) => `/conversations/${encodeURIComponent(r.waId)}`}
+      rowKey={(r) => String(r.id)}
+      rowHref={(r) => `/conversations/${encodeURIComponent(r.waId)}?op=${r.id}`}
       rowAriaLabel={(r) => `${labels.pageTitle}: ${r.displayName}`}
       empty={{ icon: <SquareKanban className="size-5" aria-hidden />, title: labels.emptyLeads }}
       minWidth={1000}

@@ -26,6 +26,7 @@ function lead(overrides: Partial<EffectiveLead> = {}): EffectiveLead {
     reminder: null,
     owner: null,
     priority: null,
+    closedAt: null,
     ...overrides,
   };
 }

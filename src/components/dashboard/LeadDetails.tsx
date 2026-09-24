@@ -39,6 +39,8 @@ export type LeadDetailField = "stage" | "priority" | "budget" | "owner" | "remin
 
 type Props = {
   waId: string;
+  // Every write in this list acts on ONE opportunity of that person.
+  opportunityId: number;
   view: LeadView;
   labels: CrmLabels;
   stages: ReadonlyArray<{ key: string; label: string }>;
@@ -111,6 +113,7 @@ function reminderDraft(open: LeadView["reminder"]): ReminderDraft {
 
 export function LeadDetails({
   waId,
+  opportunityId,
   view,
   labels,
   stages,
@@ -158,7 +161,7 @@ export function LeadDetails({
 
   async function save(path: LeadApiPath, body: Record<string, unknown>): Promise<boolean> {
     setBusy(true);
-    const res = await postLead(path, { contactWaId: waId, ...body });
+    const res = await postLead(path, { opportunityId, ...body });
     setBusy(false);
     if (res.ok) {
       toast.success(labels.saved);
@@ -178,11 +181,11 @@ export function LeadDetails({
   const canReassign = isAdmin || view.ownerEmail === null || view.ownerEmail === sessionEmail;
   const ownerEditor = (
     <>
-      <label htmlFor={`owner-${waId}`} className="sr-only">
+      <label htmlFor={`owner-${opportunityId}`} className="sr-only">
         {labels.ownerLabel}
       </label>
       <CommitSelect
-        id={`owner-${waId}`}
+        id={`owner-${opportunityId}`}
         data-testid="lead-owner-select"
         autoFocus
         disabled={busy}
@@ -199,7 +202,7 @@ export function LeadDetails({
   // "Tomar" saves at once; the toast offers to give the lead back.
   async function takeLead() {
     setBusy(true);
-    const res = await postLead("assign", { contactWaId: waId, ownerEmail: "me", take: true });
+    const res = await postLead("assign", { opportunityId, ownerEmail: "me", take: true });
     setBusy(false);
     router.refresh();
     if (!res.ok) {
@@ -211,7 +214,7 @@ export function LeadDetails({
       action: {
         label: labels.undo,
         onClick: () => {
-          void postLead("assign", { contactWaId: waId, ownerEmail: null }).then((undo) => {
+          void postLead("assign", { opportunityId, ownerEmail: null }).then((undo) => {
             if (!undo.ok) toast.error(errorText(labels.errors, undo.error));
             router.refresh();
           });
@@ -291,12 +294,12 @@ export function LeadDetails({
             className={LEAD_FIELD_CLASS}
           />
           <div className="flex items-center gap-1.5">
-            <label htmlFor={`reminder-date-${waId}`} className="sr-only">
+            <label htmlFor={`reminder-date-${opportunityId}`} className="sr-only">
               {labels.dateLabel}
             </label>
             <input
               ref={dateRef}
-              id={`reminder-date-${waId}`}
+              id={`reminder-date-${opportunityId}`}
               type="date"
               data-testid="reminder-date"
               value={reminder.date}
@@ -304,11 +307,11 @@ export function LeadDetails({
               onChange={(e) => setReminder((r) => ({ ...r, preset: "custom", date: e.target.value }))}
               className={cn(LEAD_FIELD_CLASS, "min-w-0 flex-1 tabular-nums")}
             />
-            <label htmlFor={`reminder-time-${waId}`} className="sr-only">
+            <label htmlFor={`reminder-time-${opportunityId}`} className="sr-only">
               {labels.timeLabel}
             </label>
             <input
-              id={`reminder-time-${waId}`}
+              id={`reminder-time-${opportunityId}`}
               type="time"
               data-testid="reminder-time"
               value={reminder.time}
@@ -334,11 +337,11 @@ export function LeadDetails({
   // ── Etapa ──
   const stageEditor = (
     <div className="space-y-1.5">
-      <label htmlFor={`stage-${waId}`} className="sr-only">
+      <label htmlFor={`stage-${opportunityId}`} className="sr-only">
         {labels.stageLabel}
       </label>
       <CommitSelect
-        id={`stage-${waId}`}
+        id={`stage-${opportunityId}`}
         data-testid="lead-stage-select"
         autoFocus
         disabled={busy}
@@ -352,11 +355,11 @@ export function LeadDetails({
       />
       {pendingLost ? (
         <div className="space-y-1.5">
-          <label htmlFor={`lost-reason-${waId}`} className="sr-only">
+          <label htmlFor={`lost-reason-${opportunityId}`} className="sr-only">
             {labels.lostReasonLabel}
           </label>
           <select
-            id={`lost-reason-${waId}`}
+            id={`lost-reason-${opportunityId}`}
             value={lostReason}
             disabled={busy}
             onChange={(e) => setLostReason(e.target.value)}
@@ -398,11 +401,11 @@ export function LeadDetails({
       }}
     >
       <div className="flex items-center gap-1.5">
-        <label htmlFor={`budget-amount-${waId}`} className="sr-only">
+        <label htmlFor={`budget-amount-${opportunityId}`} className="sr-only">
           {labels.budget.amountLabel}
         </label>
         <input
-          id={`budget-amount-${waId}`}
+          id={`budget-amount-${opportunityId}`}
           data-testid="lead-budget-amount"
           type="text"
           inputMode="numeric"
@@ -414,11 +417,11 @@ export function LeadDetails({
           onChange={(e) => setAmount(e.target.value)}
           className={cn(LEAD_FIELD_CLASS, "min-w-0 flex-1 tabular-nums")}
         />
-        <label htmlFor={`budget-currency-${waId}`} className="sr-only">
+        <label htmlFor={`budget-currency-${opportunityId}`} className="sr-only">
           {labels.budget.currencyLabel}
         </label>
         <select
-          id={`budget-currency-${waId}`}
+          id={`budget-currency-${opportunityId}`}
           data-testid="lead-budget-currency"
           value={currency}
           disabled={busy}
@@ -577,11 +580,11 @@ export function LeadDetails({
           onOutside={close}
           editor={
             <>
-              <label htmlFor={`priority-${waId}`} className="sr-only">
+              <label htmlFor={`priority-${opportunityId}`} className="sr-only">
                 {labels.priority.label}
               </label>
               <CommitSelect
-                id={`priority-${waId}`}
+                id={`priority-${opportunityId}`}
                 data-testid="lead-priority-select"
                 autoFocus
                 disabled={busy}

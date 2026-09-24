@@ -7,11 +7,11 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fillTemplate, formatDay } from "@/lib/crm/view-model";
 import type { CrmConfig } from "@/config/verticals/_types";
-import type { ManualLeadInfo } from "@/lib/queries/leads";
+import type { ContactInfo } from "@/lib/queries/leads";
 
 type Props = {
   waId: string;
-  manual: ManualLeadInfo;
+  manual: ContactInfo;
   config: CrmConfig;
   memberLabel: (email: string | null) => string;
   locale: string;

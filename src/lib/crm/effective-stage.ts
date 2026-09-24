@@ -30,6 +30,8 @@ export const ACTIVITY_EVENT_KINDS: ReadonlyArray<CrmEventKind> = [
   "contact",
   // Registering a lead by hand starts its clock (it has no WhatsApp message).
   "created",
+  // Opening an opportunity by hand does too.
+  "opened",
 ];
 
 export type LeadSignals = {
@@ -50,6 +52,12 @@ export type LeadStateRow = {
   nextActionNote: string;
   nextActionDoneAt: Date | null;
   priority: string; // '' | alta | media | baja (validated by parsePriority)
+  // When this opportunity started. An opportunity opened by hand has no
+  // WhatsApp message of its own, so this is the floor for its stage date and
+  // its inactivity clock.
+  openedAt: Date;
+  // When an advisor closed it (terminal stage). NULL = open.
+  closedAt: Date | null;
 };
 
 export type LostInfo = {
@@ -73,6 +81,9 @@ export type EffectiveLead = {
   owner: string | null;
   // Manual priority; setting it is not activity (same rule as assigning).
   priority: CrmPriorityKey | null;
+  // Persisted close (an advisor moved it to a terminal stage). A lead that is
+  // only lost by inactivity stays open and reversible, so this stays null.
+  closedAt: Date | null;
 };
 
 function maxDate(...dates: Array<Date | null | undefined>): Date | null {
@@ -86,6 +97,7 @@ function maxDate(...dates: Array<Date | null | undefined>): Date | null {
 function autoStage(
   signals: LeadSignals,
   config: CrmConfig,
+  openedAt: Date | null,
 ): { stage: string; at: Date | null } {
   if (signals.lastHandoffAt) {
     return { stage: config.autoStages.qualified, at: signals.lastHandoffAt };
@@ -93,7 +105,7 @@ function autoStage(
   if (signals.lastHumanContactAt) {
     return { stage: config.autoStages.contacted, at: signals.lastHumanContactAt };
   }
-  return { stage: config.autoStages.new, at: signals.firstSeen };
+  return { stage: config.autoStages.new, at: signals.firstSeen ?? openedAt };
 }
 
 export function deriveLead(
@@ -112,7 +124,7 @@ export function deriveLead(
     state?.stage && rank(state.stage) >= 0
       ? { stage: state.stage, at: state.stageChangedAt }
       : null;
-  const auto = autoStage(signals, config);
+  const auto = autoStage(signals, config, state?.openedAt ?? null);
 
   let stage: string;
   let source: "auto" | "manual";
@@ -140,10 +152,13 @@ export function deriveLead(
     }
   }
 
+  // Opening the opportunity starts its clock: one opened by hand has no
+  // WhatsApp message of its own and must not be born "por vencer".
   const lastActivityAt = maxDate(
     signals.lastMessageAt,
     signals.lastCrmActivityAt,
     state?.stageChangedAt,
+    state?.openedAt,
   );
   const daysInactive =
     lastActivityAt === null
@@ -202,5 +217,6 @@ export function deriveLead(
     reminder,
     owner: state?.ownerEmail ?? null,
     priority: parsePriority(state?.priority),
+    closedAt: state?.closedAt ?? null,
   };
 }

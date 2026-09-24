@@ -45,9 +45,11 @@ export default async function SearchPage({ searchParams }: Props) {
       return {
         waId: r.contactWaId,
         name: r.displayName,
-        sourceLabel: r.manual
-          ? (crm.manualLeadSources.find((s) => s.key === r.manual?.source)?.label ?? r.manual.source)
-          : crm.labels.sourceWhatsapp,
+        sourceLabel:
+          r.contact.source === "whatsapp"
+            ? crm.labels.sourceWhatsapp
+            : (crm.manualLeadSources.find((s) => s.key === r.contact.source)?.label ??
+              r.contact.source),
         stage: { label: view.stageLabel, tone: view.tone, auto: view.auto },
         lastActivity: view.lastActivityText,
       };

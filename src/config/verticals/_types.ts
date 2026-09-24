@@ -168,7 +168,12 @@ export type CrmEventKind =
   // A person set or cleared the manual priority.
   | "priority"
   // A person typed (or cleared) the budget by hand.
-  | "budget";
+  | "budget"
+  // A person opened an opportunity by hand. The bot's ones are recorded by
+  // the opportunity's own opened_at, not by an event.
+  | "opened"
+  // A person corrected an opportunity's rubro or title.
+  | "kind_change";
 
 export type CrmLabels = {
   nav: string;
@@ -327,6 +332,33 @@ export type CrmLabels = {
   // "Lo que captó el bot": summary paragraph, chips, and the rest folded.
   showAllTemplate: string; // {n}
   showLess: string;
+
+  // Opportunities: a person can have several commercial processes over time,
+  // so a lead card is one of them and the person's card lists them all.
+  opportunity: {
+    listTitle: string;
+    newButton: string;
+    dialogTitle: string;
+    dialogHint: string;
+    kindLabel: string;
+    kindNone: string;
+    titleLabel: string;
+    titlePlaceholder: string;
+    create: string;
+    createdToast: string;
+    ofTotalTemplate: string; // {n} {total}
+    openedTemplate: string; // {date}
+    closedTemplate: string; // {date}
+    openedByBot: string;
+    // A rubro nobody is working showed up in the conversation.
+    newIntentTemplate: string; // {kind}
+    openFromIntent: string;
+    // Conversations that never reached a handoff.
+    underivedTitle: string;
+    underivedCountTemplate: string; // {n}
+    underivedCountOne: string;
+    underivedHint: string;
+  };
 
   // Lead detail modal
   openConversation: string;

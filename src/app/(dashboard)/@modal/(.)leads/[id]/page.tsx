@@ -8,11 +8,11 @@ import { ExternalLink, MessageCircle, X } from "lucide-react";
 import { tenantConfig } from "@/config/tenant";
 import { verticalConfig } from "@/config/verticals";
 import { crmConfig } from "@/lib/crm/enabled";
-import { buildLeadView } from "@/lib/crm/view-model";
+import { buildLeadView, fillTemplate } from "@/lib/crm/view-model";
 import { leadIntent } from "@/lib/crm/intent";
 import { getSessionRole, hasRole } from "@/lib/role-guard";
-import { getLead } from "@/lib/queries/leads";
-import { getLeadQualification, listLeadEvents } from "@/lib/queries/lead-detail";
+import { getOpportunity } from "@/lib/queries/leads";
+import { getLeadQualification, listOpportunityEvents } from "@/lib/queries/lead-detail";
 import { listTeam, memberLabel } from "@/lib/queries/team";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogTitle } from "@/components/ui/dialog";
@@ -24,7 +24,7 @@ import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
 import { RefreshOnce } from "@/components/dashboard/RefreshOnce";
 
 type Props = {
-  params: Promise<{ waId: string }>;
+  params: Promise<{ id: string }>;
   // ?edit=reminder opens the "Próximo paso" editor (Nuevo lead lands here).
   searchParams: Promise<{ edit?: string | string[] }>;
 };
@@ -33,19 +33,20 @@ const CHIP =
   "inline-flex h-[22px] items-center rounded-full border border-[var(--rule)] px-2 text-[11.5px] text-[var(--muted-ink)]";
 
 export default async function LeadModalPage({ params, searchParams }: Props) {
-  const [{ waId }, { edit }] = await Promise.all([params, searchParams]);
+  const [{ id }, { edit }] = await Promise.all([params, searchParams]);
   const initialField = edit === "reminder" ? ("reminder" as const) : undefined;
   const crm = crmConfig();
   const session = await getSessionRole();
   if (!crm || !session) return null;
   const now = new Date();
-  const [lead, events, qualification, team] = await Promise.all([
-    getLead(crm, waId, now),
-    listLeadEvents(waId),
-    getLeadQualification(crm, waId),
+  const lead = await getOpportunity(crm, Number(id), now);
+  if (!lead) redirect("/leads");
+  const waId = lead.contactWaId;
+  const [events, qualification, team] = await Promise.all([
+    listOpportunityEvents(lead.id, waId),
+    getLeadQualification(crm, lead),
     listTeam(),
   ]);
-  if (!lead) redirect(`/conversations/${encodeURIComponent(waId)}`);
 
   const tenant = tenantConfig();
   const labels = crm.labels;
@@ -55,11 +56,13 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
     .filter((m) => m.role !== "viewer" && m.active)
     .map((m) => ({ email: m.email, label: m.displayName || m.email }));
   const view = buildLeadView(lead.lead, crm, labelFor, tenant.locale, tenant.timezone, now, lead.budget);
-  const intent = leadIntent(lead.lastIntent, verticalConfig().intents);
-  const sourceLabel = lead.manual
-    ? (crm.manualLeadSources.find((s) => s.key === lead.manual?.source)?.label ?? lead.manual.source)
-    : labels.sourceWhatsapp;
-  const conversationHref = `/conversations/${encodeURIComponent(waId)}`;
+  const intent = leadIntent(lead.kind, verticalConfig().intents);
+  const sourceLabel =
+    lead.contact.source === "whatsapp"
+      ? labels.sourceWhatsapp
+      : (crm.manualLeadSources.find((s) => s.key === lead.contact.source)?.label ??
+        lead.contact.source);
+  const conversationHref = `/conversations/${encodeURIComponent(waId)}?op=${lead.id}`;
 
   return (
     <div className="flex max-h-[calc(100dvh-3rem)] flex-col">
@@ -75,6 +78,11 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
           {intent ? (
             <span data-testid="lead-intent" className={CHIP}>
               {intent.label}
+            </span>
+          ) : null}
+          {lead.ofTotal > 1 ? (
+            <span data-testid="lead-of-total" className={CHIP} title={labels.opportunity.listTitle}>
+              {fillTemplate(labels.opportunity.ofTotalTemplate, { n: lead.seq, total: lead.ofTotal })}
             </span>
           ) : null}
           <span className={CHIP}>{sourceLabel}</span>
@@ -104,6 +112,9 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
             <DialogTitle className="text-[22px] font-semibold tracking-[-0.02em] leading-[1.15] text-[var(--ink)]">
               {lead.displayName}
             </DialogTitle>
+            {lead.title ? (
+              <p className="text-[13px] text-[var(--muted-ink)]">{lead.title}</p>
+            ) : null}
             <a
               href={`https://wa.me/${encodeURIComponent(waId)}`}
               target="_blank"
@@ -122,6 +133,7 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
           />
           <LeadActivityFeed
             waId={waId}
+            opportunityId={lead.id}
             events={events}
             config={crm}
             memberLabel={labelFor}
@@ -134,6 +146,7 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
         <aside className="order-1 lg:order-2">
           <LeadCrmCard
             waId={waId}
+            opportunityId={lead.id}
             view={view}
             config={crm}
             members={members}

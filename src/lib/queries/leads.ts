@@ -1,14 +1,21 @@
-// Read side of the CRM-lite. One query gathers every signal per contact —
-// messages (automation.lead_log), real handoffs (automation.escalations),
-// opt-outs (outreach.suppression, when the tenant has it), and the dashboard's
-// own lead_state / lead_events — and deriveLead() turns them into a stage.
+// Read side of the CRM-lite. A lead is an OPPORTUNITY — one commercial
+// process — and a person can have several over time (a rental, later a sale,
+// an appraisal). One query gathers every signal per opportunity, windowed to
+// its own life [opened_at, closed_at), and deriveLead() turns them into a
+// stage.
+//
+// Attribution (the rule that makes several opportunities per person work):
+//   - a handoff counts only for the opportunity of ITS rubro;
+//   - messages and human replies count for every open opportunity of the
+//     person, because nothing in the data says which one they were about;
+//   - events carry an opportunity_id, so what an advisor logged is exact.
 //
 // Deliberately NOT built on v_contact_summary (4 correlated subqueries per
 // contact): a single GROUP BY over lead_log rides ix_lead_log_contact_timestamp.
 // Derivation, filtering and pagination happen in memory, which is trivial at
-// real-estate volumes (client1: a handful of contacts per month). If a tenant
-// ever passes ~10k contacts, port deriveLead() to a SQL CTE and keep
-// tests/unit/crm-effective-stage.test.ts as the equivalence fixture.
+// real-estate volumes. If a tenant ever passes ~10k contacts, port deriveLead()
+// to a SQL CTE and keep tests/unit/crm-effective-stage.test.ts as the
+// equivalence fixture.
 
 import { sql } from "@/db/client";
 import type { CrmConfig, CrmPriorityKey } from "@/config/verticals/_types";
@@ -22,14 +29,14 @@ import {
 import { hasLeadLogSentBy, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
 import { priceRangeText } from "@/lib/crm/price-range";
 import { priorityRank } from "@/lib/crm/priority";
-import { leadIntentForTenant } from "@/lib/crm/intent";
 import { attentionKind, attentionRank } from "@/lib/crm/attention";
 import { tenantConfig } from "@/config/tenant";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
+import { getIntentMap, syncOpportunities } from "@/lib/queries/opportunity-sync";
 
-// What the lead can spend. A person's figure (lead_state) wins; otherwise the
-// amount of the latest real handoff that carried one, or — if the bot only
-// captured a range — that range text.
+// What the lead can spend. A person's figure wins; otherwise the amount of the
+// latest real handoff of this opportunity that carried one, or — if the bot
+// only captured a range — that range text.
 export type LeadBudget = {
   amount: number | null;
   currency: string;
@@ -37,23 +44,43 @@ export type LeadBudget = {
   source: "manual" | "bot";
 };
 
-// Set when a person registered the lead by hand (dashboard.manual_leads).
-export type ManualLeadInfo = { source: string; intent: string; createdBy: string; createdAt: Date };
+/** The person behind the opportunity (dashboard.contacts). */
+export type ContactInfo = {
+  // 'whatsapp' for people who wrote to the bot, else a manualLeadSources key.
+  source: string;
+  createdBy: string;
+  createdAt: Date;
+  firstSeenAt: Date | null;
+};
 
-export type LeadRow = {
+export type OpportunityRow = {
+  id: number;
   contactWaId: string;
+  // 1, 2, 3… in the order the person's opportunities opened.
+  seq: number;
+  // How many the person has in total, for the "2 de 3" chip.
+  ofTotal: number;
+  // Vertical intent key ("Ventas"); '' when nobody has labelled it yet.
+  kind: string;
+  title: string;
+  openedAt: Date;
+  // '' = opened automatically by a handoff.
+  openedBy: string;
+  closedAt: Date | null;
   displayName: string;
   firstSeen: Date | null;
   lastMessageAt: Date | null;
   handoffCount: number;
   budget: LeadBudget | null;
-  manual: ManualLeadInfo | null;
-  // Raw intent of the last inbound WhatsApp message, or, for a lead that
-  // never wrote, the one chosen when it was registered by hand (null when
-  // neither exists); lib/crm/intent maps it to the vertical's bucket.
-  lastIntent: string | null;
+  contact: ContactInfo;
+  // Rubro of a recent enquiry nobody is working (rule 7): the card offers to
+  // open an opportunity for it. Null when there is nothing new.
+  newIntent: string | null;
   lead: EffectiveLead;
 };
+
+/** Kept while the UI finishes moving to opportunities. */
+export type LeadRow = OpportunityRow;
 
 const positive = (raw: unknown): number | null => {
   // NUMERIC arrives as a string from postgres.js.
@@ -81,149 +108,202 @@ export function toBudget(
 const toDate = (v: unknown): Date | null =>
   v === null || v === undefined ? null : new Date(v as string | Date);
 
-async function selectLeadRows(
+type Scope = { waIds?: ReadonlyArray<string>; ids?: ReadonlyArray<number> };
+
+async function selectOpportunityRows(
   config: CrmConfig,
   now: Date,
-  waIds?: ReadonlyArray<string>,
-): Promise<LeadRow[]> {
-  const [sentBy, suppression, snapshot] = await Promise.all([
+  scope: Scope = {},
+): Promise<OpportunityRow[]> {
+  const [sentBy, suppression, snapshot, map] = await Promise.all([
     hasLeadLogSentBy(),
     hasOutreachSuppression(),
     hasSessionMemory(),
+    getIntentMap(now),
   ]);
-  const onlyIds = waIds && waIds.length > 0 ? [...waIds] : null;
+  const waIds = scope.waIds && scope.waIds.length > 0 ? [...scope.waIds] : null;
+  const ids = scope.ids && scope.ids.length > 0 ? [...scope.ids] : null;
 
-  // contacts = everyone who wrote on WhatsApp ∪ everyone registered by hand,
-  // joined on the shared contact_wa_id: a manual lead who later writes is ONE
-  // row. The name typed by a person wins over the WhatsApp profile name.
+  // A handoff belongs to the opportunity of its rubro (or to one that has no
+  // rubro yet). The raw token → rubro map comes from TypeScript.
+  const handoffOfOpportunity = sql`
+    e.contact_wa_id = o.contact_wa_id
+    AND e.escalation_type <> ALL(${[...NON_BUSINESS_ESCALATION_TYPES]}::text[])
+    AND e.escalation_timestamp >= o.opened_at
+    AND (o.closed_at IS NULL OR e.escalation_timestamp < o.closed_at)
+    AND (
+      o.kind = ''
+      OR o.kind = COALESCE(
+        (SELECT m.kind FROM intent_map m WHERE m.raw = to_jsonb(e) ->> 'intent'),
+        (SELECT m.kind FROM intent_map m WHERE m.raw = e.escalation_type)
+      )
+    )
+  `;
+
   const rows = await sql<Record<string, unknown>[]>`
-    WITH msgs AS (
-      SELECT
-        contact_wa_id,
-        COALESCE(NULLIF(MAX(lead_name), ''), NULLIF(MAX(profile_name), ''), contact_wa_id) AS display_name,
-        MIN(log_timestamp) AS first_seen,
-        MAX(log_timestamp) AS last_message_at,
-        ${sentBy
-          ? sql`MAX(log_timestamp) FILTER (WHERE sent_by = 'human')`
-          : sql`NULL::timestamptz`} AS last_human_log_at
-      FROM automation.lead_log
-      WHERE contact_wa_id <> ''
-        ${onlyIds ? sql`AND contact_wa_id IN ${sql(onlyIds)}` : sql``}
-      GROUP BY contact_wa_id
+    WITH intent_map AS (
+      SELECT * FROM unnest(${map.raws}::text[], ${map.kinds}::text[]) AS t(raw, kind)
     ),
-    manual AS (
-      SELECT contact_wa_id, display_name, source, intent, created_by, created_at
-      FROM dashboard.manual_leads
-      WHERE true ${onlyIds ? sql`AND contact_wa_id IN ${sql(onlyIds)}` : sql``}
+    opps AS (
+      SELECT * FROM dashboard.opportunities o
+      WHERE true
+        ${waIds ? sql`AND o.contact_wa_id IN ${sql(waIds)}` : sql``}
+        ${ids ? sql`AND o.id IN ${sql(ids)}` : sql``}
     ),
-    contacts AS (
-      SELECT
-        COALESCE(m.contact_wa_id, ml.contact_wa_id) AS contact_wa_id,
-        COALESCE(NULLIF(ml.display_name, ''), m.display_name) AS display_name,
-        LEAST(m.first_seen, ml.created_at) AS first_seen,
-        m.last_message_at,
-        m.last_human_log_at,
-        ml.source AS manual_source,
-        ml.intent AS manual_intent,
-        ml.created_by AS manual_created_by,
-        ml.created_at AS manual_created_at
-      FROM msgs m
-      FULL JOIN manual ml ON ml.contact_wa_id = m.contact_wa_id
+    persons AS (SELECT DISTINCT contact_wa_id FROM opps),
+    names AS (
+      -- The name a person typed wins over the WhatsApp profile name.
+      SELECT c.contact_wa_id,
+             COALESCE(
+               NULLIF(c.display_name, ''),
+               NULLIF(MAX(l.lead_name), ''),
+               NULLIF(MAX(l.profile_name), ''),
+               c.contact_wa_id
+             ) AS display_name,
+             c.source, c.created_by, c.created_at, c.first_seen_at
+      FROM dashboard.contacts c
+      JOIN persons p ON p.contact_wa_id = c.contact_wa_id
+      LEFT JOIN automation.lead_log l ON l.contact_wa_id = c.contact_wa_id
+      GROUP BY c.contact_wa_id, c.display_name, c.source, c.created_by, c.created_at, c.first_seen_at
+    ),
+    msgs AS (
+      -- Messages keep every open opportunity of the person alive: nothing in
+      -- the data says which one they were about.
+      SELECT o.id,
+             MIN(l.log_timestamp) AS first_seen,
+             MAX(l.log_timestamp) AS last_message_at,
+             ${sentBy
+               ? sql`MAX(l.log_timestamp) FILTER (WHERE l.sent_by = 'human')`
+               : sql`NULL::timestamptz`} AS last_human_log_at
+      FROM opps o
+      JOIN automation.lead_log l
+        ON l.contact_wa_id = o.contact_wa_id
+       AND l.log_timestamp >= o.opened_at
+       AND (o.closed_at IS NULL OR l.log_timestamp < o.closed_at)
+      GROUP BY o.id
     ),
     handoffs AS (
-      SELECT contact_wa_id,
-             MAX(escalation_timestamp) AS last_handoff_at,
+      SELECT o.id,
+             MAX(e.escalation_timestamp) AS last_handoff_at,
              COUNT(*)::int AS handoff_count
-      FROM automation.escalations
-      WHERE escalation_type NOT IN ${sql(NON_BUSINESS_ESCALATION_TYPES)}
-        AND contact_wa_id IN (SELECT contact_wa_id FROM contacts)
-      GROUP BY contact_wa_id
+      FROM opps o
+      JOIN automation.escalations e ON ${handoffOfOpportunity}
+      GROUP BY o.id
     ),
     budgets AS (
-      -- Latest real handoff that carried an amount. Read through to_jsonb:
-      -- not every tenant's escalations table has the budget columns.
-      SELECT DISTINCT ON (e.contact_wa_id)
-             e.contact_wa_id,
+      -- Latest handoff of this opportunity that carried an amount. Read
+      -- through to_jsonb: not every tenant has the budget columns.
+      SELECT DISTINCT ON (o.id)
+             o.id,
              to_jsonb(e) ->> 'budget_amount' AS budget_amount,
              to_jsonb(e) ->> 'budget_currency' AS budget_currency
-      FROM automation.escalations e
-      WHERE e.escalation_type NOT IN ${sql(NON_BUSINESS_ESCALATION_TYPES)}
-        AND e.contact_wa_id IN (SELECT contact_wa_id FROM contacts)
-        AND NULLIF(to_jsonb(e) ->> 'budget_amount', '') IS NOT NULL
-      ORDER BY e.contact_wa_id, e.escalation_timestamp DESC
+      FROM opps o
+      JOIN automation.escalations e ON ${handoffOfOpportunity}
+      WHERE NULLIF(to_jsonb(e) ->> 'budget_amount', '') IS NOT NULL
+      ORDER BY o.id, e.escalation_timestamp DESC
     ),
     snaps AS (
       ${snapshot
         ? sql`SELECT contact_wa_id, qualification_snapshot_json -> 'selected_price_range' AS price_range
               FROM automation.session_memory
-              WHERE contact_wa_id IN (SELECT contact_wa_id FROM contacts)`
+              WHERE contact_wa_id IN (SELECT contact_wa_id FROM persons)`
         : sql`SELECT NULL::text AS contact_wa_id, NULL::jsonb AS price_range WHERE false`}
     ),
-    last_intent AS (
-      -- Intent of the last inbound message that carried one (same DISTINCT ON
-      -- pattern as lib/queries/intents.ts; rides ix_lead_log_contact_timestamp).
+    events AS (
+      -- Exact per opportunity, plus the person-level ones that happened
+      -- while this opportunity was alive.
+      SELECT o.id,
+             MAX(ev.occurred_at) FILTER (WHERE ev.kind = ANY(${[...ACTIVITY_EVENT_KINDS]}::text[])) AS last_crm_activity_at,
+             MAX(ev.occurred_at) FILTER (WHERE ev.kind = 'contact') AS last_contact_event_at
+      FROM opps o
+      JOIN dashboard.lead_events ev
+        ON ev.opportunity_id = o.id
+        OR (ev.opportunity_id IS NULL
+            AND ev.contact_wa_id = o.contact_wa_id
+            AND ev.occurred_at >= o.opened_at
+            AND (o.closed_at IS NULL OR ev.occurred_at < o.closed_at))
+      GROUP BY o.id
+    ),
+    last_inbound AS (
       SELECT DISTINCT ON (contact_wa_id) contact_wa_id, intent
       FROM automation.lead_log
-      WHERE direction = 'inbound' AND contact_wa_id <> '' AND NULLIF(intent, '') IS NOT NULL
-        ${onlyIds ? sql`AND contact_wa_id IN ${sql(onlyIds)}` : sql``}
+      WHERE direction = 'inbound'
+        AND contact_wa_id IN (SELECT contact_wa_id FROM persons)
+        AND NULLIF(intent, '') IS NOT NULL
       ORDER BY contact_wa_id, log_timestamp DESC, id DESC
     ),
-    events AS (
-      SELECT contact_wa_id,
-             MAX(occurred_at) FILTER (WHERE kind IN ${sql([...ACTIVITY_EVENT_KINDS])}) AS last_crm_activity_at,
-             MAX(occurred_at) FILTER (WHERE kind = 'contact') AS last_contact_event_at
-      FROM dashboard.lead_events
-      WHERE contact_wa_id IN (SELECT contact_wa_id FROM contacts)
-      GROUP BY contact_wa_id
+    new_intent AS (
+      -- An enquiry about a rubro nobody has open: the hint, not an opening.
+      SELECT li.contact_wa_id, im.kind
+      FROM last_inbound li
+      JOIN intent_map im ON im.raw = li.intent
+      WHERE NOT EXISTS (
+        SELECT 1 FROM dashboard.opportunities o
+        WHERE o.contact_wa_id = li.contact_wa_id
+          AND o.closed_at IS NULL
+          AND (o.kind = im.kind OR o.kind = '')
+      )
     )
     SELECT
-      c.contact_wa_id, c.display_name, c.first_seen, c.last_message_at, c.last_human_log_at,
-      c.manual_source, c.manual_intent, c.manual_created_by, c.manual_created_at,
+      o.id, o.contact_wa_id, o.seq, o.kind, o.title, o.opened_at, o.opened_by, o.closed_at,
+      o.stage, o.stage_changed_at, o.lost_reason, o.owner_email,
+      o.next_action_at, o.next_action_note, o.next_action_done_at, o.priority,
+      o.budget_amount AS manual_budget_amount, o.budget_currency AS manual_budget_currency,
+      (SELECT COUNT(*)::int FROM dashboard.opportunities t WHERE t.contact_wa_id = o.contact_wa_id) AS of_total,
+      n.display_name, n.source, n.created_by, n.created_at, n.first_seen_at,
+      m.first_seen, m.last_message_at, m.last_human_log_at,
       h.last_handoff_at, COALESCE(h.handoff_count, 0) AS handoff_count,
       b.budget_amount, b.budget_currency, sn.price_range,
       e.last_crm_activity_at, e.last_contact_event_at,
-      s.contact_wa_id AS state_wa_id,
-      s.stage, s.stage_changed_at, s.lost_reason, s.owner_email,
-      s.next_action_at, s.next_action_note, s.next_action_done_at, s.priority,
-      s.budget_amount AS manual_budget_amount, s.budget_currency AS manual_budget_currency,
-      COALESCE(NULLIF(li.intent, ''), NULLIF(c.manual_intent, '')) AS last_intent,
+      ni.kind AS new_intent,
       ${suppression
-        ? sql`(SELECT MIN(o.created_at) FROM outreach.suppression o WHERE o.wa_id = c.contact_wa_id)`
+        ? sql`(SELECT MIN(s.created_at) FROM outreach.suppression s WHERE s.wa_id = o.contact_wa_id)`
         : sql`NULL::timestamptz`} AS opted_out_at
-    FROM contacts c
-    LEFT JOIN handoffs h ON h.contact_wa_id = c.contact_wa_id
-    LEFT JOIN budgets b ON b.contact_wa_id = c.contact_wa_id
-    LEFT JOIN snaps sn ON sn.contact_wa_id = c.contact_wa_id
-    LEFT JOIN events e ON e.contact_wa_id = c.contact_wa_id
-    LEFT JOIN last_intent li ON li.contact_wa_id = c.contact_wa_id
-    LEFT JOIN dashboard.lead_state s ON s.contact_wa_id = c.contact_wa_id
+    FROM opps o
+    JOIN names n ON n.contact_wa_id = o.contact_wa_id
+    LEFT JOIN msgs m ON m.id = o.id
+    LEFT JOIN handoffs h ON h.id = o.id
+    LEFT JOIN budgets b ON b.id = o.id
+    LEFT JOIN snaps sn ON sn.contact_wa_id = o.contact_wa_id
+    LEFT JOIN events e ON e.id = o.id
+    LEFT JOIN new_intent ni ON ni.contact_wa_id = o.contact_wa_id
   `;
 
   return rows.map((r) => {
+    const openedAt = new Date(r.opened_at as string | Date);
     const signals: LeadSignals = {
       firstSeen: toDate(r.first_seen),
       lastMessageAt: toDate(r.last_message_at),
       lastHandoffAt: toDate(r.last_handoff_at),
-      lastHumanContactAt: [toDate(r.last_human_log_at), toDate(r.last_contact_event_at)]
-        .filter((d): d is Date => d !== null)
-        .sort((a, b) => b.getTime() - a.getTime())[0] ?? null,
+      lastHumanContactAt:
+        [toDate(r.last_human_log_at), toDate(r.last_contact_event_at)]
+          .filter((d): d is Date => d !== null)
+          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null,
       optedOutAt: toDate(r.opted_out_at),
       lastCrmActivityAt: toDate(r.last_crm_activity_at),
     };
-    const state: LeadStateRow | null = r.state_wa_id !== null
-      ? {
-          stage: r.stage === null ? null : String(r.stage),
-          stageChangedAt: toDate(r.stage_changed_at),
-          lostReason: String(r.lost_reason ?? ""),
-          ownerEmail: r.owner_email === null ? null : String(r.owner_email),
-          nextActionAt: toDate(r.next_action_at),
-          nextActionNote: String(r.next_action_note ?? ""),
-          nextActionDoneAt: toDate(r.next_action_done_at),
-          priority: String(r.priority ?? ""),
-        }
-      : null;
+    const state: LeadStateRow = {
+      stage: r.stage === null ? null : String(r.stage),
+      stageChangedAt: toDate(r.stage_changed_at),
+      lostReason: String(r.lost_reason ?? ""),
+      ownerEmail: r.owner_email === null ? null : String(r.owner_email),
+      nextActionAt: toDate(r.next_action_at),
+      nextActionNote: String(r.next_action_note ?? ""),
+      nextActionDoneAt: toDate(r.next_action_done_at),
+      priority: String(r.priority ?? ""),
+      openedAt,
+      closedAt: toDate(r.closed_at),
+    };
     return {
+      id: Number(r.id),
       contactWaId: String(r.contact_wa_id),
+      seq: Number(r.seq),
+      ofTotal: Number(r.of_total ?? 1),
+      kind: String(r.kind ?? ""),
+      title: String(r.title ?? ""),
+      openedAt,
+      openedBy: String(r.opened_by ?? ""),
+      closedAt: state.closedAt,
       displayName: String(r.display_name),
       firstSeen: signals.firstSeen,
       lastMessageAt: signals.lastMessageAt,
@@ -235,16 +315,13 @@ async function selectLeadRows(
         r.budget_currency,
         r.price_range,
       ),
-      lastIntent: r.last_intent === null || r.last_intent === undefined ? null : String(r.last_intent),
-      manual:
-        r.manual_source === null || r.manual_source === undefined
-          ? null
-          : {
-              source: String(r.manual_source),
-              intent: String(r.manual_intent ?? ""),
-              createdBy: String(r.manual_created_by ?? ""),
-              createdAt: new Date(r.manual_created_at as string | Date),
-            },
+      contact: {
+        source: String(r.source ?? "whatsapp"),
+        createdBy: String(r.created_by ?? ""),
+        createdAt: new Date(r.created_at as string | Date),
+        firstSeenAt: toDate(r.first_seen_at),
+      },
+      newIntent: r.new_intent === null || r.new_intent === undefined ? null : String(r.new_intent),
       lead: deriveLead(signals, state, config, now),
     };
   });
@@ -262,13 +339,13 @@ export const LEAD_LIST_FILTERS: ReadonlyArray<LeadListFilter> = [
 export type LeadViewer = { email: string; isAdmin: boolean };
 
 /**
- * "Hoy": what this person should act on today — their leads with a reminder
- * overdue or due today, their leads about to be lost, and unassigned leads
+ * "Hoy": what this person should act on today — their opportunities with a
+ * reminder overdue or due today, theirs about to be lost, and unassigned ones
  * still in the bot's early stages (someone has to pick them up). An admin's
  * "their" is everyone's. Pure.
  */
 export function isTodayLead(
-  row: LeadRow,
+  row: OpportunityRow,
   viewer: LeadViewer,
   config: CrmConfig,
   now: Date,
@@ -286,7 +363,12 @@ export function isTodayLead(
 }
 
 /** Board/list order: what needs attention first, then priority, then recency. */
-export function compareLeads(a: LeadRow, b: LeadRow, now: Date, timezone: string): number {
+export function compareLeads(
+  a: OpportunityRow,
+  b: OpportunityRow,
+  now: Date,
+  timezone: string,
+): number {
   return (
     attentionRank(a.lead, now, timezone) - attentionRank(b.lead, now, timezone) ||
     priorityRank(a.lead.priority) - priorityRank(b.lead.priority) ||
@@ -299,26 +381,26 @@ export type ListLeadsParams = {
   owner?: string; // email; "none" = unassigned
   filter?: LeadListFilter;
   q?: string;
-  // Lost leads pile up (every idle contact ends there), so they are hidden
+  // Lost opportunities pile up (every idle one ends there), so they are hidden
   // unless the stage filter asks for them explicitly.
   includeLost?: boolean;
   priority?: CrmPriorityKey | "none";
-  // Vertical intent key ("Ventas"); matched against the lead's last intent bucket.
+  // Vertical intent key ("Ventas"); matched against the opportunity's rubro.
   intent?: string;
   // Who is looking (for the "today" filter and its count).
   viewer?: LeadViewer;
 };
 
 export type ListLeadsResult = {
-  rows: LeadRow[];
+  rows: OpportunityRow[];
   // Per-stage counts over the unfiltered-by-stage set, for the stage chips
   // and the board column headers.
   stageCounts: Record<string, number>;
-  // Size of the viewer's "Hoy" set over every lead (for the chip), 0 without a viewer.
+  // Size of the viewer's "Hoy" set over every opportunity, 0 without a viewer.
   todayCount: number;
 };
 
-function matchesQuery(row: LeadRow, q: string): boolean {
+function matchesQuery(row: OpportunityRow, q: string): boolean {
   const term = q.trim().toLowerCase();
   if (!term) return true;
   return row.displayName.toLowerCase().includes(term) || row.contactWaId.includes(term);
@@ -329,22 +411,27 @@ export async function listLeads(
   params: ListLeadsParams,
   now: Date,
 ): Promise<ListLeadsResult> {
-  const all = await selectLeadRows(config, now);
+  await syncOpportunities(config);
+  const all = await selectOpportunityRows(config, now);
   const lostKey = config.autoStages.lost;
   const timezone = tenantConfig().timezone;
   const viewer = params.viewer;
-  const todayCount = viewer ? all.filter((r) => isTodayLead(r, viewer, config, now, timezone)).length : 0;
+  const todayCount = viewer
+    ? all.filter((r) => isTodayLead(r, viewer, config, now, timezone)).length
+    : 0;
 
   const base = all.filter((row) => {
-    if (params.filter === "today" && (!viewer || !isTodayLead(row, viewer, config, now, timezone))) return false;
+    if (params.filter === "today" && (!viewer || !isTodayLead(row, viewer, config, now, timezone)))
+      return false;
     if (params.owner === "none" && row.lead.owner !== null) return false;
     if (params.owner && params.owner !== "none" && row.lead.owner !== params.owner) return false;
     if (params.filter === "at_risk" && !row.lead.atRisk) return false;
     if (params.filter === "overdue" && row.lead.reminder?.status !== "overdue") return false;
     if (params.filter === "unassigned" && row.lead.owner !== null) return false;
     if (params.priority === "none" && row.lead.priority !== null) return false;
-    if (params.priority && params.priority !== "none" && row.lead.priority !== params.priority) return false;
-    if (params.intent && leadIntentForTenant(row.lastIntent)?.key !== params.intent) return false;
+    if (params.priority && params.priority !== "none" && row.lead.priority !== params.priority)
+      return false;
+    if (params.intent && row.kind !== params.intent) return false;
     if (params.q && !matchesQuery(row, params.q)) return false;
     return true;
   });
@@ -365,13 +452,122 @@ export async function listLeads(
   return { rows, stageCounts, todayCount };
 }
 
-export async function getLead(
+/** One opportunity by its id. */
+export async function getOpportunity(
+  config: CrmConfig,
+  id: number,
+  now: Date,
+): Promise<OpportunityRow | null> {
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const rows = await selectOpportunityRows(config, now, { ids: [id] });
+  return rows[0] ?? null;
+}
+
+/** The person and every opportunity they have had. */
+export type PersonRow = {
+  contactWaId: string;
+  displayName: string;
+  contact: ContactInfo;
+  optedOutAt: Date | null;
+  // Rubro of a recent enquiry nobody is working, for the "Sin derivar" and
+  // "Consulta nueva" hints.
+  newIntent: string | null;
+  opportunities: OpportunityRow[]; // open first, then newest
+};
+
+export async function getPerson(
   config: CrmConfig,
   waId: string,
   now: Date,
-): Promise<LeadRow | null> {
-  const rows = await selectLeadRows(config, now, [waId]);
-  return rows[0] ?? null;
+): Promise<PersonRow | null> {
+  await syncOpportunities(config, [waId]);
+  const [rows, contact] = await Promise.all([
+    selectOpportunityRows(config, now, { waIds: [waId] }),
+    sql<Record<string, unknown>[]>`
+      SELECT c.contact_wa_id, c.display_name, c.source, c.created_by, c.created_at, c.first_seen_at,
+             (SELECT COALESCE(NULLIF(MAX(l.lead_name), ''), NULLIF(MAX(l.profile_name), ''))
+                FROM automation.lead_log l WHERE l.contact_wa_id = c.contact_wa_id) AS wa_name
+      FROM dashboard.contacts c
+      WHERE c.contact_wa_id = ${waId}
+    `,
+  ]);
+
+  const head = contact[0];
+  if (!head && rows.length === 0) return null;
+
+  const opportunities = [...rows].sort(
+    (a, b) =>
+      Number(a.closedAt !== null) - Number(b.closedAt !== null) ||
+      b.openedAt.getTime() - a.openedAt.getTime(),
+  );
+
+  if (!head) {
+    const first = opportunities[0]!;
+    return {
+      contactWaId: first.contactWaId,
+      displayName: first.displayName,
+      contact: first.contact,
+      optedOutAt: first.lead.lost?.reason === "opt_out" ? first.lead.lost.at : null,
+      newIntent: first.newIntent,
+      opportunities,
+    };
+  }
+
+  return {
+    contactWaId: String(head.contact_wa_id),
+    displayName:
+      String(head.display_name ?? "") ||
+      String(head.wa_name ?? "") ||
+      String(head.contact_wa_id),
+    contact: {
+      source: String(head.source ?? "whatsapp"),
+      createdBy: String(head.created_by ?? ""),
+      createdAt: new Date(head.created_at as string | Date),
+      firstSeenAt: toDate(head.first_seen_at),
+    },
+    optedOutAt: opportunities[0]?.lead.lost?.reason === "opt_out" ? opportunities[0].lead.lost.at : null,
+    newIntent: opportunities[0]?.newIntent ?? null,
+    opportunities,
+  };
+}
+
+/**
+ * Which opportunity the person's page opens on: the one asked for, else the
+ * open one that needs attention today, else the newest open one, else the
+ * newest. Pure.
+ */
+export function pickDefaultOpportunity(
+  person: PersonRow,
+  opParam: number | null,
+  now: Date,
+  timezone: string,
+): OpportunityRow | null {
+  const asked = opParam ? person.opportunities.find((o) => o.id === opParam) : undefined;
+  if (asked) return asked;
+  const open = person.opportunities.filter((o) => o.closedAt === null);
+  const urgent = open.find((o) => {
+    const kind = attentionKind(o.lead, now, timezone);
+    return kind === "overdue" || kind === "today";
+  });
+  return urgent ?? open[0] ?? person.opportunities[0] ?? null;
+}
+
+/** Rows grouped by person, keeping each group's best-ranked row first. */
+export function groupByPerson(
+  rows: ReadonlyArray<OpportunityRow>,
+): Array<{ contactWaId: string; displayName: string; rows: OpportunityRow[] }> {
+  const groups = new Map<string, { contactWaId: string; displayName: string; rows: OpportunityRow[] }>();
+  for (const row of rows) {
+    const hit = groups.get(row.contactWaId);
+    if (hit) hit.rows.push(row);
+    else
+      groups.set(row.contactWaId, {
+        contactWaId: row.contactWaId,
+        displayName: row.displayName,
+        rows: [row],
+      });
+  }
+  return [...groups.values()];
 }
 
 export type CrmAlerts = { atRisk: number; overdueReminders: number };
@@ -387,8 +583,8 @@ export function invalidateCrmAlerts(): void {
 
 /**
  * Counts for the "leads por vencer / recordatorios vencidos" banner. Scope:
- * pass an owner email to count only that person's leads (asesor), or null to
- * count every lead (admin).
+ * pass an owner email to count only that person's opportunities (asesor), or
+ * null to count every one (admin).
  */
 export async function getCrmAlerts(
   config: CrmConfig,
@@ -399,7 +595,7 @@ export async function getCrmAlerts(
   const hit = alertsCache.get(key);
   if (hit && now.getTime() - hit.at < ALERTS_TTL_MS) return hit.value;
 
-  const all = await selectLeadRows(config, now);
+  const all = await selectOpportunityRows(config, now);
   const scoped = ownerEmail ? all.filter((r) => r.lead.owner === ownerEmail) : all;
   const value: CrmAlerts = {
     atRisk: scoped.filter((r) => r.lead.atRisk !== null).length,
