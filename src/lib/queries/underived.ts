@@ -16,9 +16,17 @@ export type UnderivedConversation = {
   lastInboundAt: Date;
 };
 
-const DEFAULT_DAYS = 7;
+// No window by default: a conversation that stopped short four months ago is
+// still somebody the agency could call. The count is cached like the alert
+// banner so opening Leads does not re-scan the message log every time.
+const TTL_MS = 60_000;
+let countCache: { value: number; at: number } | null = null;
 
-async function select(days: number, limit: number | null): Promise<UnderivedConversation[]> {
+export function invalidateUnderived(): void {
+  countCache = null;
+}
+
+async function select(days: number | null, limit: number | null): Promise<UnderivedConversation[]> {
   const map = await getIntentMap();
   if (map.raws.length === 0) return [];
 
@@ -36,7 +44,7 @@ async function select(days: number, limit: number | null): Promise<UnderivedConv
       WHERE l.direction = 'inbound'
         AND l.contact_wa_id <> ''
         AND NULLIF(l.intent, '') IS NOT NULL
-        AND l.log_timestamp >= NOW() - ${`${days} days`}::interval
+        ${days ? sql`AND l.log_timestamp >= NOW() - ${`${days} days`}::interval` : sql``}
       ORDER BY l.contact_wa_id, l.log_timestamp DESC, l.id DESC
     )
     SELECT r.contact_wa_id,
@@ -54,7 +62,7 @@ async function select(days: number, limit: number | null): Promise<UnderivedConv
       SELECT 1 FROM automation.escalations e
       WHERE e.contact_wa_id = r.contact_wa_id
         AND e.escalation_type <> ALL(${[...NON_BUSINESS_ESCALATION_TYPES]}::text[])
-        AND e.escalation_timestamp >= NOW() - ${`${days} days`}::interval
+        ${days ? sql`AND e.escalation_timestamp >= NOW() - ${`${days} days`}::interval` : sql``}
     )
     ORDER BY r.log_timestamp DESC
     ${limit ? sql`LIMIT ${limit}` : sql``}
@@ -71,11 +79,13 @@ async function select(days: number, limit: number | null): Promise<UnderivedConv
 export function listUnderivedConversations(
   opts: { days?: number; limit?: number } = {},
 ): Promise<UnderivedConversation[]> {
-  return select(opts.days ?? DEFAULT_DAYS, opts.limit ?? 50);
+  return select(opts.days ?? null, opts.limit ?? 50);
 }
 
-/** How many arrived in the window — the pill above the board. */
-export async function countUnderived(days = DEFAULT_DAYS): Promise<number> {
-  const rows = await select(days, null);
+/** How many are waiting — the pill above the board. Cached for a minute. */
+export async function countUnderived(now: Date = new Date()): Promise<number> {
+  if (countCache && now.getTime() - countCache.at < TTL_MS) return countCache.value;
+  const rows = await select(null, null);
+  countCache = { value: rows.length, at: now.getTime() };
   return rows.length;
 }

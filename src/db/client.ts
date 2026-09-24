@@ -16,31 +16,42 @@ declare global {
   var __db_client: DbClient | undefined;
 }
 
+// ONE pool per process. `sql` is a Proxy, so every query goes through
+// getSqlClient(); caching only on `global` (which dev needs to survive HMR)
+// left production building a fresh pool — and a fresh connection — per query.
+// A page that runs a dozen of them then exhausted the server's connection
+// slots ("remaining connection slots are reserved for roles with the SUPERUSER
+// attribute"). These module-level singletons are what prevent that.
+let pgClient: SqlClient | undefined;
+let dbSingleton: DbClient | undefined;
+
 function getSqlClient(): SqlClient {
   if (global.__pg_client) return global.__pg_client;
+  if (pgClient) return pgClient;
 
-  const client = postgres(env().TENANT_DB_URL, {
+  pgClient = postgres(env().TENANT_DB_URL, {
     max: 10,
     idle_timeout: 20,
     connect_timeout: 10,
   });
 
   if (env().NODE_ENV !== "production") {
-    global.__pg_client = client;
+    global.__pg_client = pgClient;
   }
 
-  return client;
+  return pgClient;
 }
 
 function getDbClient(): DbClient {
   if (global.__db_client) return global.__db_client;
+  if (dbSingleton) return dbSingleton;
 
-  const dbClient = createDb(getSqlClient());
+  dbSingleton = createDb(getSqlClient());
   if (env().NODE_ENV !== "production") {
-    global.__db_client = dbClient;
+    global.__db_client = dbSingleton;
   }
 
-  return dbClient;
+  return dbSingleton;
 }
 
 // Lazily initialize the tenant DB binding so Docker builds can import this
