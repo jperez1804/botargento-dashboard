@@ -19,6 +19,7 @@ import { sql } from "@/db/client";
 import type { CrmActivityKind, CrmPriorityKey } from "@/config/verticals/_types";
 import { invalidateCrmAlerts } from "@/lib/queries/leads";
 import { ensureContacts } from "@/lib/queries/opportunity-sync";
+import { invalidateUnderived } from "@/lib/queries/underived";
 import { hasOutreachSuppression } from "@/lib/crm/probes";
 
 async function appendEvent(
@@ -328,7 +329,10 @@ export async function openOpportunity(input: {
     if ((err as { code?: string }).code !== "23505") throw err;
     result = await run();
   }
-  if (result.ok) invalidateCrmAlerts();
+  if (result.ok) {
+    invalidateCrmAlerts();
+    invalidateUnderived();
+  }
   return result;
 }
 
