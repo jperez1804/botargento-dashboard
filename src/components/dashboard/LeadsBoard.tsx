@@ -15,6 +15,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronsLeftRight, Lock, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { clearLeadsFilters } from "@/lib/crm/filter-memory";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LeadCard, type BoardCard } from "@/components/dashboard/LeadCard";
@@ -39,6 +40,8 @@ export type BoardColumn = {
   // Terminal columns collapse to a rail by default.
   terminal: boolean;
   cards: ReadonlyArray<BoardCard>;
+  // Lista filtered by this stage, for the "+N" under the capped cards.
+  moreHref: string;
 };
 
 type Props = {
@@ -231,7 +234,7 @@ export function LeadsBoard({
               variant="outline"
               nativeButton={false}
               data-testid="board-clear-filters"
-              render={<Link href={clearHref} />}
+              render={<Link href={clearHref} onClick={clearLeadsFilters} />}
             >
               {labels.clearFilters}
             </Button>
@@ -394,7 +397,13 @@ export function LeadsBoard({
               )}
 
               {extra > 0 ? (
-                <p className="px-1 text-center text-[11.5px] text-[var(--muted-ink)]">+{extra}</p>
+                <Link
+                  href={col.moreHref}
+                  data-testid="board-more"
+                  className="block px-1 py-1 text-center text-[11.5px] font-medium text-[var(--muted-ink)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+                >
+                  {fillTemplate(labels.moreInListTemplate, { n: extra })}
+                </Link>
               ) : null}
             </section>
           );

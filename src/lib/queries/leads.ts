@@ -38,7 +38,7 @@ export type LeadBudget = {
 };
 
 // Set when a person registered the lead by hand (dashboard.manual_leads).
-export type ManualLeadInfo = { source: string; createdBy: string; createdAt: Date };
+export type ManualLeadInfo = { source: string; intent: string; createdBy: string; createdAt: Date };
 
 export type LeadRow = {
   contactWaId: string;
@@ -48,8 +48,9 @@ export type LeadRow = {
   handoffCount: number;
   budget: LeadBudget | null;
   manual: ManualLeadInfo | null;
-  // Raw intent of the last inbound WhatsApp message (null for leads that
-  // never wrote); lib/crm/intent maps it to the vertical's bucket.
+  // Raw intent of the last inbound WhatsApp message, or, for a lead that
+  // never wrote, the one chosen when it was registered by hand (null when
+  // neither exists); lib/crm/intent maps it to the vertical's bucket.
   lastIntent: string | null;
   lead: EffectiveLead;
 };
@@ -111,7 +112,7 @@ async function selectLeadRows(
       GROUP BY contact_wa_id
     ),
     manual AS (
-      SELECT contact_wa_id, display_name, source, created_by, created_at
+      SELECT contact_wa_id, display_name, source, intent, created_by, created_at
       FROM dashboard.manual_leads
       WHERE true ${onlyIds ? sql`AND contact_wa_id IN ${sql(onlyIds)}` : sql``}
     ),
@@ -123,6 +124,7 @@ async function selectLeadRows(
         m.last_message_at,
         m.last_human_log_at,
         ml.source AS manual_source,
+        ml.intent AS manual_intent,
         ml.created_by AS manual_created_by,
         ml.created_at AS manual_created_at
       FROM msgs m
@@ -176,7 +178,7 @@ async function selectLeadRows(
     )
     SELECT
       c.contact_wa_id, c.display_name, c.first_seen, c.last_message_at, c.last_human_log_at,
-      c.manual_source, c.manual_created_by, c.manual_created_at,
+      c.manual_source, c.manual_intent, c.manual_created_by, c.manual_created_at,
       h.last_handoff_at, COALESCE(h.handoff_count, 0) AS handoff_count,
       b.budget_amount, b.budget_currency, sn.price_range,
       e.last_crm_activity_at, e.last_contact_event_at,
@@ -184,7 +186,7 @@ async function selectLeadRows(
       s.stage, s.stage_changed_at, s.lost_reason, s.owner_email,
       s.next_action_at, s.next_action_note, s.next_action_done_at, s.priority,
       s.budget_amount AS manual_budget_amount, s.budget_currency AS manual_budget_currency,
-      li.intent AS last_intent,
+      COALESCE(NULLIF(li.intent, ''), NULLIF(c.manual_intent, '')) AS last_intent,
       ${suppression
         ? sql`(SELECT MIN(o.created_at) FROM outreach.suppression o WHERE o.wa_id = c.contact_wa_id)`
         : sql`NULL::timestamptz`} AS opted_out_at
@@ -239,6 +241,7 @@ async function selectLeadRows(
           ? null
           : {
               source: String(r.manual_source),
+              intent: String(r.manual_intent ?? ""),
               createdBy: String(r.manual_created_by ?? ""),
               createdAt: new Date(r.manual_created_at as string | Date),
             },

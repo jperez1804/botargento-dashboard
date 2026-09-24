@@ -67,6 +67,7 @@ export function LeadActivityComposer({ waId, labels, offers }: Props) {
     const offer = offers[kind];
     if (offer) {
       toast.success(labels.saved, {
+        duration: 8000,
         action: {
           label: fillTemplate(labels.moveToStageOfferTemplate, { stage: offer.label }),
           onClick: () => void moveTo(offer),

@@ -13,6 +13,7 @@ const createManualLead = vi.fn(async () => ({ ok: true }) as { ok: true } | { ok
 
 vi.mock("@/lib/role-guard", () => ({ requireRoleApi: async () => authResult }));
 vi.mock("@/lib/crm/enabled", () => ({ crmConfig: () => crm }));
+vi.mock("@/config/verticals", () => ({ verticalConfig: () => realEstate }));
 vi.mock("@/lib/queries/lead-writes", () => ({ createManualLead }));
 vi.mock("@/db/client", () => ({
   db: {
@@ -48,6 +49,7 @@ describe("POST /api/leads/create", () => {
       waId: "5491155550000",
       name: "Laura Paz",
       source: "portal",
+      intent: "",
       note: "Vio el PH",
       by: "asesor@cliente.com",
     });
@@ -55,6 +57,19 @@ describe("POST /api/leads/create", () => {
       action: "lead_create",
       metadata: { contact_wa_id: "5491155550000", source: "portal", ok: true },
     });
+  });
+
+  it("stores the intent as the vertical's key and refuses one off the list", async () => {
+    const res = await post({ phone: "11 5555-0000", name: "Laura Paz", source: "portal", intent: "alquileres" });
+    expect(res.status).toBe(200);
+    expect(createManualLead).toHaveBeenCalledWith(expect.objectContaining({ intent: "Alquileres" }));
+    expect(auditCalls[0]).toMatchObject({ metadata: { intent: "Alquileres", ok: true } });
+
+    createManualLead.mockClear();
+    const bad = await post({ phone: "11 5555-0000", name: "Laura Paz", source: "portal", intent: "Hipotecas" });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toEqual({ error: "invalid_intent" });
+    expect(createManualLead).not.toHaveBeenCalled();
   });
 
   it("refuses a phone that cannot be a WhatsApp number", async () => {

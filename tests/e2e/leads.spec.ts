@@ -173,12 +173,13 @@ test("Lead card: take the lead, log a call and schedule a reminder", async ({ pa
   // "Tomar" saves at once; the toast offers Deshacer, which gives it back.
   // On a cold dev server the first click can land before hydration, so the
   // pair (click → owner shown) is retried.
+  const taken = page.locator("[data-sonner-toast]").filter({ hasText: "Es tuyo" });
   await expect(async () => {
     const take = card.getByTestId("lead-take");
     if (await take.isVisible()) await take.click();
-    await expect(card.getByTestId("lead-owner")).toHaveText("Dev Admin", { timeout: 5000 });
+    await expect(taken).toBeVisible({ timeout: 5000 });
   }).toPass({ timeout: 30_000 });
-  const taken = page.locator("[data-sonner-toast]").filter({ hasText: "Es tuyo" });
+  await expect(card.getByTestId("lead-owner")).toHaveText("Dev Admin");
   await taken.getByRole("button", { name: "Deshacer" }).click();
   await expect(card.getByTestId("lead-owner")).toHaveCount(0);
   await expect(card.getByTestId("lead-take")).toBeVisible();
@@ -332,6 +333,7 @@ test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ 
   await page.locator("#new-lead-phone").fill("011 15 4444-7777");
   await expect(page.getByTestId("new-lead-phone-preview")).toContainText("+54 9 1144447777");
   await page.locator("#new-lead-source").selectOption("telefono");
+  await page.locator("#new-lead-intent").selectOption("Alquileres");
   await page.locator("#new-lead-note").fill("Llamó por el PH de Caballito");
   await page.getByRole("button", { name: "Cargar lead" }).click();
 
@@ -341,21 +343,24 @@ test("Registers a walk-in lead by hand and refuses a duplicate phone", async ({ 
   const modal = page.getByTestId("lead-detail-modal");
   await expect(modal).toBeVisible();
   await expect(modal.getByTestId("lead-crm-card")).toContainText("Nuevo");
+  await expect(modal.getByTestId("lead-intent")).toHaveText("Alquileres");
   await expect(modal.getByTestId("lead-owner")).toHaveText("Dev Admin");
   await expect(modal.getByTestId("reminder-preset-tomorrow")).toBeVisible();
   await expect(modal.getByTestId("lead-activity")).toContainText("Llamó por el PH de Caballito");
   await page.keyboard.press("Escape");
   await expect(modal).toHaveCount(0);
 
-  // Its page exists without a WhatsApp conversation.
-  await page.goto("/conversations/5491144447777");
-  await expect(page.getByTestId("no-conversation")).toContainText("Teléfono");
-
-  // On the board: Nuevo column, origin chip.
-  await page.goto("/leads");
+  // The board behind the modal already shows the new card (no reload):
+  // Nuevo column, origin chip, and the intent chosen on the form.
   const card = page.locator('[data-lead-card="5491144447777"]');
   await expect(page.locator('[data-board-column="nuevo"]')).toContainText("Marta Iglesias");
   await expect(card.getByTestId("lead-source")).toHaveText("Teléfono");
+  await expect(card.getByTestId("lead-intent")).toHaveText("Alquileres");
+
+  // Its page exists without a WhatsApp conversation.
+  await page.goto("/conversations/5491144447777");
+  await expect(page.getByTestId("no-conversation")).toContainText("Teléfono");
+  await page.goto("/leads");
 
   await expect.poll(() => lastAudit("lead_create")).toMatchObject({ contact_wa_id: "5491144447777", ok: true });
 
@@ -748,6 +753,15 @@ test("Board: attention strip first, Hoy filter, rails, column subtitles", async 
   await expect(page.locator("[data-board-rail]")).toHaveCount(1);
 
   // Hoy: overdue + at-risk (admin sees everyone's) + unassigned in Nuevo/Calificado.
+  // Chip groups carry their kicker; urgency reads Vencidos → Se pierden → Sin responsable.
+  await expect(page.locator('[data-filter-group="mine"]')).toContainText("Para mí");
+  await expect(page.locator('[data-filter-group="urgency"]')).toContainText("Urgencia");
+  await expect(page.locator('[data-filter-group="priority"]')).toContainText("Prioridad");
+  await expect(page.locator('[data-filter-group="urgency"] button')).toHaveText([
+    "Vencidos",
+    "Se pierden pronto",
+    "Sin responsable",
+  ]);
   const today = page.getByTestId("filter-today");
   const n = Number((await today.textContent())?.replace(/\D/g, ""));
   expect(n).toBeGreaterThanOrEqual(2);
@@ -810,6 +824,29 @@ test("Board: losing a lead asks for the motive; stage moves can be undone", asyn
       }),
     )
     .toBe("reserva");
+});
+
+test("Board remembers the last filters until they are cleared", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/leads?filter=overdue&priority=alta");
+  await expect(page.getByTestId("leads-clear-filters")).toBeVisible();
+
+  // Back to bare /leads: the last filter set comes back (URL updated).
+  await page.goto("/leads");
+  await page.waitForURL(/\/leads\?filter=overdue&priority=alta$/);
+  await expect(page.getByTestId("leads-clear-filters")).toContainText("2");
+
+  // Search text and page are never remembered; filterless views don't touch it.
+  await page.goto("/leads?view=summary");
+  await page.goto("/leads");
+  await page.waitForURL(/\/leads\?filter=overdue&priority=alta$/);
+
+  // Limpiar filtros forgets them: bare /leads stays bare.
+  await page.getByTestId("leads-clear-filters").click();
+  await page.waitForURL(/\/leads$/);
+  await page.goto("/leads");
+  await expect(page.getByTestId("leads-clear-filters")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/leads$/);
 });
 
 test("Board: nothing matches the filters → one empty state with a clear link", async ({ page }) => {

@@ -4,13 +4,14 @@
 // &mine=1&q=&view=) so views are shareable and survive refresh; defaults are
 // omitted to keep URLs clean. The server does the filtering.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LEAD_FIELD_CLASS } from "@/components/dashboard/lead-field-class";
 import type { CrmLabels, CrmPriorityKey } from "@/config/verticals/_types";
 import { priorityOptions } from "@/lib/crm/priority";
+import { clearLeadsFilters, loadLeadsFilters, saveLeadsFilters } from "@/lib/crm/filter-memory";
 import type { LeadListFilter } from "@/lib/queries/leads";
 
 type Props = {
@@ -37,6 +38,12 @@ const CHIP =
   "inline-flex items-center gap-1.5 h-[30px] px-3 rounded-full border text-[12.5px] font-medium cursor-pointer touch-manipulation transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-2";
 const CHIP_ON =
   "border-[color-mix(in_oklch,var(--client-primary)_55%,var(--rule))] bg-[color-mix(in_oklch,var(--client-primary)_12%,var(--surface))] text-[var(--ink)] font-semibold";
+// Kicker over each chip group ("PARA MÍ", "URGENCIA", "PRIORIDAD").
+const KICKER =
+  "font-[var(--font-geist-mono)] text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--soft-ink)]";
+const GROUP = "flex flex-col gap-1.5";
+const GROUP_DIVIDED = "sm:border-l sm:border-[var(--rule)] sm:pl-4";
+
 const CHIP_OFF =
   "border-[var(--rule)] bg-[var(--canvas-2)] text-[var(--muted-ink)] hover:text-[var(--ink)] hover:border-[var(--rule-strong)]";
 
@@ -81,14 +88,27 @@ export function LeadsFilters({
 
   const activeCount = [current.q, current.stage, current.owner, current.filter, current.priority, current.intent]
     .filter(Boolean).length + (current.mine ? 1 : 0);
+  // Filter memory: /leads with no parameters reopens the last filter set;
+  // every filtered visit updates it. The URL stays the source of truth.
+  useEffect(() => {
+    const qs = searchParams.toString();
+    if (qs === "") {
+      const saved = loadLeadsFilters();
+      if (saved) router.replace(`${pathname}?${saved}`);
+      return;
+    }
+    saveLeadsFilters(new URLSearchParams(qs));
+  }, [searchParams, pathname, router]);
+
   function clearAll() {
     setSearch("");
+    clearLeadsFilters();
     navigate({ q: null, stage: null, owner: null, mine: null, filter: null, priority: null, intent: null });
   }
 
   const quick: ReadonlyArray<{ key: LeadListFilter; label: string }> = [
-    { key: "at_risk", label: labels.filterAtRisk },
     { key: "overdue", label: labels.filterOverdue },
+    { key: "at_risk", label: labels.filterAtRisk },
     { key: "unassigned", label: labels.filterUnassigned },
   ];
 
@@ -187,8 +207,13 @@ export function LeadsFilters({
         </div>
       ) : null}
 
-      <div role="group" aria-label={labels.pageTitle} className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         {showMine ? (
+        <div role="group" aria-label={labels.filterGroupMine} data-filter-group="mine" className={GROUP}>
+          <span className={KICKER} aria-hidden>
+            {labels.filterGroupMine}
+          </span>
+          <div className="flex flex-wrap gap-2">
           <button
             type="button"
             data-testid="filter-today"
@@ -204,10 +229,16 @@ export function LeadsFilters({
             )}
           >
             {labels.filterToday}
-            <span className="tabular-nums text-[11px] text-[var(--soft-ink)]">{todayCount}</span>
+            <span
+              data-testid="filter-today-count"
+              className={cn(
+                "inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10.5px] font-semibold tabular-nums",
+                todayCount > 0 ? "bg-[var(--danger)] text-white" : "bg-[var(--rule)] text-[var(--muted-ink)]",
+              )}
+            >
+              {todayCount}
+            </span>
           </button>
-        ) : null}
-        {showMine ? (
           <button
             type="button"
             aria-pressed={current.mine}
@@ -216,7 +247,19 @@ export function LeadsFilters({
           >
             {labels.filterMine}
           </button>
+          </div>
+        </div>
         ) : null}
+        <div
+          role="group"
+          aria-label={labels.filterGroupUrgency}
+          data-filter-group="urgency"
+          className={cn(GROUP, showMine && GROUP_DIVIDED)}
+        >
+          <span className={KICKER} aria-hidden>
+            {labels.filterGroupUrgency}
+          </span>
+          <div className="flex flex-wrap gap-2">
         {quick.map((f) => (
           <button
             key={f.key}
@@ -228,11 +271,18 @@ export function LeadsFilters({
             {f.label}
           </button>
         ))}
-        <span
+          </div>
+        </div>
+        <div
           role="group"
           aria-label={labels.priority.filterLabel}
-          className="flex flex-wrap gap-2 sm:ml-2 sm:border-l sm:border-[var(--rule)] sm:pl-4"
+          data-filter-group="priority"
+          className={cn(GROUP, GROUP_DIVIDED)}
         >
+          <span className={KICKER} aria-hidden>
+            {labels.priority.filterLabel}
+          </span>
+          <div className="flex flex-wrap gap-2">
           {priorityOptions(labels).map((p) => (
             <button
               key={p.key}
@@ -245,7 +295,8 @@ export function LeadsFilters({
               {p.label}
             </button>
           ))}
-        </span>
+          </div>
+        </div>
       </div>
     </div>
   );

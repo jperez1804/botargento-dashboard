@@ -97,6 +97,7 @@ export const CRM_LABELS_ES: CrmLabels = {
     already_exists: "Ese teléfono ya es un lead.",
     invalid_phone: "Revisá el teléfono: poné el código de área y el número.",
     invalid_source: "Elegí un origen de la lista.",
+    invalid_intent: "Elegí una intención de la lista.",
     invalid_stage: "Esa etapa no existe para este panel.",
     invalid_priority: "Esa prioridad no existe.",
     invalid_currency: "Elegí una moneda de la lista.",
@@ -182,6 +183,7 @@ export const CRM_LABELS_ES: CrmLabels = {
   clearFilters: "Limpiar filtros",
   intentLabel: "Intención",
   filterAllIntents: "Todas las intenciones",
+  intentNone: "Sin intención",
 
   reminderOverdueRelativeTemplate: "Vencido {relative}",
   reminderDueRelativeTemplate: "Vence {relative}",
@@ -206,6 +208,9 @@ export const CRM_LABELS_ES: CrmLabels = {
   confirm: "Confirmar",
 
   filterToday: "Hoy",
+  filterGroupMine: "Para mí",
+  filterGroupUrgency: "Urgencia",
+  moreInListTemplate: "+{n} en la lista",
   attentionOverdueTemplate: "Vencido {relative}",
   attentionTodayTemplate: "Vence hoy, {time}",
   attentionAtRiskTemplate: "Se pierde el {date}",
