@@ -35,7 +35,7 @@ import { LEAD_FIELD_CLASS, TOGGLE_CHIP_CLASS } from "@/components/dashboard/lead
 import type { CrmLabels } from "@/config/verticals/_types";
 import type { LeadView } from "@/lib/crm/view-model";
 
-export type LeadDetailField = "stage" | "priority" | "budget" | "owner" | "reminder";
+export type LeadDetailField = "stage" | "kind" | "priority" | "budget" | "owner" | "reminder";
 
 type Props = {
   waId: string;
@@ -44,6 +44,10 @@ type Props = {
   view: LeadView;
   labels: CrmLabels;
   stages: ReadonlyArray<{ key: string; label: string }>;
+  // What this opportunity is about, and the vertical's rubros to pick from.
+  kind: string;
+  kindLabel: string | null;
+  intents: ReadonlyArray<{ key: string; label: string }>;
   lostKey: string;
   currencies: ReadonlyArray<string>;
   members: ReadonlyArray<{ email: string; label: string }>;
@@ -117,6 +121,9 @@ export function LeadDetails({
   view,
   labels,
   stages,
+  kind,
+  kindLabel,
+  intents,
   lostKey,
   currencies,
   members,
@@ -563,6 +570,48 @@ export function LeadDetails({
                 {view.auto ? <p title={labels.autoStageDetail}>{labels.autoStageHint}</p> : null}
               </>
             ) : null
+          }
+        />
+
+        <InlineField
+          fieldKey="kind"
+          label={labels.opportunity.kindLabel}
+          editLabel={editLabel(labels.opportunity.kindLabel)}
+          placeholder={labels.opportunity.kindNone}
+          value={
+            kindLabel ? (
+              <span
+                data-testid="lead-kind"
+                className="inline-flex h-[22px] items-center rounded-full bg-[var(--info-soft)] px-2 text-[11.5px] font-medium text-[color-mix(in_oklch,var(--info)_75%,var(--ink))]"
+              >
+                {kindLabel}
+              </span>
+            ) : null
+          }
+          canEdit={canEdit}
+          editing={editing === "kind"}
+          busy={busy && editing === "kind"}
+          onOpen={() => open("kind")}
+          onCancel={close}
+          onOutside={close}
+          editor={
+            <>
+              <label htmlFor={`kind-${opportunityId}`} className="sr-only">
+                {labels.opportunity.kindLabel}
+              </label>
+              <CommitSelect
+                id={`kind-${opportunityId}`}
+                data-testid="lead-kind-select"
+                autoFocus
+                disabled={busy}
+                value={kind}
+                options={[{ key: "", label: labels.opportunity.kindNone }, ...intents]}
+                onCommit={(next) => {
+                  if (next === kind) return close();
+                  void save("set-kind", { kind: next });
+                }}
+              />
+            </>
           }
         />
 

@@ -8,11 +8,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LeadDetails, type LeadDetailField } from "@/components/dashboard/LeadDetails";
 import { LEAD_CAPTION_CLASS } from "@/components/dashboard/lead-field-class";
 import { crmCurrencies } from "@/lib/crm/budget";
-import type { CrmConfig } from "@/config/verticals/_types";
+import { intentOptions, leadIntent } from "@/lib/crm/intent";
+import type { CrmConfig, IntentDef } from "@/config/verticals/_types";
 import type { LeadView } from "@/lib/crm/view-model";
 
 type Props = {
   waId: string;
+  // What this opportunity is about ('' = nobody labelled it yet).
+  kind: string;
+  intents: ReadonlyArray<IntentDef>;
   // The opportunity every write in this card acts on.
   opportunityId: number;
   view: LeadView;
@@ -26,6 +30,8 @@ type Props = {
 
 export function LeadCrmCard({
   waId,
+  kind,
+  intents,
   opportunityId,
   view,
   config,
@@ -45,6 +51,9 @@ export function LeadCrmCard({
           view={view}
           labels={config.labels}
           stages={config.stages.map((s) => ({ key: s.key, label: s.label }))}
+          kind={kind}
+          kindLabel={leadIntent(kind, intents)?.label ?? null}
+          intents={intentOptions(intents)}
           lostKey={config.autoStages.lost}
           currencies={crmCurrencies(config)}
           members={members}

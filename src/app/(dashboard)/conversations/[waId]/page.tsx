@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { getContact, getConversation } from "@/lib/queries/contacts";
 import { tenantConfig } from "@/config/tenant";
 import { verticalConfig } from "@/config/verticals";
+import { intentOptions } from "@/lib/crm/intent";
 import { ConversationTimeline } from "@/components/dashboard/ConversationTimeline";
 import { ContactSidebar } from "@/components/dashboard/ContactSidebar";
 import { formatAutomationLabel } from "@/lib/automation-labels";
@@ -142,6 +143,8 @@ export default async function ConversationDetailPage({ params, searchParams }: P
           {crm && person ? (
             <OpportunityList
               waId={waId}
+              canEdit={canEdit}
+              intentOptions={intentOptions(vertical.intents)}
               opportunities={person.opportunities}
               selectedId={lead?.id ?? null}
               config={crm}
@@ -164,6 +167,8 @@ export default async function ConversationDetailPage({ params, searchParams }: P
             <>
               <LeadCrmCard
                 waId={waId}
+                kind={lead.kind}
+                intents={vertical.intents}
                 opportunityId={lead.id}
                 view={buildLeadView(lead.lead, crm, labelFor, tenant.locale, tenant.timezone, now, lead.budget)}
                 config={crm}
