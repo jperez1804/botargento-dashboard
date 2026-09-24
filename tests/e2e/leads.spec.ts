@@ -1083,8 +1083,16 @@ test("Nueva oportunidad: the same person, a second process, followed apart", asy
   await page.goto(`/conversations/${F.visita.wa_id}`);
 
   // Ramiro is being worked on Ventas; he also wants to rent something.
-  await page.getByTestId("new-opportunity").click();
-  await page.locator("#new-opportunity-kind").selectOption("Alquileres");
+  // Same as "Tomar" further up: on a cold server the first click can land
+  // before hydration and the dialog never opens, so the pair is retried.
+  const kindSelect = page.locator("#new-opportunity-kind");
+  await expect(async () => {
+    if (!(await kindSelect.isVisible())) {
+      await page.getByTestId("new-opportunity").click({ timeout: 5000 });
+    }
+    await expect(kindSelect).toBeVisible({ timeout: 5000 });
+  }).toPass({ timeout: 30_000 });
+  await kindSelect.selectOption("Alquileres");
   await page.locator("#new-opportunity-title").fill("2 amb en Palermo");
   await page.getByRole("button", { name: "Abrir oportunidad" }).click();
 
@@ -1124,9 +1132,16 @@ test("The rubro of an opportunity can be corrected, and it is logged", async ({ 
   const card = page.getByTestId("lead-crm-card");
   await expect(card.getByTestId("lead-kind")).toHaveText("Ventas");
 
-  // The bot read it as a sale; it was an appraisal.
-  await card.getByTestId("lead-field-kind").click();
-  await card.getByTestId("lead-kind-select").selectOption("Tasaciones");
+  // The bot read it as a sale; it was an appraisal. The click is retried for
+  // the same reason as the one in "Tomar": hydration.
+  const kindSelect = card.getByTestId("lead-kind-select");
+  await expect(async () => {
+    if (!(await kindSelect.isVisible())) {
+      await card.getByTestId("lead-field-kind").click({ timeout: 5000 });
+    }
+    await expect(kindSelect).toBeVisible({ timeout: 5000 });
+  }).toPass({ timeout: 30_000 });
+  await kindSelect.selectOption("Tasaciones");
   await expect(card.getByTestId("lead-kind")).toHaveText("Tasaciones");
   await expect(card.getByTestId("lead-kind-select")).toHaveCount(0);
 
