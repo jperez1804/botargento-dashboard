@@ -311,6 +311,10 @@ export const CRM_LABELS_ES: CrmLabels = {
     opportunitiesManual:
       "También podés abrir una a mano desde la ficha del contacto, o con «Nuevo lead» para alguien que no vino por WhatsApp.",
     opportunitiesUnderived:
-      "Quien escribió pero nunca llegó a derivar no ocupa lugar en el tablero: está en Conversaciones, con el filtro «Sin derivar», y arriba del tablero ves cuántos llegaron esta semana.",
+      "Quien escribió pero nunca llegó a derivar no ocupa lugar en el tablero: está en Conversaciones, con el filtro «Sin derivar», y arriba del tablero ves cuántos están esperando.",
+    opportunitiesKind:
+      "El rubro lo pone el bot según la consulta que derivó. Si lo leyó mal, lo corregís desde la ficha: es el que separa una oportunidad de otra.",
+    opportunitiesOrdinal:
+      "Las oportunidades de una persona se numeran por orden de apertura. Si en una tarjeta ves «2 de 3», es la segunda de las tres que tuvo ese contacto; entrando a la ficha las ves todas, con la misma numeración.",
   },
 };

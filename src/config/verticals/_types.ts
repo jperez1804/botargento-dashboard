@@ -431,6 +431,8 @@ export type CrmLabels = {
     opportunitiesMessages: string;
     opportunitiesManual: string;
     opportunitiesUnderived: string;
+    opportunitiesKind: string;
+    opportunitiesOrdinal: string;
   };
 };
 

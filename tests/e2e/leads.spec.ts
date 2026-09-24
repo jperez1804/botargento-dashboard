@@ -1078,6 +1078,88 @@ test("Lista: grouping by contact puts a person's opportunities together", async 
   await expect(page.getByTestId("lead-crm-card")).toContainText("Calificado");
 });
 
+test("Nueva oportunidad: the same person, a second process, followed apart", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto(`/conversations/${F.visita.wa_id}`);
+
+  // Ramiro is being worked on Ventas; he also wants to rent something.
+  // Same as "Tomar" further up: on a cold server the first click can land
+  // before hydration and the dialog never opens, so the pair is retried.
+  const kindSelect = page.locator("#new-opportunity-kind");
+  await expect(async () => {
+    if (!(await kindSelect.isVisible())) {
+      await page.getByTestId("new-opportunity").click({ timeout: 5000 });
+    }
+    await expect(kindSelect).toBeVisible({ timeout: 5000 });
+  }).toPass({ timeout: 30_000 });
+  await kindSelect.selectOption("Alquileres");
+  await page.locator("#new-opportunity-title").fill("2 amb en Palermo");
+  await page.getByRole("button", { name: "Abrir oportunidad" }).click();
+
+  // It lands on the new one, in Nuevo because a person opened it, and owned
+  // by whoever opened it.
+  await page.waitForURL(new RegExp(`/conversations/${F.visita.wa_id}\\?op=\\d+`));
+  const card = page.getByTestId("lead-crm-card");
+  await expect(card).toContainText("Nuevo");
+  await expect(card.getByTestId("lead-kind")).toHaveText("Alquileres");
+  await expect(card.getByTestId("lead-owner")).toHaveText("Dev Admin");
+
+  // Both are listed, oldest first, and the old one did not move.
+  const rows = page.getByTestId("opportunity-list").getByTestId("opportunity-row");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText("Visita");
+  await expect(rows.last()).toContainText("2 amb en Palermo");
+
+  expect(await opportunitiesOf(F.visita.wa_id)).toMatchObject([
+    { seq: 1, kind: "Ventas", stage: "visita" },
+    { seq: 2, kind: "Alquileres", stage: null, opened_by: "dev@botargento.com.ar" },
+  ]);
+  await expect.poll(() => lastAudit("lead_open")).toMatchObject({
+    contact_wa_id: F.visita.wa_id,
+    kind: "Alquileres",
+    ok: true,
+  });
+
+  // On the board they are two cards, in two columns.
+  await page.goto("/leads?view=board");
+  await expect(page.locator(`[data-board-column="visita"] [data-lead-wa="${F.visita.wa_id}"]`)).toHaveCount(1);
+  await expect(page.locator(`[data-board-column="nuevo"] [data-lead-wa="${F.visita.wa_id}"]`)).toHaveCount(1);
+});
+
+test("The rubro of an opportunity can be corrected, and it is logged", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto(`/conversations/${F.reserva.wa_id}`);
+  const card = page.getByTestId("lead-crm-card");
+  await expect(card.getByTestId("lead-kind")).toHaveText("Ventas");
+
+  // The bot read it as a sale; it was an appraisal. The click is retried for
+  // the same reason as the one in "Tomar": hydration.
+  const kindSelect = card.getByTestId("lead-kind-select");
+  await expect(async () => {
+    if (!(await kindSelect.isVisible())) {
+      await card.getByTestId("lead-field-kind").click({ timeout: 5000 });
+    }
+    await expect(kindSelect).toBeVisible({ timeout: 5000 });
+  }).toPass({ timeout: 30_000 });
+  await kindSelect.selectOption("Tasaciones");
+  await expect(card.getByTestId("lead-kind")).toHaveText("Tasaciones");
+  await expect(card.getByTestId("lead-kind-select")).toHaveCount(0);
+
+  await expect(page.getByTestId("lead-activity")).toContainText("Rubro");
+  await expect.poll(() => lastAudit("lead_set_kind")).toMatchObject({
+    opportunity_id: F.reserva.opp,
+    from: "Ventas",
+    to: "Tasaciones",
+    ok: true,
+  });
+
+  // The board card says so too.
+  await page.goto("/leads?view=board");
+  await expect(
+    page.locator(`[data-lead-card="${F.reserva.opp}"]`).getByTestId("lead-intent"),
+  ).toHaveText("Tasaciones");
+});
+
 test("Board: nothing matches the filters → one empty state with a clear link", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board&q=zzzz-nadie");

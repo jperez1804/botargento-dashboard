@@ -12,6 +12,7 @@ import { Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { LEAD_CAPTION_CLASS } from "@/components/dashboard/lead-field-class";
 import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
+import { NewOpportunityDialog } from "@/components/dashboard/NewOpportunityDialog";
 import { fillTemplate, formatDay } from "@/lib/crm/view-model";
 import { leadIntent } from "@/lib/crm/intent";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,8 @@ import type { OpportunityRow } from "@/lib/queries/leads";
 
 type Props = {
   waId: string;
+  canEdit: boolean;
+  intentOptions: ReadonlyArray<{ key: string; label: string }>;
   opportunities: ReadonlyArray<OpportunityRow>;
   selectedId: number | null;
   config: CrmConfig;
@@ -30,6 +33,8 @@ type Props = {
 
 export function OpportunityList({
   waId,
+  canEdit,
+  intentOptions,
   opportunities,
   selectedId,
   config,
@@ -37,16 +42,21 @@ export function OpportunityList({
   locale,
   timezone,
 }: Props) {
-  if (opportunities.length <= 1) return null;
+  if (opportunities.length === 0) return null;
   const labels = config.labels;
   const stageOf = (key: string) => config.stages.find((s) => s.key === key);
 
   return (
     <Card data-testid="opportunity-list">
       <CardContent className="space-y-2 px-4 py-4">
-        <p className={LEAD_CAPTION_CLASS}>
-          {labels.opportunity.listTitle} · {opportunities.length}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className={LEAD_CAPTION_CLASS}>
+            {labels.opportunity.listTitle} · {opportunities.length}
+          </p>
+          {canEdit ? (
+            <NewOpportunityDialog contactWaId={waId} labels={labels} intents={intentOptions} />
+          ) : null}
+        </div>
         <ol className="space-y-1">
           {opportunities.map((o) => {
             const selected = o.id === selectedId;

@@ -146,6 +146,8 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
         <aside className="order-1 lg:order-2">
           <LeadCrmCard
             waId={waId}
+            kind={lead.kind}
+            intents={verticalConfig().intents}
             opportunityId={lead.id}
             view={view}
             config={crm}

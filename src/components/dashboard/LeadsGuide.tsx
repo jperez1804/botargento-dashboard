@@ -48,6 +48,8 @@ export function LeadsGuide({ config }: Props) {
           <li>{g.opportunitiesSameKind}</li>
           <li>{g.opportunitiesMessages}</li>
           <li>{g.opportunitiesManual}</li>
+          <li>{g.opportunitiesKind}</li>
+          <li>{g.opportunitiesOrdinal}</li>
           <li>{g.opportunitiesUnderived}</li>
         </ul>
       </Section>
