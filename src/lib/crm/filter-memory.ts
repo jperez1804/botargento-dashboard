@@ -6,7 +6,17 @@
 
 export const LEADS_FILTER_MEMORY_KEY = "botargento:leads-filters";
 
-const PERSISTED_KEYS = ["view", "stage", "owner", "mine", "filter", "priority", "intent", "open"] as const;
+const PERSISTED_KEYS = [
+  "view",
+  "stage",
+  "owner",
+  "mine",
+  "filter",
+  "priority",
+  "intent",
+  "open",
+  "group",
+] as const;
 const FILTERED_VIEWS = new Set(["board", "list"]);
 
 /**

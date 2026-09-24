@@ -218,6 +218,7 @@ export const CRM_LABELS_ES: CrmLabels = {
     create: "Abrir oportunidad",
     createdToast: "Oportunidad abierta",
     ofTotalTemplate: "{n} de {total}",
+    ordinalTemplate: "{n}ª",
     openedTemplate: "Abierta el {date}",
     closedTemplate: "Cerrada el {date}",
     openedByBot: "La abrió el bot al derivar la consulta.",
@@ -228,6 +229,11 @@ export const CRM_LABELS_ES: CrmLabels = {
     underivedCountOne: "1 sin derivar esta semana",
     underivedHint:
       "Escribieron al bot pero no llegaron a derivar. Abrí una oportunidad si la consulta vale la pena.",
+    underivedEmpty: "Todas las consultas de esta semana llegaron a derivar.",
+    allConversations: "Todas",
+    groupByContact: "Agrupar por contacto",
+    oneOpportunity: "1 oportunidad",
+    manyOpportunities: "{n} oportunidades",
   },
 
   openConversation: "Ver conversación",
@@ -293,5 +299,18 @@ export const CRM_LABELS_ES: CrmLabels = {
     sourcesTitle: "Origen",
     sourcesBody:
       "Los leads que escriben al bot llegan por WhatsApp. Los que llaman, visitan la oficina o vienen por un portal o un referido se cargan a mano con «Nuevo lead»; si después escriben, la conversación se suma al mismo lead.",
+    opportunitiesTitle: "Una persona, varias oportunidades",
+    opportunitiesIntro:
+      "Cada tarjeta del tablero es una oportunidad: una consulta concreta, con su rubro, su etapa y su responsable. La misma persona puede tener varias a lo largo del tiempo — alquiló el año pasado y hoy pregunta por una venta — y cada una se sigue por separado. En la ficha del contacto están todas, numeradas por orden de apertura.",
+    opportunitiesHandoff:
+      "Cuando el bot deriva una consulta de un rubro que la persona no tiene abierto, se abre una oportunidad sola, en Calificado.",
+    opportunitiesSameKind:
+      "Si deriva otra vez por el mismo rubro, cuenta para la que ya está abierta: no se duplica.",
+    opportunitiesMessages:
+      "Los mensajes sueltos no abren nada. Mantienen viva la oportunidad y, si la persona pregunta por otro rubro, la tarjeta avisa «Consulta nueva» con un botón para abrirla vos.",
+    opportunitiesManual:
+      "También podés abrir una a mano desde la ficha del contacto, o con «Nuevo lead» para alguien que no vino por WhatsApp.",
+    opportunitiesUnderived:
+      "Quien escribió pero nunca llegó a derivar no ocupa lugar en el tablero: está en Conversaciones, con el filtro «Sin derivar», y arriba del tablero ves cuántos llegaron esta semana.",
   },
 };

@@ -3,7 +3,7 @@ import { tenantConfig } from "@/config/tenant";
 import { SEARCH_LABELS as L } from "@/config/search-labels";
 import { crmConfig } from "@/lib/crm/enabled";
 import { buildLeadView, fillTemplate, formatDayTime } from "@/lib/crm/view-model";
-import { listLeads } from "@/lib/queries/leads";
+import { groupByPerson, listLeads } from "@/lib/queries/leads";
 import { listContacts } from "@/lib/queries/contacts";
 import { listTeam, memberLabel } from "@/lib/queries/team";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -15,11 +15,15 @@ const MAX_RESULTS = 50;
 
 type Props = { searchParams: Promise<{ q?: string }> };
 
+type Stage = { label: string; tone: CrmStageTone; auto: boolean };
+
 type Result = {
   waId: string;
   name: string;
   sourceLabel: string | null;
-  stage: { label: string; tone: CrmStageTone; auto: boolean } | null;
+  // One chip per opportunity the person has: a rental in Visita and a sale in
+  // Calificado are two chips on the same row.
+  stages: Stage[];
   lastActivity: string;
 };
 
@@ -40,27 +44,32 @@ export default async function SearchPage({ searchParams }: Props) {
   if (q && crm) {
     const [leads, team] = await Promise.all([listLeads(crm, { q, includeLost: true }, now), listTeam()]);
     const labelFor = (email: string | null) => memberLabel(team, email);
-    results = leads.rows.slice(0, MAX_RESULTS).map((r) => {
-      const view = buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now, r.budget);
-      return {
-        waId: r.contactWaId,
-        name: r.displayName,
-        sourceLabel:
-          r.contact.source === "whatsapp"
-            ? crm.labels.sourceWhatsapp
-            : (crm.manualLeadSources.find((s) => s.key === r.contact.source)?.label ??
-              r.contact.source),
-        stage: { label: view.stageLabel, tone: view.tone, auto: view.auto },
-        lastActivity: view.lastActivityText,
-      };
-    });
+    results = groupByPerson(leads.rows)
+      .slice(0, MAX_RESULTS)
+      .map((group) => {
+        const views = group.rows.map((r) =>
+          buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now, r.budget),
+        );
+        const first = group.rows[0]!;
+        return {
+          waId: group.contactWaId,
+          name: group.displayName,
+          sourceLabel:
+            first.contact.source === "whatsapp"
+              ? crm.labels.sourceWhatsapp
+              : (crm.manualLeadSources.find((s) => s.key === first.contact.source)?.label ??
+                first.contact.source),
+          stages: views.map((v) => ({ label: v.stageLabel, tone: v.tone, auto: v.auto })),
+          lastActivity: views[0]!.lastActivityText,
+        };
+      });
   } else if (q) {
     const contacts = await listContacts({ search: q, limit: MAX_RESULTS });
     results = contacts.map((c) => ({
       waId: c.contactWaId,
       name: c.displayName ?? c.contactWaId,
       sourceLabel: null,
-      stage: null,
+      stages: [],
       lastActivity: formatDayTime(new Date(c.lastSeen), tenant.locale, tenant.timezone),
     }));
   }
@@ -87,15 +96,20 @@ export default async function SearchPage({ searchParams }: Props) {
           {
             id: "stage",
             header: L.columnStage,
-            width: "150px",
+            width: "minmax(150px, 0.9fr)",
             cell: (r: Result) =>
-              r.stage ? (
-                <LeadStageChip
-                  label={r.stage.label}
-                  tone={r.stage.tone}
-                  auto={r.stage.auto}
-                  autoTitle={crm.labels.autoStageDetail}
-                />
+              r.stages.length > 0 ? (
+                <span className="flex flex-wrap gap-1">
+                  {r.stages.map((s, i) => (
+                    <LeadStageChip
+                      key={`${i}-${s.label}`}
+                      label={s.label}
+                      tone={s.tone}
+                      auto={s.auto}
+                      autoTitle={crm.labels.autoStageDetail}
+                    />
+                  ))}
+                </span>
               ) : null,
           },
         ]

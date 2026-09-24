@@ -21,6 +21,8 @@ export type LeadsSearchParams = {
   priority?: string;
   intent?: string;
   open?: string;
+  // "contact" groups the list by person instead of one row per opportunity.
+  group?: string;
 };
 
 export type ParsedLeadsParams = {
@@ -34,6 +36,7 @@ export type ParsedLeadsParams = {
   priority: CrmPriorityKey | "";
   intent: string; // Vertical intent key, "" = all.
   open: string[]; // Terminal board columns expanded (stage keys).
+  groupByContact: boolean;
   pageNum: number;
   activityKind: string;
   activityBy: string;
@@ -68,6 +71,7 @@ export function parseLeadsSearchParams(
       .split(",")
       .map((k) => k.trim())
       .filter((k) => crm.stages.some((s) => s.key === k && s.terminal)),
+    groupByContact: sp.group === "contact",
     pageNum: Math.max(1, Number(sp.page) || 1),
     activityKind: sp.kind && sp.kind in crm.labels.eventKinds ? sp.kind : "",
     activityBy: (sp.by ?? "").trim().toLowerCase(),
@@ -94,6 +98,7 @@ export function buildLeadsHref(
   if (p.intent) params.set("intent", p.intent);
   if (p.q) params.set("q", p.q);
   if (view === "board" && p.open.length) params.set("open", p.open.join(","));
+  if (view === "list" && p.groupByContact) params.set("group", "contact");
   if (overrides.page && overrides.page > 1) params.set("page", String(overrides.page));
   const qs = params.toString();
   return `/leads${qs ? `?${qs}` : ""}`;

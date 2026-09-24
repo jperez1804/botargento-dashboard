@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MessageCircleQuestion } from "lucide-react";
+import { MessageCircleQuestion, Users } from "lucide-react";
 import { tenantConfig } from "@/config/tenant";
 import { verticalConfig } from "@/config/verticals";
 import { intentOptions, leadIntent } from "@/lib/crm/intent";
@@ -9,11 +9,12 @@ import { buildLeadView, fillTemplate } from "@/lib/crm/view-model";
 import { buildLeadsSummary, closedStageKeys } from "@/lib/crm/summary";
 import { leadAttention } from "@/lib/crm/attention";
 import { hasRole, requireRole } from "@/lib/role-guard";
-import { listLeads, type ListLeadsResult } from "@/lib/queries/leads";
+import { groupByPerson, listLeads, type ListLeadsResult } from "@/lib/queries/leads";
 import { listTeam, memberLabel } from "@/lib/queries/team";
 import { listTeamLeadEvents } from "@/lib/queries/lead-detail";
 import { countUnderived } from "@/lib/queries/underived";
 import { formatNumber } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LeadsFilters } from "@/components/dashboard/LeadsFilters";
 import { LeadsViewTabs } from "@/components/dashboard/LeadsViewTabs";
@@ -21,6 +22,7 @@ import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { LeadsBoard } from "@/components/dashboard/LeadsBoard";
 import { LeadsSummary } from "@/components/dashboard/LeadsSummary";
 import { LeadsGuide } from "@/components/dashboard/LeadsGuide";
+import { LeadsGroupedList } from "@/components/dashboard/LeadsGroupedList";
 import { NewLeadDialog } from "@/components/dashboard/NewLeadDialog";
 import { TeamActivityFeed } from "@/components/dashboard/TeamActivityFeed";
 import { TeamActivityFilters } from "@/components/dashboard/TeamActivityFilters";
@@ -246,17 +248,54 @@ export default async function LeadsPage({ searchParams }: Props) {
           clearHref="/leads"
         />
       ) : (
-        <LeadsTable
-          rows={pageRows}
-          labels={labels}
-          pagination={{
-            page: p.pageNum,
-            pageSize: PAGE_SIZE,
-            total: views.length,
-            buildPageHref: (page) => buildHref({ page }),
-            locale: tenant.locale,
-          }}
-        />
+        <div className="space-y-3">
+          {/* A Kanban cannot group across columns; the list can. */}
+          <div className="flex justify-end">
+            <Link
+              href={buildLeadsHref({ ...p, groupByContact: !p.groupByContact }, { view: "list" })}
+              data-testid="leads-group-toggle"
+              aria-pressed={p.groupByContact}
+              className={cn(
+                "inline-flex h-[30px] items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-150",
+                p.groupByContact
+                  ? "border-[color-mix(in_oklch,var(--client-primary)_55%,var(--rule))] bg-[color-mix(in_oklch,var(--client-primary)_12%,var(--surface))] text-[var(--ink)]"
+                  : "border-[var(--rule)] bg-[var(--canvas-2)] text-[var(--muted-ink)] hover:border-[var(--rule-strong)] hover:text-[var(--ink)]",
+              )}
+            >
+              <Users className="size-3.5" aria-hidden />
+              {labels.opportunity.groupByContact}
+            </Link>
+          </div>
+
+          {p.groupByContact ? (
+            <LeadsGroupedList
+              groups={groupByPerson(result.rows).map((g) => ({
+                contactWaId: g.contactWaId,
+                displayName: g.displayName,
+                rows: g.rows.map((r) => ({
+                  id: r.id,
+                  seq: r.seq,
+                  kindLabel: leadIntent(r.kind, intents)?.label ?? null,
+                  title: r.title,
+                  view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now, r.budget),
+                })),
+              }))}
+              labels={labels}
+            />
+          ) : (
+            <LeadsTable
+              rows={pageRows}
+              labels={labels}
+              pagination={{
+                page: p.pageNum,
+                pageSize: PAGE_SIZE,
+                total: views.length,
+                buildPageHref: (page) => buildHref({ page }),
+                locale: tenant.locale,
+              }}
+            />
+          )}
+        </div>
       )}
     </div>
   );

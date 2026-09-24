@@ -18,6 +18,8 @@ import { LeadCrmCard } from "@/components/dashboard/LeadCrmCard";
 import { LeadActivityFeed } from "@/components/dashboard/LeadActivityFeed";
 import { LeadQualificationCard } from "@/components/dashboard/LeadQualificationCard";
 import { NoConversationYet } from "@/components/dashboard/NoConversationYet";
+import { OpportunityList } from "@/components/dashboard/OpportunityList";
+import { UnderivedNotice } from "@/components/dashboard/UnderivedNotice";
 
 type Props = {
   params: Promise<{ waId: string }>;
@@ -136,6 +138,28 @@ export default async function ConversationDetailPage({ params, searchParams }: P
         </section>
 
         <div className="order-1 lg:order-2 space-y-3">
+          {/* One person, N opportunities: which one this card is about. */}
+          {crm && person ? (
+            <OpportunityList
+              waId={waId}
+              opportunities={person.opportunities}
+              selectedId={lead?.id ?? null}
+              config={crm}
+              intents={vertical.intents}
+              locale={tenant.locale}
+              timezone={tenant.timezone}
+            />
+          ) : null}
+          {/* Wrote, never derived: no opportunity, but not lost either. */}
+          {crm && person && person.opportunities.length === 0 ? (
+            <UnderivedNotice
+              waId={waId}
+              kind={person.newIntent}
+              config={crm}
+              intents={vertical.intents}
+              canEdit={canEdit}
+            />
+          ) : null}
           {crm && lead && session ? (
             <>
               <LeadCrmCard

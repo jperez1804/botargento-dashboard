@@ -76,6 +76,15 @@ const opportunitiesOf = (waId: string) =>
     `,
   );
 
+// The bot signals these tests add must not outlive the file: other specs
+// count the seeded handoffs and would see one too many.
+test.afterAll(async () => {
+  await withSql(async (sql) => {
+    await sql`DELETE FROM automation.escalations WHERE reason = 'e2e'`;
+    await sql`DELETE FROM automation.lead_log WHERE route = 'e2e'`;
+  });
+});
+
 test.beforeEach(async () => {
   await resetAuthState();
   await withSql(async (sql) => {
@@ -94,7 +103,8 @@ test("Banner surfaces at-risk leads and overdue reminders for the admin", async 
 
   await banner.getByRole("link", { name: /pasa a perdido/ }).click();
   await page.waitForURL(/filter=at_risk/);
-  await expect(leadRows(page)).toHaveCount(1);
+  // First CRM render of the whole suite: the dev server compiles /leads here.
+  await expect(leadRows(page)).toHaveCount(1, { timeout: 45_000 });
   await expect(leadRows(page).first()).toContainText(F.atRisk.name);
   await expect(leadRows(page).first()).toContainText("Se pierde el");
 });
@@ -974,6 +984,81 @@ test("Somebody who wrote but never derived stays off the board, and is counted",
   expect(await opportunitiesOf(F.underived.wa_id)).toHaveLength(0);
   // But they are not lost: Leads says how many arrived this week.
   await expect(page.getByTestId("underived-pill")).toContainText("sin derivar");
+});
+
+test("The person's card lists every opportunity they have had", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  // Ramiro is being worked on Ventas; the bot hands him off for a rental too.
+  await botHandoff(F.visita.wa_id, "Alquileres");
+  await page.goto(`/conversations/${F.visita.wa_id}`);
+
+  const list = page.getByTestId("opportunity-list");
+  await expect(list).toBeVisible();
+  const rows = list.getByTestId("opportunity-row");
+  await expect(rows).toHaveCount(2);
+  // Each row carries its ordinal — the same number the board card shows — so
+  // "2ª de 2" on a card always finds its row here.
+  await expect(rows.first()).toContainText("1ª");
+  await expect(rows.first()).toContainText("Ventas");
+  await expect(rows.last()).toContainText("2ª");
+  await expect(rows.last()).toContainText("Alquileres");
+
+  // The list reads oldest first, but the page opens on the newest open one:
+  // the rental the bot just qualified, not the sale from days ago.
+  await expect(page.getByTestId("lead-crm-card")).toContainText("Calificado");
+  // Picking the older row switches the card to it.
+  await rows.first().click();
+  await page.waitForURL(/\?op=\d+$/);
+  await expect(page.getByTestId("lead-crm-card")).toContainText("Visita");
+  await expect(page.getByTestId("lead-activity")).toBeVisible();
+});
+
+test("Sin derivar: the conversations that stopped short, and one click to open them", async ({
+  page,
+}) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/conversations");
+  const chip = page.getByTestId("conversations-no-handoff");
+  await expect(chip).toContainText("sin derivar");
+
+  await chip.click();
+  await page.waitForURL(/filter=no_handoff/);
+  // Several conversations can be waiting here, so work on hers.
+  const row = page.getByRole("link", { name: new RegExp(F.underived.name) });
+  await expect(row).toBeVisible();
+  await expect(row.getByTestId("underived-kind")).toHaveText("Ventas");
+
+  // Opening it lands on the new opportunity, in Nuevo because a person opened it.
+  await row.getByTestId("open-opportunity").click();
+  await page.waitForURL(new RegExp(`/conversations/${F.underived.wa_id}\\?op=\\d+`));
+  await expect(page.getByTestId("lead-crm-card")).toContainText("Nuevo");
+  expect(await opportunitiesOf(F.underived.wa_id)).toMatchObject([
+    { seq: 1, kind: "Ventas", opened_by: "dev@botargento.com.ar" },
+  ]);
+
+  // And she is no longer waiting: the board has her now.
+  await page.goto("/leads?view=board");
+  await expect(page.locator(`[data-lead-wa="${F.underived.wa_id}"]`)).toHaveCount(1);
+});
+
+test("Lista: grouping by contact puts a person's opportunities together", async ({ page }) => {
+  await loginAsDevViaLog(page, LOG_PATH);
+  await botHandoff(F.visita.wa_id, "Alquileres");
+  await page.goto("/leads?view=list");
+
+  await page.getByTestId("leads-group-toggle").click();
+  await page.waitForURL(/group=contact/);
+  const group = page.locator(`[data-testid="lead-group"][data-wa="${F.visita.wa_id}"]`);
+  await expect(group).toContainText("2 oportunidades");
+  const rows = group.getByTestId("grouped-opportunity");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText("1ª");
+  await expect(rows.last()).toContainText("2ª");
+
+  // Each row opens the person on that opportunity.
+  await rows.last().click();
+  await page.waitForURL(new RegExp(`/conversations/${F.visita.wa_id}\\?op=\\d+`));
+  await expect(page.getByTestId("lead-crm-card")).toContainText("Calificado");
 });
 
 test("Board: nothing matches the filters → one empty state with a clear link", async ({ page }) => {

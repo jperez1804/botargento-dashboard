@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { describeLeadEvent, eventKindLabel } from "@/lib/crm/event-text";
+import { fillTemplate } from "@/lib/crm/view-model";
 import { formatDayTime } from "@/lib/crm/view-model";
 import type { CrmConfig } from "@/config/verticals/_types";
 import type { TeamLeadEvent } from "@/lib/queries/lead-detail";
@@ -73,6 +74,13 @@ export function TeamActivityFeed({ events, config, memberLabel, locale, timezone
                 >
                   {e.leadName}
                 </Link>
+                {/* The same ordinal the board card and the person's list show. */}
+                {e.opportunitySeq !== null && e.opportunitySeq > 1 ? (
+                  <span data-testid="activity-opportunity" className="text-[11.5px] text-[var(--soft-ink)]">
+                    {fillTemplate(config.labels.opportunity.ordinalTemplate, { n: e.opportunitySeq })}
+                    {e.opportunityKind ? ` ${e.opportunityKind}` : ""}
+                  </span>
+                ) : null}
               </p>
               {text ? (
                 <p className="whitespace-pre-line break-words text-[13px] text-[var(--muted-ink)]">{text}</p>

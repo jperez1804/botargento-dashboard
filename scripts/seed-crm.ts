@@ -50,8 +50,9 @@ const ahead = (days: number) => new Date(Date.now() + days * DAY);
  * read-time sync (lib/queries/opportunity-sync) on the next render, together
  * with the opportunities their handoffs have earned.
  */
-export async function seedCrmState(sql: Sql): Promise<void> {
+export async function seedCrmState(outer: Sql): Promise<void> {
   const f = CRM_FIXTURES;
+  await outer.begin(async (sql) => {
   await sql`
     TRUNCATE dashboard.contacts, dashboard.opportunities, dashboard.lead_events
     RESTART IDENTITY CASCADE
@@ -145,6 +146,7 @@ export async function seedCrmState(sql: Sql): Promise<void> {
     VALUES (${created.contact_wa_id}, ${f.manual.opp}, ${created.kind}, ${created.body},
             ${created.occurred_at}, ${created.created_by}, ${sql.json({ source: "visita" })})
   `;
+  });
 }
 
 export async function seedCrm(sql: Sql): Promise<void> {
