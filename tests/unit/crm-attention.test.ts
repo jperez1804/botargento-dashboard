@@ -23,6 +23,7 @@ function lead(over: Partial<EffectiveLead> = {}): EffectiveLead {
     reminder: null,
     owner: null,
     priority: null,
+    closedAt: null,
     ...over,
   };
 }
@@ -83,8 +84,16 @@ function row(over: Partial<EffectiveLead> = {}): LeadRow {
     lastMessageAt: null,
     handoffCount: 0,
     budget: null,
-    manual: null,
-    lastIntent: null,
+    contact: { source: "whatsapp", createdBy: "", createdAt: at(-10 * DAY), firstSeenAt: at(-10 * DAY) },
+    openedAt: at(-10 * DAY),
+    id: n,
+    seq: 1,
+    ofTotal: 1,
+    kind: "",
+    title: "",
+    openedBy: "",
+    closedAt: null,
+    newIntent: null,
     lead: lead(over),
   };
 }

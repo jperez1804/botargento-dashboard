@@ -8,18 +8,20 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRoleApi, type SessionWithRole } from "@/lib/role-guard";
 import { crmConfig } from "@/lib/crm/enabled";
-import { getLead, type LeadRow } from "@/lib/queries/leads";
+import { getOpportunity, type OpportunityRow } from "@/lib/queries/leads";
 import { listAssignableMembers } from "@/lib/queries/team";
 import {
-  addLeadActivity,
-  assignLead,
-  completeLeadReminder,
-  setLeadBudget,
-  setLeadPriority,
-  setLeadReminder,
-  setLeadStage,
+  addOpportunityActivity,
+  assignOpportunity,
+  completeOpportunityReminder,
+  setOpportunityBudget,
+  setOpportunityKind,
+  setOpportunityPriority,
+  setOpportunityReminder,
+  setOpportunityStage,
 } from "@/lib/queries/lead-writes";
 import type { CrmConfig, CrmPriorityKey } from "@/config/verticals/_types";
+import { verticalConfig } from "@/config/verticals";
 import { crmCurrencies } from "@/lib/crm/budget";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
@@ -32,43 +34,52 @@ export type LeadAction =
   | "reminder-set"
   | "reminder-done"
   | "set-priority"
-  | "set-budget";
+  | "set-budget"
+  | "set-kind";
 
-const WaId = z.string().regex(/^[0-9]{8,15}$/, "contactWaId must be 8-15 digits");
+// Every action names ONE opportunity: a person can have several, so the phone
+// is no longer enough to say what to change.
+const OppId = z.number().int().positive();
 const DAY_MS = 86_400_000;
 
 const Bodies = {
   "set-stage": z.object({
-    contactWaId: WaId,
+    opportunityId: OppId,
     stage: z.string().min(1).max(40),
     lostReason: z.string().max(200).optional(),
   }),
   assign: z.object({
-    contactWaId: WaId,
+    opportunityId: OppId,
     // "me" = the caller; null = unassign.
     ownerEmail: z.union([z.literal("me"), z.email(), z.null()]),
-    // "Tomar": only succeed if the lead is still unassigned.
+    // "Tomar": only succeed if the opportunity is still unassigned.
     take: z.boolean().optional(),
   }),
   event: z.object({
-    contactWaId: WaId,
+    opportunityId: OppId,
     kind: z.enum(["note", "call", "visit", "meeting"]),
     body: z.string().trim().min(1).max(2000),
     occurredAt: z.iso.datetime({ offset: true }).optional(),
   }),
   "reminder-set": z.object({
-    contactWaId: WaId,
+    opportunityId: OppId,
     at: z.iso.datetime({ offset: true }),
     note: z.string().trim().max(300),
   }),
-  "reminder-done": z.object({ contactWaId: WaId }),
+  "reminder-done": z.object({ opportunityId: OppId }),
   // "" clears the priority.
-  "set-priority": z.object({ contactWaId: WaId, priority: z.enum(["", "alta", "media", "baja"]) }),
+  "set-priority": z.object({ opportunityId: OppId, priority: z.enum(["", "alta", "media", "baja"]) }),
   // null amount clears the manual budget (the bot's figure shows again).
   "set-budget": z.object({
-    contactWaId: WaId,
+    opportunityId: OppId,
     amount: z.number().int().min(1).max(1_000_000_000).nullable(),
     currency: z.string().trim().toUpperCase().max(8).optional(),
+  }),
+  // "" clears the rubro; the title is free text shown next to it.
+  "set-kind": z.object({
+    opportunityId: OppId,
+    kind: z.string().trim().max(60),
+    title: z.string().trim().max(80).optional(),
   }),
 } as const;
 
@@ -83,20 +94,42 @@ const fail = (status: number, error: string, audit: Record<string, unknown> = {}
 async function apply(
   action: LeadAction,
   data: Record<string, unknown>,
-  lead: LeadRow,
+  lead: OpportunityRow,
   session: SessionWithRole,
   config: CrmConfig,
 ): Promise<Outcome> {
   const waId = lead.contactWaId;
+  const id = lead.id;
   const now = Date.now();
 
   if (action === "set-stage") {
     const stage = String(data.stage);
-    if (!config.stages.some((s) => s.key === stage)) return fail(400, "invalid_stage", { stage });
+    const def = config.stages.find((s) => s.key === stage);
+    if (!def) return fail(400, "invalid_stage", { stage });
     const lostReason =
       stage === config.autoStages.lost ? String(data.lostReason ?? "").trim() : "";
-    await setLeadStage(waId, stage, lostReason, session.email, lead.lead.stage);
+    // A terminal stage closes the opportunity: from here on a new handoff for
+    // this rubro opens a fresh one instead of reviving this.
+    await setOpportunityStage(
+      id,
+      waId,
+      stage,
+      lostReason,
+      session.email,
+      lead.lead.stage,
+      def.terminal === true,
+    );
     return { status: 200, body: { ok: true }, audit: { from: lead.lead.stage, to: stage } };
+  }
+
+  if (action === "set-kind") {
+    const kind = String(data.kind ?? "");
+    if (kind && !verticalConfig().intents.some((i) => i.key === kind)) {
+      return fail(400, "invalid_kind", { kind });
+    }
+    const title = String(data.title ?? lead.title).trim();
+    await setOpportunityKind(id, waId, kind, title, session.email, lead.kind);
+    return { status: 200, body: { ok: true }, audit: { from: lead.kind || null, to: kind || null } };
   }
 
   if (action === "set-budget") {
@@ -111,7 +144,7 @@ async function apply(
         ? { amount: lead.budget.amount, currency: lead.budget.currency }
         : null;
     const to = amount === null ? null : { amount, currency };
-    await setLeadBudget(waId, to, session.email, from);
+    await setOpportunityBudget(id, waId, to, session.email, from);
     return { status: 200, body: { ok: true }, audit: { from, to } };
   }
 
@@ -119,7 +152,7 @@ async function apply(
     // Same rule as set-stage: any asesor may prioritize any lead.
     const priority = data.priority as CrmPriorityKey | "";
     const to = priority === "" ? null : priority;
-    await setLeadPriority(waId, priority, session.email, lead.lead.priority);
+    await setOpportunityPriority(id, waId, priority, session.email, lead.lead.priority);
     return { status: 200, body: { ok: true }, audit: { from: lead.lead.priority, to } };
   }
 
@@ -136,7 +169,7 @@ async function apply(
       const members = await listAssignableMembers();
       if (!members.some((m) => m.email === target)) return fail(400, "invalid_owner", { to: target });
     }
-    const applied = await assignLead(waId, target, session.email, {
+    const applied = await assignOpportunity(id, waId, target, session.email, {
       onlyIfUnassigned: data.take === true,
       fromOwner: current,
     });
@@ -148,18 +181,18 @@ async function apply(
     const occurredAt = data.occurredAt ? new Date(String(data.occurredAt)) : null;
     if (occurredAt && occurredAt.getTime() > now + DAY_MS) return fail(400, "invalid_body");
     const kind = data.kind as "note" | "call" | "visit" | "meeting";
-    await addLeadActivity(waId, kind, String(data.body), occurredAt, session.email);
+    await addOpportunityActivity(id, waId, kind, String(data.body), occurredAt, session.email);
     return { status: 200, body: { ok: true }, audit: { kind } };
   }
 
   if (action === "reminder-set") {
     const at = new Date(String(data.at));
     if (at.getTime() > now + 365 * DAY_MS) return fail(400, "invalid_body");
-    await setLeadReminder(waId, at, String(data.note ?? ""), session.email);
+    await setOpportunityReminder(id, waId, at, String(data.note ?? ""), session.email);
     return { status: 200, body: { ok: true }, audit: { at: at.toISOString() } };
   }
 
-  const done = await completeLeadReminder(waId, session.email);
+  const done = await completeOpportunityReminder(id, waId, session.email);
   if (!done) return fail(409, "no_open_reminder");
   return { status: 200, body: { ok: true }, audit: {} };
 }
@@ -188,11 +221,13 @@ export function makeLeadHandler(action: LeadAction) {
       );
     }
     const data = parsed.data as Record<string, unknown>;
-    const waId = String(data.contactWaId);
+    const opportunityId = Number(data.opportunityId);
 
     let outcome: Outcome;
+    let waId: string | null = null;
     try {
-      const lead = await getLead(config, waId, new Date());
+      const lead = await getOpportunity(config, opportunityId, new Date());
+      waId = lead?.contactWaId ?? null;
       outcome = lead
         ? await apply(action, data, lead, session, config)
         : fail(404, "lead_not_found");
@@ -207,7 +242,12 @@ export function makeLeadHandler(action: LeadAction) {
       await db.insert(auditLog).values({
         email: session.email,
         action: `lead_${action.replace("-", "_")}`,
-        metadata: { contact_wa_id: waId, ok: outcome.status === 200, ...outcome.audit },
+        metadata: {
+          opportunity_id: opportunityId,
+          contact_wa_id: waId,
+          ok: outcome.status === 200,
+          ...outcome.audit,
+        },
       });
     } catch (err) {
       logger.error({ err, action }, "Lead audit insert failed");

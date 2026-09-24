@@ -13,6 +13,8 @@ import type { LeadView } from "@/lib/crm/view-model";
 
 type Props = {
   waId: string;
+  // The opportunity every write in this card acts on.
+  opportunityId: number;
   view: LeadView;
   config: CrmConfig;
   members: ReadonlyArray<{ email: string; label: string }>;
@@ -22,13 +24,24 @@ type Props = {
   initialField?: LeadDetailField;
 };
 
-export function LeadCrmCard({ waId, view, config, members, sessionEmail, isAdmin, canEdit, initialField }: Props) {
+export function LeadCrmCard({
+  waId,
+  opportunityId,
+  view,
+  config,
+  members,
+  sessionEmail,
+  isAdmin,
+  canEdit,
+  initialField,
+}: Props) {
   return (
     <Card data-testid="lead-crm-card">
       <CardContent className="space-y-3 px-4 py-4">
         <p className={LEAD_CAPTION_CLASS}>{config.labels.cardTitle}</p>
         <LeadDetails
           waId={waId}
+          opportunityId={opportunityId}
           view={view}
           labels={config.labels}
           stages={config.stages.map((s) => ({ key: s.key, label: s.label }))}

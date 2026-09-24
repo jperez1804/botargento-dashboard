@@ -31,7 +31,8 @@ import type { CrmLabels, CrmLeadSourceDef } from "@/config/verticals/_types";
 type Props = {
   labels: CrmLabels;
   sources: ReadonlyArray<CrmLeadSourceDef>;
-  // The vertical's intents ("Ventas", "Alquileres"…), optional on the form.
+  // The vertical's intents ("Ventas", "Alquileres"…): the rubro of the first
+  // opportunity, and every opportunity has one.
   intents: ReadonlyArray<{ key: string; label: string }>;
 };
 
@@ -41,19 +42,20 @@ export function NewLeadDialog({ labels, sources, intents }: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [source, setSource] = useState(sources[0]?.key ?? "");
-  const [intent, setIntent] = useState("");
+  const [intent, setIntent] = useState(intents[0]?.key ?? "");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [existing, setExisting] = useState<string | null>(null);
 
   const normalized = phone.trim() ? normalizeLeadPhone(phone) : null;
-  const canSubmit = !busy && name.trim() !== "" && normalized?.ok === true && source !== "";
+  const canSubmit =
+    !busy && name.trim() !== "" && normalized?.ok === true && source !== "" && intent !== "";
 
   function reset() {
     setName("");
     setPhone("");
     setSource(sources[0]?.key ?? "");
-    setIntent("");
+    setIntent(intents[0]?.key ?? "");
     setNote("");
     setExisting(null);
   }
@@ -63,7 +65,7 @@ export function NewLeadDialog({ labels, sources, intents }: Props) {
     if (!canSubmit) return;
     setBusy(true);
     setExisting(null);
-    let data: { ok?: boolean; error?: string; contactWaId?: string } = {};
+    let data: { ok?: boolean; error?: string; contactWaId?: string; opportunityId?: number } = {};
     try {
       const res = await fetch("/api/leads/create", {
         method: "POST",
@@ -76,13 +78,13 @@ export function NewLeadDialog({ labels, sources, intents }: Props) {
     }
     setBusy(false);
 
-    if (data.ok && data.contactWaId) {
+    if (data.ok && data.opportunityId) {
       toast.success(labels.leadCreated);
       setOpen(false);
       reset();
       // The modal refreshes the board underneath once it has opened
       // (RefreshOnce): the board was rendered before this lead existed.
-      router.push(`/leads/${encodeURIComponent(data.contactWaId)}?edit=reminder`);
+      router.push(`/leads/${data.opportunityId}?edit=reminder`);
       return;
     }
     if (data.error === "already_exists" && data.contactWaId) {
@@ -186,7 +188,7 @@ export function NewLeadDialog({ labels, sources, intents }: Props) {
           {intents.length > 0 ? (
             <div className="space-y-1.5">
               <label htmlFor="new-lead-intent" className={LEAD_CAPTION_CLASS}>
-                {labels.intentLabel}
+                {labels.opportunity.kindLabel}
               </label>
               <select
                 id="new-lead-intent"
@@ -195,7 +197,6 @@ export function NewLeadDialog({ labels, sources, intents }: Props) {
                 onChange={(e) => setIntent(e.target.value)}
                 className={cn(LEAD_FIELD_CLASS, "cursor-pointer")}
               >
-                <option value="">{labels.intentNone}</option>
                 {intents.map((i) => (
                   <option key={i.key} value={i.key}>
                     {i.label}
@@ -224,7 +225,7 @@ export function NewLeadDialog({ labels, sources, intents }: Props) {
             <p role="alert" className="text-[12.5px] text-[var(--danger)]">
               {labels.errors.already_exists}{" "}
               <Link
-                href={`/leads/${encodeURIComponent(existing)}`}
+                href={`/conversations/${encodeURIComponent(existing)}`}
                 className="font-medium underline underline-offset-2"
                 onClick={() => setOpen(false)}
               >

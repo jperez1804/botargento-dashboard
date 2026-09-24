@@ -91,6 +91,8 @@ export const CRM_LABELS_ES: CrmLabels = {
     created: "Cargado a mano",
     priority: "Prioridad",
     budget: "Presupuesto",
+    opened: "Oportunidad abierta",
+    kind_change: "Rubro",
   },
   errors: {
     already_owned: "Otra persona tomó este lead recién.",
@@ -98,6 +100,9 @@ export const CRM_LABELS_ES: CrmLabels = {
     invalid_phone: "Revisá el teléfono: poné el código de área y el número.",
     invalid_source: "Elegí un origen de la lista.",
     invalid_intent: "Elegí una intención de la lista.",
+    invalid_kind: "Elegí un rubro de la lista.",
+    person_not_found: "Ese contacto no existe en el panel.",
+    opted_out: "Esta persona pidió no recibir más mensajes.",
     invalid_stage: "Esa etapa no existe para este panel.",
     invalid_priority: "Esa prioridad no existe.",
     invalid_currency: "Elegí una moneda de la lista.",
@@ -199,6 +204,31 @@ export const CRM_LABELS_ES: CrmLabels = {
 
   showAllTemplate: "Ver todo ({n})",
   showLess: "Ver menos",
+
+  opportunity: {
+    listTitle: "Oportunidades",
+    newButton: "Nueva oportunidad",
+    dialogTitle: "Nueva oportunidad",
+    dialogHint:
+      "Para cuando la misma persona consulta por otra cosa: un alquiler y una venta se siguen por separado.",
+    kindLabel: "Rubro",
+    kindNone: "Sin rubro",
+    titleLabel: "Título (opcional)",
+    titlePlaceholder: "Ej.: 2 ambientes en Palermo",
+    create: "Abrir oportunidad",
+    createdToast: "Oportunidad abierta",
+    ofTotalTemplate: "{n} de {total}",
+    openedTemplate: "Abierta el {date}",
+    closedTemplate: "Cerrada el {date}",
+    openedByBot: "La abrió el bot al derivar la consulta.",
+    newIntentTemplate: "Consulta nueva: {kind}",
+    openFromIntent: "Abrir oportunidad",
+    underivedTitle: "Sin derivar",
+    underivedCountTemplate: "{n} sin derivar esta semana",
+    underivedCountOne: "1 sin derivar esta semana",
+    underivedHint:
+      "Escribieron al bot pero no llegaron a derivar. Abrí una oportunidad si la consulta vale la pena.",
+  },
 
   openConversation: "Ver conversación",
   close: "Cerrar",

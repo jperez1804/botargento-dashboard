@@ -37,6 +37,8 @@ function state(overrides: Partial<LeadStateRow> = {}): LeadStateRow {
     nextActionNote: "",
     nextActionDoneAt: null,
     priority: "",
+    openedAt: daysAgo(3),
+    closedAt: null,
     ...overrides,
   };
 }
@@ -231,7 +233,7 @@ describe("deriveLead — reminders and owner", () => {
   it("does not count the owner assignment as activity", () => {
     const lead = deriveLead(
       signals({ lastMessageAt: daysAgo(31) }),
-      state({ ownerEmail: "asesor@cliente.com" }),
+      state({ ownerEmail: "asesor@cliente.com", openedAt: daysAgo(40) }),
       config,
       NOW,
     );

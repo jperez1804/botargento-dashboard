@@ -8,20 +8,27 @@ export type LeadApiPath =
   | "reminder-set"
   | "reminder-done"
   | "set-priority"
-  | "set-budget";
+  | "set-budget"
+  | "set-kind"
+  // Opens a new opportunity for a person the dashboard already knows.
+  | "open";
 
 export async function postLead(
   path: LeadApiPath,
   body: Record<string, unknown>,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; opportunityId?: number }> {
   try {
     const res = await fetch(`/api/leads/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-    return { ok: res.ok && data.ok === true, error: data.error };
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+      opportunityId?: number;
+    };
+    return { ok: res.ok && data.ok === true, error: data.error, opportunityId: data.opportunityId };
   } catch {
     return { ok: false, error: "network" };
   }

@@ -135,14 +135,24 @@ that `fetch()` would silently follow and read as a 200.
 
 ## CRM-lite (`features.crmTab` + `crm` block on the vertical)
 
-- State lives in `dashboard.lead_state` (current: manual stage, owner, next
-  step), `dashboard.lead_events` (append-only history) and
-  `dashboard.team_members` (display name + WhatsApp per email) —
-  `migrations/0005_crm_leads.sql`.
+**The business rules live in `docs/crm-oportunidades.md`. Read it before
+changing anything here, and update it in the same PR when a rule moves.**
+
+- A lead is an **opportunity**, not a person: one person (`dashboard.contacts`)
+  can have several over time, each with its own stage, owner, priority, budget,
+  reminder and activity (`dashboard.opportunities`). History is append-only in
+  `dashboard.lead_events`, carrying both the person and, usually, the
+  opportunity — `migrations/0010_opportunities.sql`.
+- **Only a handoff (or a person) opens an opportunity.** Plain messages never
+  do; they keep the person's open opportunities alive and, when they carry a
+  rubro nobody is working, show a "Consulta nueva" hint. Opening happens at
+  read time in `src/lib/queries/opportunity-sync.ts`, with idempotent SQL.
 - Automatic stages (nuevo / contactado / calificado / perdido por baja o 30
   días sin actividad) are **derived at read time** by
   `src/lib/crm/effective-stage.ts` and never persisted. That pure function is
   the single source of the stage rules; its unit test is the spec.
+- Every `/api/leads/*` body names ONE opportunity (`opportunityId`); the audit
+  row carries `opportunity_id` and `contact_wa_id`.
 - Raw `sql` writes share the client with drizzle, which replaces postgres.js's
   json/timestamp serializers with identity functions: pass JSON as
   `${JSON.stringify(x)}::jsonb` and dates as ISO strings, never `sql.json()` or

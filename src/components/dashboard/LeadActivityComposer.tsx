@@ -29,13 +29,13 @@ const noSubscribe = () => () => {};
 const readIsMac = () => /Mac|iPhone|iPad/.test(navigator.platform);
 
 type Props = {
-  waId: string;
+  opportunityId: number;
   labels: CrmLabels;
   // Per kind, the stage the activity implies when it is ahead of the lead.
   offers: Partial<Record<CrmActivityKind, StageOffer>>;
 };
 
-export function LeadActivityComposer({ waId, labels, offers }: Props) {
+export function LeadActivityComposer({ opportunityId, labels, offers }: Props) {
   const router = useRouter();
   const [kind, setKind] = useState<CrmActivityKind>("note");
   const [body, setBody] = useState("");
@@ -46,7 +46,7 @@ export function LeadActivityComposer({ waId, labels, offers }: Props) {
   const keys = isMac ? "⌘↵" : "Ctrl+↵";
 
   async function moveTo(offer: StageOffer) {
-    const res = await postLead("set-stage", { contactWaId: waId, stage: offer.key });
+    const res = await postLead("set-stage", { opportunityId, stage: offer.key });
     if (res.ok) toast.success(labels.saved);
     else toast.error(errorText(labels.errors, res.error));
     router.refresh();
@@ -56,7 +56,7 @@ export function LeadActivityComposer({ waId, labels, offers }: Props) {
     const text = body.trim();
     if (!text) return;
     setBusy(true);
-    const res = await postLead("event", { contactWaId: waId, kind, body: text });
+    const res = await postLead("event", { opportunityId, kind, body: text });
     setBusy(false);
     if (!res.ok) {
       toast.error(errorText(labels.errors, res.error));

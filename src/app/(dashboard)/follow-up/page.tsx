@@ -81,6 +81,7 @@ async function loadReminders(
     .filter((r) => r.lead.reminder?.status === "overdue" || r.lead.reminder?.status === "upcoming")
     .sort((a, b) => (a.lead.reminder?.at.getTime() ?? 0) - (b.lead.reminder?.at.getTime() ?? 0))
     .map((r) => ({
+      id: r.id,
       waId: r.contactWaId,
       displayName: r.displayName,
       view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone),

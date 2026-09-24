@@ -1,15 +1,18 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MessageCircleQuestion } from "lucide-react";
 import { tenantConfig } from "@/config/tenant";
 import { verticalConfig } from "@/config/verticals";
 import { intentOptions, leadIntent } from "@/lib/crm/intent";
 import { crmConfig } from "@/lib/crm/enabled";
-import { buildLeadView } from "@/lib/crm/view-model";
+import { buildLeadView, fillTemplate } from "@/lib/crm/view-model";
 import { buildLeadsSummary, closedStageKeys } from "@/lib/crm/summary";
 import { leadAttention } from "@/lib/crm/attention";
 import { hasRole, requireRole } from "@/lib/role-guard";
 import { listLeads, type ListLeadsResult } from "@/lib/queries/leads";
 import { listTeam, memberLabel } from "@/lib/queries/team";
 import { listTeamLeadEvents } from "@/lib/queries/lead-detail";
+import { countUnderived } from "@/lib/queries/underived";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LeadsFilters } from "@/components/dashboard/LeadsFilters";
@@ -48,7 +51,7 @@ export default async function LeadsPage({ searchParams }: Props) {
   const canEdit = hasRole(session, "asesor");
 
   const now = new Date();
-  const [result, team, events] = await Promise.all([
+  const [result, team, events, underived] = await Promise.all([
     view === "guide"
       ? Promise.resolve(EMPTY)
       : view === "summary"
@@ -72,19 +75,29 @@ export default async function LeadsPage({ searchParams }: Props) {
     view === "activity"
       ? listTeamLeadEvents({ kind: p.activityKind || undefined, by: p.activityBy || undefined })
       : Promise.resolve([]),
+    view === "guide" ? Promise.resolve(0) : countUnderived(),
   ]);
   const labelFor = (email: string | null) => memberLabel(team, email);
   const sourceLabel = (key: string) =>
     crm.manualLeadSources.find((s) => s.key === key)?.label ?? key;
   const views: LeadViewRow[] = result.rows.map((r) => ({
+    id: r.id,
     waId: r.contactWaId,
     displayName: r.displayName,
+    seq: r.seq,
+    ofTotal: r.ofTotal,
+    title: r.title,
     budget: r.budget,
     // Every lead shows where it came from: the origin picked when it was
     // registered by hand (kept even after the person writes on WhatsApp),
     // otherwise WhatsApp.
-    sourceLabel: r.manual ? sourceLabel(r.manual.source) : labels.sourceWhatsapp,
-    intentLabel: leadIntent(r.lastIntent, intents)?.label ?? null,
+    sourceLabel:
+      r.contact.source === "whatsapp" ? labels.sourceWhatsapp : sourceLabel(r.contact.source),
+    // The rubro of this opportunity, and the rubro of an enquiry nobody is
+    // working yet (rule: only a handoff opens one, a message just hints).
+    intentLabel: leadIntent(r.kind, intents)?.label ?? null,
+    newIntentKey: r.newIntent,
+    newIntentLabel: leadIntent(r.newIntent, intents)?.label ?? null,
     attention: leadAttention(r.lead, labels, tenant.locale, tenant.timezone, now),
     view: buildLeadView(r.lead, crm, labelFor, tenant.locale, tenant.timezone, now, r.budget),
   }));
@@ -185,6 +198,21 @@ export default async function LeadsPage({ searchParams }: Props) {
           />
         ) : null}
       </div>
+
+      {/* Conversations that never reached a handoff never open an
+          opportunity, so the board would hide them entirely. */}
+      {view !== "guide" && underived > 0 ? (
+        <Link
+          href="/conversations?filter=no_handoff"
+          data-testid="underived-pill"
+          className="inline-flex w-fit items-center gap-1.5 rounded-full border border-[var(--rule-strong)] bg-[var(--surface)] px-3 py-1 text-[12.5px] text-[var(--muted-ink)] transition-colors duration-150 hover:border-[var(--ink)] hover:text-[var(--ink)]"
+        >
+          <MessageCircleQuestion className="size-3.5" aria-hidden />
+          {underived === 1
+            ? labels.opportunity.underivedCountOne
+            : fillTemplate(labels.opportunity.underivedCountTemplate, { n: underived })}
+        </Link>
+      ) : null}
 
       {view === "guide" ? (
         <LeadsGuide config={crm} />

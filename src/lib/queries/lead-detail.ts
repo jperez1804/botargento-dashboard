@@ -31,6 +31,37 @@ function asObject(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
 }
 
+const toEvent = (r: Record<string, unknown>): LeadEvent => ({
+  id: Number(r.id),
+  kind: String(r.kind),
+  body: String(r.body ?? ""),
+  occurredAt: new Date(r.occurred_at as string | Date),
+  createdBy: String(r.created_by ?? ""),
+  metadata: asObject(r.metadata),
+});
+
+/**
+ * One opportunity's history: its own events plus anything recorded about the
+ * person while no opportunity was open (opportunity_id NULL), so nothing a
+ * person did disappears from view.
+ */
+export async function listOpportunityEvents(
+  opportunityId: number,
+  waId: string,
+  limit = 50,
+): Promise<LeadEvent[]> {
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT id, kind, body, occurred_at, created_by, metadata
+    FROM dashboard.lead_events
+    WHERE opportunity_id = ${opportunityId}
+       OR (opportunity_id IS NULL AND contact_wa_id = ${waId})
+    ORDER BY occurred_at DESC, id DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(toEvent);
+}
+
+/** Every event of a person, across all their opportunities. */
 export async function listLeadEvents(waId: string, limit = 50): Promise<LeadEvent[]> {
   const rows = await sql<Record<string, unknown>[]>`
     SELECT id, kind, body, occurred_at, created_by, metadata
@@ -39,17 +70,17 @@ export async function listLeadEvents(waId: string, limit = 50): Promise<LeadEven
     ORDER BY occurred_at DESC, id DESC
     LIMIT ${limit}
   `;
-  return rows.map((r) => ({
-    id: Number(r.id),
-    kind: String(r.kind),
-    body: String(r.body ?? ""),
-    occurredAt: new Date(r.occurred_at as string | Date),
-    createdBy: String(r.created_by ?? ""),
-    metadata: asObject(r.metadata),
-  }));
+  return rows.map(toEvent);
 }
 
-export type TeamLeadEvent = LeadEvent & { contactWaId: string; leadName: string };
+export type TeamLeadEvent = LeadEvent & {
+  contactWaId: string;
+  leadName: string;
+  // The opportunity the event belongs to, when it belongs to one.
+  opportunityId: number | null;
+  opportunitySeq: number | null;
+  opportunityKind: string;
+};
 
 /**
  * The team-wide Actividad feed: latest lead_events across every lead, newest
@@ -63,14 +94,16 @@ export async function listTeamLeadEvents(
   const rows = await sql<Record<string, unknown>[]>`
     SELECT
       ev.id, ev.contact_wa_id, ev.kind, ev.body, ev.occurred_at, ev.created_by, ev.metadata,
+      ev.opportunity_id, o.seq AS opportunity_seq, o.kind AS opportunity_kind,
       COALESCE(
-        NULLIF(ml.display_name, ''),
+        NULLIF(c.display_name, ''),
         (SELECT COALESCE(NULLIF(MAX(l.lead_name), ''), NULLIF(MAX(l.profile_name), ''))
            FROM automation.lead_log l WHERE l.contact_wa_id = ev.contact_wa_id),
         ev.contact_wa_id
       ) AS lead_name
     FROM dashboard.lead_events ev
-    LEFT JOIN dashboard.manual_leads ml ON ml.contact_wa_id = ev.contact_wa_id
+    LEFT JOIN dashboard.contacts c ON c.contact_wa_id = ev.contact_wa_id
+    LEFT JOIN dashboard.opportunities o ON o.id = ev.opportunity_id
     WHERE true
       ${kind ? sql`AND ev.kind = ${kind}` : sql``}
       ${by ? sql`AND ev.created_by = ${by}` : sql``}
@@ -78,14 +111,13 @@ export async function listTeamLeadEvents(
     LIMIT ${limit}
   `;
   return rows.map((r) => ({
-    id: Number(r.id),
+    ...toEvent(r),
     contactWaId: String(r.contact_wa_id),
     leadName: String(r.lead_name ?? r.contact_wa_id),
-    kind: String(r.kind),
-    body: String(r.body ?? ""),
-    occurredAt: new Date(r.occurred_at as string | Date),
-    createdBy: String(r.created_by ?? ""),
-    metadata: asObject(r.metadata),
+    opportunityId: r.opportunity_id === null || r.opportunity_id === undefined ? null : Number(r.opportunity_id),
+    opportunitySeq:
+      r.opportunity_seq === null || r.opportunity_seq === undefined ? null : Number(r.opportunity_seq),
+    opportunityKind: String(r.opportunity_kind ?? ""),
   }));
 }
 
@@ -105,16 +137,25 @@ function asText(v: unknown): string {
   return String(v).trim();
 }
 
+/** The slice of an opportunity's life that its handoffs must fall in. */
+export type QualificationWindow = {
+  contactWaId: string;
+  openedAt: Date;
+  closedAt: Date | null;
+};
+
 /**
- * Resolves the vertical's qualificationFields against the lead's latest real
- * handoff and its session snapshot. Both reads are defensive: escalation
- * columns go through to_jsonb (not every tenant has every column) and
- * session_memory is only queried when it exists.
+ * Resolves the vertical's qualificationFields against the latest real handoff
+ * OF THIS OPPORTUNITY (its own window) and the person's session snapshot —
+ * what the bot last knew about them, which is not tied to one process. Both
+ * reads are defensive: escalation columns go through to_jsonb (not every
+ * tenant has every column) and session_memory is only queried when it exists.
  */
 export async function getLeadQualification(
   config: CrmConfig,
-  waId: string,
+  window: QualificationWindow,
 ): Promise<QualificationItem[]> {
+  const waId = window.contactWaId;
   const withSnapshot = await hasSessionMemory();
   const [escalationRows, snapshotRows] = await Promise.all([
     sql<{ data: Record<string, unknown> }[]>`
@@ -122,6 +163,10 @@ export async function getLeadQualification(
       FROM automation.escalations e
       WHERE e.contact_wa_id = ${waId}
         AND e.escalation_type NOT IN ${sql(NON_BUSINESS_ESCALATION_TYPES)}
+        AND e.escalation_timestamp >= ${window.openedAt.toISOString()}::timestamptz
+        ${window.closedAt
+          ? sql`AND e.escalation_timestamp < ${window.closedAt.toISOString()}::timestamptz`
+          : sql``}
       ORDER BY e.escalation_timestamp DESC
       LIMIT 1
     `,

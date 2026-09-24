@@ -13,6 +13,7 @@ import type { LeadEvent } from "@/lib/queries/lead-detail";
 
 type Props = {
   waId: string;
+  opportunityId: number;
   events: ReadonlyArray<LeadEvent>;
   config: CrmConfig;
   memberLabel: (email: string | null) => string;
@@ -23,7 +24,17 @@ type Props = {
   stageKey: string;
 };
 
-export function LeadActivityFeed({ waId, events, config, memberLabel, canEdit, locale, timezone, stageKey }: Props) {
+export function LeadActivityFeed({
+  waId,
+  opportunityId,
+  events,
+  config,
+  memberLabel,
+  canEdit,
+  locale,
+  timezone,
+  stageKey,
+}: Props) {
   const labels = config.labels;
   const kindLabel = (kind: string) => eventKindLabel(config, kind);
   return (
@@ -31,7 +42,11 @@ export function LeadActivityFeed({ waId, events, config, memberLabel, canEdit, l
       <CardContent className="px-5 py-4 space-y-3">
         <p className={LEAD_CAPTION_CLASS}>{labels.activityTitle}</p>
         {canEdit ? (
-          <LeadActivityComposer waId={waId} labels={labels} offers={stageOffers(config, stageKey)} />
+          <LeadActivityComposer
+            opportunityId={opportunityId}
+            labels={labels}
+            offers={stageOffers(config, stageKey)}
+          />
         ) : null}
         {events.length === 0 ? (
           <p className="text-[12.5px] text-[var(--soft-ink)] italic">{labels.emptyActivity}</p>
