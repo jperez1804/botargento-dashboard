@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { realEstate } from "@/config/verticals/real-estate";
+import { outboundSales } from "@/config/verticals/outbound-sales";
 import {
   deriveLead,
   type LeadSignals,
@@ -271,5 +272,33 @@ describe("deriveLead — reminders and owner", () => {
     const withoutNotice = deriveLead(signals(), state(reminder), config, NOW);
     expect(withNotice.lastActivityAt).toEqual(withoutNotice.lastActivityAt);
     expect(withNotice.daysInactive).toBe(withoutNotice.daysInactive);
+  });
+});
+
+describe("deriveLead — outbound sales", () => {
+  const outbound = outboundSales.crm!;
+
+  it("stays nuevo on a reply and becomes calificado on a handoff", () => {
+    const replied = deriveLead(signals({ lastMessageAt: daysAgo(1) }), state({ openedAt: daysAgo(1) }), outbound, NOW);
+    expect(replied.stage).toBe("nuevo");
+    const asked = deriveLead(
+      signals({ lastMessageAt: daysAgo(1), lastHandoffAt: daysAgo(0) }),
+      state({ openedAt: daysAgo(1) }),
+      outbound,
+      NOW,
+    );
+    expect(asked.stage).toBe("calificado");
+  });
+
+  it("goes stale in 14 days, with the warning 3 days before — not real-estate's 30/7", () => {
+    const quiet = deriveLead(signals({ lastMessageAt: daysAgo(15) }), state({ openedAt: daysAgo(15) }), outbound, NOW);
+    expect(quiet.stage).toBe("perdido");
+    expect(quiet.lost?.reason).toBe("inactivity");
+    const soon = deriveLead(signals({ lastMessageAt: daysAgo(12) }), state({ openedAt: daysAgo(12) }), outbound, NOW);
+    expect(soon.stage).toBe("nuevo");
+    expect(soon.atRisk).not.toBeNull();
+    // The same silence is nothing to worry about for a real-estate lead.
+    const patient = deriveLead(signals({ lastMessageAt: daysAgo(12) }), state({ openedAt: daysAgo(12) }), config, NOW);
+    expect(patient.atRisk).toBeNull();
   });
 });

@@ -2,8 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MessageCircleQuestion, Users } from "lucide-react";
 import { tenantConfig } from "@/config/tenant";
-import { verticalConfig } from "@/config/verticals";
-import { intentOptions, leadIntent } from "@/lib/crm/intent";
+import { crmKinds, intentOptions, leadIntent } from "@/lib/crm/intent";
 import { crmConfig } from "@/lib/crm/enabled";
 import { buildLeadView, fillTemplate } from "@/lib/crm/view-model";
 import { buildLeadsSummary, closedStageKeys } from "@/lib/crm/summary";
@@ -33,6 +32,7 @@ import {
   type LeadsSearchParams,
   type LeadsView,
 } from "./search-params";
+import { contactSourceLabel } from "@/lib/crm/source";
 
 const PAGE_SIZE = 25;
 
@@ -47,7 +47,7 @@ export default async function LeadsPage({ searchParams }: Props) {
   const sp = await searchParams;
   const labels = crm.labels;
   const tenant = tenantConfig();
-  const intents = verticalConfig().intents;
+  const intents = crmKinds(crm);
   const p = parseLeadsSearchParams(sp, crm, session.email, intents.map((i) => i.key));
   const { view } = p;
   const canEdit = hasRole(session, "asesor");
@@ -77,11 +77,9 @@ export default async function LeadsPage({ searchParams }: Props) {
     view === "activity"
       ? listTeamLeadEvents({ kind: p.activityKind || undefined, by: p.activityBy || undefined })
       : Promise.resolve([]),
-    view === "guide" ? Promise.resolve(0) : countUnderived(),
+    view === "guide" ? Promise.resolve(0) : countUnderived(crm),
   ]);
   const labelFor = (email: string | null) => memberLabel(team, email);
-  const sourceLabel = (key: string) =>
-    crm.manualLeadSources.find((s) => s.key === key)?.label ?? key;
   const views: LeadViewRow[] = result.rows.map((r) => ({
     id: r.id,
     waId: r.contactWaId,
@@ -93,8 +91,7 @@ export default async function LeadsPage({ searchParams }: Props) {
     // Every lead shows where it came from: the origin picked when it was
     // registered by hand (kept even after the person writes on WhatsApp),
     // otherwise WhatsApp.
-    sourceLabel:
-      r.contact.source === "whatsapp" ? labels.sourceWhatsapp : sourceLabel(r.contact.source),
+    sourceLabel: contactSourceLabel(crm, r.contact.source),
     // The rubro of this opportunity, and the rubro of an enquiry nobody is
     // working yet (rule: only a handoff opens one, a message just hints).
     intentLabel: leadIntent(r.kind, intents)?.label ?? null,

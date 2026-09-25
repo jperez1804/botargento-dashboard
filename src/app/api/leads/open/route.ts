@@ -9,12 +9,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRoleApi } from "@/lib/role-guard";
-import { verticalConfig } from "@/config/verticals";
 import { crmConfig } from "@/lib/crm/enabled";
 import { openOpportunity } from "@/lib/queries/lead-writes";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
 import { logger } from "@/lib/logger";
+import { crmKinds } from "@/lib/crm/intent";
 
 const Body = z.object({
   contactWaId: z.string().regex(/^[0-9]{8,15}$/, "contactWaId must be 8-15 digits"),
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>;
   let opportunityId: number | null = null;
 
-  if (kind && !verticalConfig().intents.some((i) => i.key === kind)) {
+  if (kind && !crmKinds(config).some((i) => i.key === kind)) {
     status = 400;
     body = { error: "invalid_kind" };
   } else {

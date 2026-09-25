@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { realEstate } from "@/config/verticals/real-estate";
+import { outboundSales } from "@/config/verticals/outbound-sales";
 import { buildGuideRules, buildStageGuide } from "@/lib/crm/guide";
 
 const config = realEstate.crm!;
+
+describe("buildStageGuide — outbound sales", () => {
+  const rows = buildStageGuide(outboundSales.crm!);
+
+  it("documents the sales pipeline: two automatic stages, three set by a person, one shared", () => {
+    expect(rows.map((r) => r.key)).toEqual(["nuevo", "calificado", "demo", "propuesta", "cerrado", "perdido"]);
+    expect(rows.map((r) => r.mover)).toEqual(["bot", "bot", "person", "person", "person", "both"]);
+  });
+
+  it("explains Nuevo as a reply to a campaign, not as somebody writing first", () => {
+    expect(rows.find((r) => r.key === "nuevo")?.trigger).toMatch(/campaña/i);
+  });
+});
 
 describe("buildStageGuide", () => {
   const rows = buildStageGuide(config);

@@ -139,6 +139,7 @@ describe("buildLeadsSummary", () => {
     const s = buildLeadsSummary(rows, config, team, NOW);
     expect(s.sources.rows.map((r) => [r.key, r.count])).toEqual([
       ["whatsapp", 1],
+      ["campaign", 0],
       ["telefono", 1],
       ["visita", 2],
       ["portal", 0],

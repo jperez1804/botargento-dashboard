@@ -10,6 +10,7 @@ import type { CrmConfig, CrmPriorityKey, CrmStageTone } from "@/config/verticals
 import type { EffectiveLead } from "@/lib/crm/effective-stage";
 import { PRIORITY_KEYS, PRIORITY_TONE, type PriorityTone } from "@/lib/crm/priority";
 import type { OpportunityRow } from "@/lib/queries/leads";
+import { sourceDefs } from "@/lib/crm/source";
 
 export const SUMMARY_WINDOW_DAYS = 7;
 const DAY_MS = 86_400_000;
@@ -147,13 +148,9 @@ export function buildLeadsSummary(
     sourceCount.set(source, (sourceCount.get(source) ?? 0) + 1);
   }
   const people = sourceOfPerson.size;
-  const sourceDefs = [
-    { key: "whatsapp", label: labels.sourceWhatsapp },
-    ...config.manualLeadSources,
-  ];
   const sources = {
     total: people,
-    rows: sourceDefs.map((s) => ({
+    rows: sourceDefs(config).map((s) => ({
       key: s.key,
       label: s.label,
       count: sourceCount.get(s.key) ?? 0,

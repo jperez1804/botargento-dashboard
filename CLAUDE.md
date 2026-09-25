@@ -173,17 +173,20 @@ changing anything here, and update it in the same PR when a rule moves.**
 | `AUTH_URL` | Full external URL of this deploy |
 | `AUTH_EMAIL_FROM` | Sender address (Resend-verified domain) |
 | `RESEND_API_KEY` | Resend API key |
+| `CRM_ENABLED` | `1` turns the CRM-lite on for THIS tenant. The vertical declares the capability (`features.crmTab` + `crm`); without this flag the shared image never shows Leads. Optional, absent = off |
+| `CRM_SINCE` | ISO instant. Replies/handoffs before it do not open opportunities on their own ("solo de acá en adelante"). Optional, absent = no cutoff |
 
 ## Reglas No Negociables
 
 1. **The dashboard never writes to `automation.*`.** DB role `dashboard_app` has `SELECT`-only on that schema. Any attempt to `INSERT`/`UPDATE`/`DELETE` there is a bug.
-2. **And n8n writes exactly one column of `dashboard.*`:** `opportunities.next_action_notified_at`, to record that a reminder's WhatsApp notice went out (`migrations/0011_n8n_reminder_grants.sql`, `docs/crm-oportunidades.md`). Anything else in `dashboard.*` written from outside the panel is a bug.
-3. **No hardcoded Spanish strings in JSX.** All UI text comes from `verticalConfig` or `tenantConfig`.
-4. **No `process.env.X` in feature code.** Read through validated config modules.
-5. **Every page query is a Server Component.** Never fetch data from a Client Component.
-6. **Every auth-sensitive action is logged to `dashboard.audit_log`.** Logins, denials, exports, theme updates, role denials.
-7. **Magic link tokens are SHA-256 hashed before storage.** Never plaintext, never logged.
-8. **Migrations are additive only.** No `DROP COLUMN` or destructive changes without a multi-deploy migration plan.
-9. **Max 300 lines per component file.** Extract when larger.
-10. **All env vars validated with Zod at boot.** The container fails fast on misconfiguration, not at request time.
-11. **No secrets in Git, ever.** `.env*` is in `.gitignore`. Secrets live in `/opt/n8n/<clientN>/dashboard.env` on the VPS.
+2. **Features that a tenant buys are gated by the tenant, not only by the vertical.** The inbox, the campaign actions and the CRM each need a vertical capability AND a tenant env (`N8N_INBOX_*`, `N8N_CAMPAIGN_*`, `CRM_ENABLED`). One image serves five tenants; a vertical-only gate would light a paid feature up on the ones that did not buy it.
+3. **And n8n writes exactly one column of `dashboard.*`:** `opportunities.next_action_notified_at`, to record that a reminder's WhatsApp notice went out (`migrations/0011_n8n_reminder_grants.sql`, `docs/crm-oportunidades.md`). Anything else in `dashboard.*` written from outside the panel is a bug.
+4. **No hardcoded Spanish strings in JSX.** All UI text comes from `verticalConfig` or `tenantConfig`.
+5. **No `process.env.X` in feature code.** Read through validated config modules.
+6. **Every page query is a Server Component.** Never fetch data from a Client Component.
+7. **Every auth-sensitive action is logged to `dashboard.audit_log`.** Logins, denials, exports, theme updates, role denials.
+8. **Magic link tokens are SHA-256 hashed before storage.** Never plaintext, never logged.
+9. **Migrations are additive only.** No `DROP COLUMN` or destructive changes without a multi-deploy migration plan.
+10. **Max 300 lines per component file.** Extract when larger.
+11. **All env vars validated with Zod at boot.** The container fails fast on misconfiguration, not at request time.
+12. **No secrets in Git, ever.** `.env*` is in `.gitignore`. Secrets live in `/opt/n8n/<clientN>/dashboard.env` on the VPS.

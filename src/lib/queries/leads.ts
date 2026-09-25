@@ -26,13 +26,13 @@ import {
   type LeadSignals,
   type LeadStateRow,
 } from "@/lib/crm/effective-stage";
-import { hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
+import { hasOutreachRecipients, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
 import { toBudget, type LeadBudget } from "@/lib/crm/budget";
 import { priorityRank } from "@/lib/crm/priority";
 import { attentionKind, attentionRank } from "@/lib/crm/attention";
 import { tenantConfig } from "@/config/tenant";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
-import { getIntentMap, syncOpportunities } from "@/lib/queries/opportunity-sync";
+import { getIntentMap, isReplyOpener, syncOpportunities } from "@/lib/queries/opportunity-sync";
 
 // Budget logic is pure and lives in lib/crm/budget; re-exported because the
 // whole CRM imports it from here.
@@ -84,28 +84,34 @@ async function selectOpportunityRows(
   now: Date,
   scope: Scope = {},
 ): Promise<OpportunityRow[]> {
-  const [suppression, snapshot, map] = await Promise.all([
+  const [suppression, snapshot, map, recipients] = await Promise.all([
     hasOutreachSuppression(),
     hasSessionMemory(),
-    getIntentMap(now),
+    getIntentMap(now, config),
+    hasOutreachRecipients(),
   ]);
+  const replyOpener = isReplyOpener(config);
   const waIds = scope.waIds && scope.waIds.length > 0 ? [...scope.waIds] : null;
   const ids = scope.ids && scope.ids.length > 0 ? [...scope.ids] : null;
 
   // A handoff belongs to the opportunity of its rubro (or to one that has no
-  // rubro yet). The raw token → rubro map comes from TypeScript.
+  // rubro yet). The raw token → rubro map comes from TypeScript. In reply mode
+  // the rubro is the PERSON's, not the handoff's, so any handoff inside the
+  // window counts — that is what moves an outbound opportunity to Calificado.
   const handoffOfOpportunity = sql`
     e.contact_wa_id = o.contact_wa_id
     AND e.escalation_type <> ALL(${[...NON_BUSINESS_ESCALATION_TYPES]}::text[])
     AND e.escalation_timestamp >= o.opened_at
     AND (o.closed_at IS NULL OR e.escalation_timestamp < o.closed_at)
-    AND (
+    ${replyOpener
+      ? sql``
+      : sql`AND (
       o.kind = ''
       OR o.kind = COALESCE(
         (SELECT m.kind FROM intent_map m WHERE m.raw = to_jsonb(e) ->> 'intent'),
         (SELECT m.kind FROM intent_map m WHERE m.raw = e.escalation_type)
       )
-    )
+    )`}
   `;
 
   const rows = await sql<Record<string, unknown>[]>`
@@ -119,11 +125,22 @@ async function selectOpportunityRows(
         ${ids ? sql`AND o.id IN ${sql(ids)}` : sql``}
     ),
     persons AS (SELECT DISTINCT contact_wa_id FROM opps),
+    business_names AS (
+      -- Outbound: the firm we wrote to, from the latest campaign that did.
+      ${recipients
+        ? sql`SELECT DISTINCT ON (r.wa_id) r.wa_id AS contact_wa_id, r.business_name
+              FROM outreach.recipients r
+              WHERE r.wa_id IN (SELECT contact_wa_id FROM persons)
+              ORDER BY r.wa_id, r.last_send_at DESC NULLS LAST, r.id DESC`
+        : sql`SELECT NULL::text AS contact_wa_id, NULL::text AS business_name WHERE false`}
+    ),
     names AS (
-      -- The name a person typed wins over the WhatsApp profile name.
+      -- The name a person typed wins, then the business name of the campaign
+      -- that wrote to them, then the WhatsApp profile name.
       SELECT c.contact_wa_id,
              COALESCE(
                NULLIF(c.display_name, ''),
+               NULLIF(MAX(b.business_name), ''),
                NULLIF(MAX(l.lead_name), ''),
                NULLIF(MAX(l.profile_name), ''),
                c.contact_wa_id
@@ -131,6 +148,7 @@ async function selectOpportunityRows(
              c.source, c.created_by, c.created_at, c.first_seen_at
       FROM dashboard.contacts c
       JOIN persons p ON p.contact_wa_id = c.contact_wa_id
+      LEFT JOIN business_names b ON b.contact_wa_id = c.contact_wa_id
       LEFT JOIN automation.lead_log l ON l.contact_wa_id = c.contact_wa_id
       GROUP BY c.contact_wa_id, c.display_name, c.source, c.created_by, c.created_at, c.first_seen_at
     ),
@@ -198,6 +216,8 @@ async function selectOpportunityRows(
     ),
     new_intent AS (
       -- An enquiry about a rubro nobody has open: the hint, not an opening.
+      -- Reply mode has no message rubros, so nothing to hint (intent_map is
+      -- empty there and the join yields nothing).
       SELECT li.contact_wa_id, im.kind
       FROM last_inbound li
       JOIN intent_map im ON im.raw = li.intent
@@ -443,12 +463,20 @@ export async function getPerson(
   now: Date,
 ): Promise<PersonRow | null> {
   await syncOpportunities(config, [waId]);
+  const recipients = await hasOutreachRecipients();
   const [rows, contact] = await Promise.all([
     selectOpportunityRows(config, now, { waIds: [waId] }),
     sql<Record<string, unknown>[]>`
       SELECT c.contact_wa_id, c.display_name, c.source, c.created_by, c.created_at, c.first_seen_at,
-             (SELECT COALESCE(NULLIF(MAX(l.lead_name), ''), NULLIF(MAX(l.profile_name), ''))
-                FROM automation.lead_log l WHERE l.contact_wa_id = c.contact_wa_id) AS wa_name
+             COALESCE(
+               ${recipients
+                 ? sql`(SELECT NULLIF(r.business_name, '') FROM outreach.recipients r
+                         WHERE r.wa_id = c.contact_wa_id
+                         ORDER BY r.last_send_at DESC NULLS LAST, r.id DESC LIMIT 1)`
+                 : sql`NULL::text`},
+               (SELECT COALESCE(NULLIF(MAX(l.lead_name), ''), NULLIF(MAX(l.profile_name), ''))
+                  FROM automation.lead_log l WHERE l.contact_wa_id = c.contact_wa_id)
+             ) AS wa_name
       FROM dashboard.contacts c
       WHERE c.contact_wa_id = ${waId}
     `,

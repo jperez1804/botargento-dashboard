@@ -243,6 +243,8 @@ export type CrmLabels = {
   columnBudget: string;
   columnSource: string;
   sourceWhatsapp: string;
+  // Origin of somebody who replied to an outbound campaign (contacts.source = 'campaign').
+  sourceCampaign: string;
   daysInStageTemplate: string; // {days}
   daysInStageToday: string;
 
@@ -450,7 +452,9 @@ export type CrmLeadSourceDef = { key: string; label: string };
 // reads a key of automation.session_memory.qualification_snapshot_json. Empty
 // values are hidden, so listing fields a flow never fills is harmless.
 export type CrmQualificationField = {
-  source: "escalation" | "snapshot";
+  // "campaign": outreach.recipients ⋈ outreach.campaigns for this person —
+  // campaign_name, campaign_sent_at, touch_count, campaign_vertical.
+  source: "escalation" | "snapshot" | "campaign";
   key: string;
   label: string;
   // money: `key` is the amount, `currencyKey` (same source) the currency.
@@ -485,6 +489,21 @@ export type CrmConfig = {
   // Activities that imply a stage: logging a `visit` on a lead that is still
   // before the "visita" stage makes the composer offer the move.
   activityStages?: Partial<Record<CrmActivityKind, string>>;
+  // What opens an opportunity by itself (docs/crm-oportunidades.md, "Reglas por
+  // vertical"). "handoff": a bot handoff of a rubro — inbound verticals, where
+  // the person wrote first and the handoff is the qualification. "reply": the
+  // person's first inbound message — outbound verticals, where WE wrote first
+  // (the campaign already chose them) and a reply is the scarce event; the
+  // handoff then pushes it to autoStages.qualified. Default "handoff".
+  opener?: "handoff" | "reply";
+  // The CRM's rubros, when they are not the Panel's intents. Outbound sales
+  // measures `ventas_lead` on the Panel but its rubro is the PROSPECT's
+  // business (inmobiliaria / arquitectura / otro). Default: the vertical's
+  // intents. Keys are persisted in dashboard.opportunities.kind — never rename.
+  kinds?: ReadonlyArray<{ key: string; label: string }>;
+  // With opener "reply": outreach.recipients.vertical → a key of `kinds`.
+  // Unmapped values leave the rubro blank, to be filled by hand.
+  kindFromCampaign?: Readonly<Record<string, string>>;
   labels: CrmLabels;
 };
 

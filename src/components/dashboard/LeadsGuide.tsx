@@ -9,6 +9,7 @@ import { buildGuideRules, buildStageGuide, type StageMover } from "@/lib/crm/gui
 import { priorityOptions } from "@/lib/crm/priority";
 import { fillTemplate } from "@/lib/crm/view-model";
 import type { CrmConfig } from "@/config/verticals/_types";
+import { sourceDefs } from "@/lib/crm/source";
 
 type Props = { config: CrmConfig };
 
@@ -117,7 +118,7 @@ export function LeadsGuide({ config }: Props) {
       <Section title={g.sourcesTitle}>
         <p>{g.sourcesBody}</p>
         <p className="text-[13px] text-[var(--muted-ink)]">
-          {[config.labels.sourceWhatsapp, ...config.manualLeadSources.map((s) => s.label)].join(" · ")}
+          {sourceDefs(config).map((s) => s.label).join(" · ")}
         </p>
       </Section>
     </article>

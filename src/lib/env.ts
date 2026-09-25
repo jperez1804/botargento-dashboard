@@ -23,6 +23,17 @@ const schema = z.object({
   // Vertical selection (used by Step 7)
   VERTICAL: z.string().min(1).default("real-estate"),
 
+  // CRM-lite (optional — the vertical declares the capability with
+  // features.crmTab + a `crm` block, and the TENANT turns it on with this
+  // flag; absence keeps the shared image from surfacing Leads on tenants that
+  // did not buy it). CRM_SINCE: replies/handoffs before this instant do not
+  // open opportunities on their own — "solo de acá en adelante".
+  CRM_ENABLED: z.enum(["1", "true", "0", "false"]).optional(),
+  CRM_SINCE: z
+    .string()
+    .refine((v) => !Number.isNaN(Date.parse(v)), "CRM_SINCE must be an ISO date")
+    .optional(),
+
   // Two-way inbox (optional — only tenants whose n8n has the inbox webhook set
   // these; absence disables the /inbox tab even when the vertical allows it).
   N8N_INBOX_WEBHOOK_URL: z.string().url().optional(),
