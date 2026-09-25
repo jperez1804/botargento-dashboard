@@ -147,7 +147,7 @@ changing anything here, and update it in the same PR when a rule moves.**
   do; they keep the person's open opportunities alive and, when they carry a
   rubro nobody is working, show a "Consulta nueva" hint. Opening happens at
   read time in `src/lib/queries/opportunity-sync.ts`, with idempotent SQL.
-- Automatic stages (nuevo / contactado / calificado / perdido por baja o 30
+- Automatic stages (nuevo / calificado / perdido por baja o 30
   días sin actividad) are **derived at read time** by
   `src/lib/crm/effective-stage.ts` and never persisted. That pure function is
   the single source of the stage rules; its unit test is the spec.

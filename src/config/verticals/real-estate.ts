@@ -133,9 +133,14 @@ export const realEstate: VerticalConfig = {
     crmTab: true,
   },
 
-  // CRM-lite pipeline. The bot moves leads through nuevo → contactado →
-  // calificado (handoff) and into perdido (opt-out / inactivity); visita,
-  // reserva and cerrado are set by a person. Keys are persisted — don't rename.
+  // CRM-lite pipeline. The bot moves leads from nuevo to calificado (a
+  // handoff) and into perdido (opt-out / inactivity); visita, reserva and
+  // cerrado are set by a person. Keys are persisted — don't rename.
+  //
+  // There is no "contactado": since an opportunity only exists because of a
+  // handoff or because an advisor opened it by hand, a bot-made one is always
+  // already calificado, and a panel reply is recorded as activity without
+  // moving the stage. It was a leftover of the model where a person WAS a lead.
   crm: {
     stages: [
       {
@@ -143,12 +148,6 @@ export const realEstate: VerticalConfig = {
         label: "Nuevo",
         tone: "neutral",
         help: "Escribió o fue cargado a mano y todavía nadie del equipo habló con la persona.",
-      },
-      {
-        key: "contactado",
-        label: "Contactado",
-        tone: "info",
-        help: "Alguien del equipo ya le respondió. Si lo llamaste o le escribiste desde tu teléfono, movelo a mano.",
       },
       {
         key: "calificado",
@@ -186,7 +185,7 @@ export const realEstate: VerticalConfig = {
         help: "No sigue: por baja, inactividad o decisión del asesor. Cualquier actividad nueva lo reabre.",
       },
     ],
-    autoStages: { new: "nuevo", contacted: "contactado", qualified: "calificado", lost: "perdido" },
+    autoStages: { new: "nuevo", qualified: "calificado", lost: "perdido" },
     autoLostDays: 30,
     warnDays: 7,
     currencies: ["USD", "ARS"],

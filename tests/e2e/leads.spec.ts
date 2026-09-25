@@ -162,7 +162,8 @@ test("Leads list derives stages, hides lost leads and filters by owner", async (
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=list");
   await expect(leadRows(page).filter({ hasText: F.visita.name })).toContainText("Visita");
-  await expect(leadRows(page).filter({ hasText: F.contacted.name })).toContainText("Contactado");
+  // A reply from the panel is activity, not a stage: she stays in Nuevo.
+  await expect(leadRows(page).filter({ hasText: F.replied.name })).toContainText("Nuevo");
   // 40 idle days → perdido (auto), hidden unless the stage filter asks for it.
   await expect(leadRows(page).filter({ hasText: F.lost.name })).toHaveCount(0);
 
@@ -179,7 +180,7 @@ test("Leads list derives stages, hides lost leads and filters by owner", async (
 test("Leads opens on the board and the tabs switch views", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads");
-  await expect(page.locator("[data-board-column]")).toHaveCount(5);
+  await expect(page.locator("[data-board-column]")).toHaveCount(4);
 
   const tabs = page.getByTestId("leads-view-tabs");
   await expect(tabs.getByRole("link", { name: "Tablero" })).toHaveAttribute("aria-current", "page");
@@ -194,31 +195,31 @@ test("Leads opens on the board and the tabs switch views", async ({ page }) => {
   await page.goto("/leads?view=list&mine=1");
   await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Tablero" }).click();
   await page.waitForURL(/mine=1/);
-  await expect(page.locator("[data-board-column]")).toHaveCount(5);
+  await expect(page.locator("[data-board-column]")).toHaveCount(4);
 });
 
 test("Board moves a lead from the ⋯ menu and audits the change", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
-  await expect(page.locator("[data-board-column]")).toHaveCount(5);
+  await expect(page.locator("[data-board-column]")).toHaveCount(4);
 
-  const card = page.locator(`[data-lead-card="${F.contacted.opp}"]`);
-  await expect(page.locator('[data-board-column="contactado"]')).toContainText(F.contacted.name);
+  const card = page.locator(`[data-lead-card="${F.replied.opp}"]`);
+  await expect(page.locator('[data-board-column="nuevo"]')).toContainText(F.replied.name);
   await card.getByTestId("lead-menu").click();
   await page.getByRole("menuitem", { name: "Visita", exact: true }).click();
-  await expect(page.locator('[data-board-column="visita"]')).toContainText(F.contacted.name);
+  await expect(page.locator('[data-board-column="visita"]')).toContainText(F.replied.name);
 
   await expect
     .poll(() =>
       withSql(async (sql) => {
-        const rows = await sql`SELECT stage FROM dashboard.opportunities WHERE id = ${F.contacted.opp}`;
+        const rows = await sql`SELECT stage FROM dashboard.opportunities WHERE id = ${F.replied.opp}`;
         return rows[0]?.stage ?? null;
       }),
     )
     .toBe("visita");
   await expect.poll(() => lastAudit("lead_set_stage")).toMatchObject({
-    contact_wa_id: F.contacted.wa_id,
-    from: "contactado",
+    contact_wa_id: F.replied.wa_id,
+    from: "nuevo",
     to: "visita",
     ok: true,
   });
@@ -558,7 +559,7 @@ test("Resumen tab shows the 7-day indicators and the breakdowns", async ({ page 
   const dueSoon = page.getByTestId("summary-kpi-dueSoon");
   await expect(dueSoon).toContainText("1");
   await expect(dueSoon).toContainText("1 vencido");
-  await expect(page.getByTestId("summary-stages").locator("[data-summary-stage]")).toHaveCount(7);
+  await expect(page.getByTestId("summary-stages").locator("[data-summary-stage]")).toHaveCount(6);
   await expect(page.getByTestId("summary-stages").locator(".recharts-surface")).toBeVisible();
   await expect(page.getByTestId("summary-priority").locator('[data-row="alta"] [data-count]')).toHaveText("1");
   await expect(
@@ -568,7 +569,7 @@ test("Resumen tab shows the 7-day indicators and the breakdowns", async ({ page 
 
   // Closing a lead today shows up under "Cerrados".
   const res = await page.request.post("/api/leads/set-stage", {
-    data: { opportunityId: F.contacted.opp, stage: "cerrado" },
+    data: { opportunityId: F.replied.opp, stage: "cerrado" },
   });
   expect(res.status()).toBe(200);
   await page.reload();
@@ -625,7 +626,7 @@ test("Guía documents the stages and rules; the viewer can read it but not prior
   await page.getByTestId("leads-view-tabs").getByRole("link", { name: "Guía" }).click();
   await page.waitForURL(/view=guide/);
   const guide = page.getByTestId("leads-guide");
-  await expect(guide.locator("[data-guide-stage]")).toHaveCount(7);
+  await expect(guide.locator("[data-guide-stage]")).toHaveCount(6);
   await expect(guide.locator('[data-guide-stage="visita"]')).toContainText("La marca un asesor");
   await expect(guide).toContainText("30 días");
   await expect(guide).toContainText("Visita a la oficina");
@@ -651,7 +652,7 @@ test("Board card opens the lead modal; edits refresh the board; Esc and navigati
   await expect(modal.getByTestId("lead-crm-card")).toContainText("Reserva");
   await expect(modal.getByTestId("lead-activity")).toBeVisible();
   // The board is still mounted behind the modal.
-  await expect(page.locator("[data-board-column]")).toHaveCount(5);
+  await expect(page.locator("[data-board-column]")).toHaveCount(4);
 
   // An edit inside the modal reaches the card behind it (router.refresh()).
   await modal.getByTestId("lead-field-priority").click();
@@ -823,7 +824,7 @@ test("Board: attention strip first, Hoy filter, rails, column subtitles", async 
   await expect(strip).toContainText("Vencido");
   await expect(strip).toContainText("Llamar para coordinar la visita");
   await expect(page.locator(`[data-lead-card="${F.atRisk.opp}"]`).getByTestId("lead-attention")).toHaveAttribute("data-attention", "at_risk");
-  await expect(page.locator(`[data-lead-card="${F.contacted.opp}"]`).getByTestId("lead-attention")).toHaveCount(0);
+  await expect(page.locator(`[data-lead-card="${F.replied.opp}"]`).getByTestId("lead-attention")).toHaveCount(0);
 
   // Who moves the stage: subtitle, lock on manual-only columns, bot glyph on auto chips.
   await expect(nuevo.locator("[data-column-mover]")).toHaveText("La mueve el bot");
@@ -861,21 +862,21 @@ test("Board: attention strip first, Hoy filter, rails, column subtitles", async 
 test("Board: losing a lead asks for the motive; stage moves can be undone", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/leads?view=board");
-  const card = page.locator(`[data-lead-card="${F.contacted.opp}"]`);
+  const card = page.locator(`[data-lead-card="${F.replied.opp}"]`);
 
   // ⋯ → Perdido lands the card in the (now open) column and asks why.
   await card.getByTestId("lead-menu").click();
   await page.getByRole("menuitem", { name: "Perdido", exact: true }).click();
   const panel = page.getByTestId("lost-reason-panel");
   await expect(panel).toBeVisible();
-  await expect(page.locator('[data-board-column="perdido"]')).toContainText(F.contacted.name);
+  await expect(page.locator('[data-board-column="perdido"]')).toContainText(F.replied.name);
   await panel.getByRole("button", { name: "Cancelar" }).click();
   await expect(panel).toHaveCount(0);
-  await expect(page.locator('[data-board-column="contactado"]')).toContainText(F.contacted.name);
+  await expect(page.locator('[data-board-column="nuevo"]')).toContainText(F.replied.name);
   await expect
     .poll(() =>
       withSql(async (sql) => {
-        const rows = await sql`SELECT stage FROM dashboard.opportunities WHERE id = ${F.contacted.opp}`;
+        const rows = await sql`SELECT stage FROM dashboard.opportunities WHERE id = ${F.replied.opp}`;
         return rows[0]?.stage ?? null;
       }),
     )
@@ -887,11 +888,11 @@ test("Board: losing a lead asks for the motive; stage moves can be undone", asyn
   await page.getByTestId("lost-reason-confirm").click();
   await expect(page.getByTestId("lost-reason-panel")).toHaveCount(0);
   await expect.poll(() => lastAudit("lead_set_stage")).toMatchObject({
-    contact_wa_id: F.contacted.wa_id,
+    contact_wa_id: F.replied.wa_id,
     to: "perdido",
     ok: true,
   });
-  await expect(page.locator(`[data-lead-card="${F.contacted.opp}"]`).getByTestId("lead-attention")).toContainText("No responde");
+  await expect(page.locator(`[data-lead-card="${F.replied.opp}"]`).getByTestId("lead-attention")).toContainText("No responde");
 
   // Move Reserva → Visita, then Deshacer from the toast.
   const reserva = page.locator(`[data-lead-card="${F.reserva.opp}"]`);
@@ -1014,20 +1015,20 @@ test("A closed opportunity does not come back: the next handoff opens a new one"
   await loginAsDevViaLog(page, LOG_PATH);
   // This is the case that started all of it: close the lead, then write again.
   const closed = await page.request.post("/api/leads/set-stage", {
-    data: { opportunityId: F.contacted.opp, stage: "cerrado" },
+    data: { opportunityId: F.replied.opp, stage: "cerrado" },
   });
   expect(closed.status()).toBe(200);
 
-  await botHandoff(F.contacted.wa_id, "Ventas");
+  await botHandoff(F.replied.wa_id, "Ventas");
   await page.goto("/leads?view=board&open=cerrado");
 
-  const rows = await opportunitiesOf(F.contacted.wa_id);
+  const rows = await opportunitiesOf(F.replied.wa_id);
   expect(rows).toMatchObject([
     { seq: 1, stage: "cerrado", closed: true },
     { seq: 2, kind: "Ventas", stage: null, closed: false, opened_by: "" },
   ]);
-  await expect(page.locator(`[data-board-column="cerrado"] [data-lead-wa="${F.contacted.wa_id}"]`)).toHaveCount(1);
-  await expect(page.locator(`[data-board-column="calificado"] [data-lead-wa="${F.contacted.wa_id}"]`)).toHaveCount(1);
+  await expect(page.locator(`[data-board-column="cerrado"] [data-lead-wa="${F.replied.wa_id}"]`)).toHaveCount(1);
+  await expect(page.locator(`[data-board-column="calificado"] [data-lead-wa="${F.replied.wa_id}"]`)).toHaveCount(1);
 });
 
 test("Somebody who wrote but never derived stays off the board, and is counted", async ({
@@ -1208,5 +1209,5 @@ test("Board: nothing matches the filters → one empty state with a clear link",
   // so it is addressed by testid, not by role.
   await page.getByTestId("board-clear-filters").click();
   await page.waitForURL(/\/leads$/);
-  await expect(page.locator("[data-board-column]")).toHaveCount(5);
+  await expect(page.locator("[data-board-column]")).toHaveCount(4);
 });

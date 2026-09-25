@@ -5,7 +5,8 @@
 //   A visita (manual, dev@) + activity · B reserva (manual, asesor@)
 //   C nuevo, 25 idle days → "por vencer" · D 40 idle days → perdido (auto)
 //   E overdue reminder (dev@), notice already sent · F upcoming (asesor@)
-//   G human reply from the inbox (sent_by='human') → contactado (auto)
+//   G human reply from the inbox (sent_by='human') → recorded as activity;
+//     the stage stays Nuevo, there is no 'contactado' any more
 //   H registered by hand (walk-in, asesor@) — no WhatsApp conversation yet
 //   I wrote with a rubro but never reached a handoff → NO opportunity: the
 //     "Sin derivar" case, which lives in Conversaciones, not on the board
@@ -32,7 +33,7 @@ export const CRM_FIXTURES = {
   lost: { wa_id: "5491155504004", name: "Emilio Sosa", opp: 4004 },
   overdue: { wa_id: "5491155504005", name: "Pilar Quintana", opp: 4005 },
   upcoming: { wa_id: "5491155504006", name: "Bruno Acosta", opp: 4006 },
-  contacted: { wa_id: "5491155504007", name: "Julieta Morales", opp: 4007 },
+  replied: { wa_id: "5491155504007", name: "Julieta Morales", opp: 4007 },
   manual: { wa_id: "5491155504008", name: "Horacio Benítez", opp: 4008 },
   // No opportunity on purpose: wrote, never derived.
   underived: { wa_id: "5491155504009", name: "Celeste Ruiz", opp: 0 },
@@ -81,7 +82,7 @@ export async function seedCrmState(outer: Sql): Promise<void> {
       (${f.lost.wa_id},      '', 'whatsapp', ${ago(40)}, '', ${ago(40)}),
       (${f.overdue.wa_id},   '', 'whatsapp', ${ago(4)},  '', ${ago(4)}),
       (${f.upcoming.wa_id},  '', 'whatsapp', ${ago(1)},  '', ${ago(1)}),
-      (${f.contacted.wa_id}, '', 'whatsapp', ${ago(2)},  '', ${ago(2)}),
+      (${f.replied.wa_id}, '', 'whatsapp', ${ago(2)},  '', ${ago(2)}),
       (${f.underived.wa_id}, '', 'whatsapp', ${ago(2)},  '', ${ago(2)}),
       (${f.manual.wa_id}, ${f.manual.name}, 'visita', ${ago(1)}, 'asesor@cliente.com', ${ago(1)})
   `;
@@ -113,7 +114,7 @@ export async function seedCrmState(outer: Sql): Promise<void> {
        NULL, NULL, '',
        'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com',
        ${ahead(3)}, 'Mandar opciones en Belgrano', 'asesor@cliente.com', '', NULL, ''),
-      (${f.contacted.opp}, ${f.contacted.wa_id}, 1, 'Ventas', ${ago(2)}, '',
+      (${f.replied.opp}, ${f.replied.wa_id}, 1, 'Ventas', ${ago(2)}, '',
        NULL, NULL, '', NULL, NULL, '', NULL, '', '', '', NULL, ''),
       (${f.manual.opp}, ${f.manual.wa_id}, 1, 'Ventas', ${ago(1)}, 'asesor@cliente.com',
        NULL, NULL, '',
@@ -178,11 +179,11 @@ export async function seedCrm(sql: Sql): Promise<void> {
     inbound(f.lost, ago(40), "Info de alquiler"),
     inbound(f.overdue, ago(4), "Busco 3 ambientes"),
     inbound(f.upcoming, ago(1), "Tienen algo en Belgrano?"),
-    inbound(f.contacted, ago(2), "Hola, consulta"),
+    inbound(f.replied, ago(2), "Hola, consulta"),
     // Wrote with a clear rubro but never reached a handoff (see header).
     inbound(f.underived, ago(2), "Hola, tienen algo para comprar en Caballito?"),
     {
-      ...inbound(f.contacted, ago(1), "Hola Julieta, te escribo por tu consulta"),
+      ...inbound(f.replied, ago(1), "Hola Julieta, te escribo por tu consulta"),
       direction: "outbound",
       sent_by: "human",
     },

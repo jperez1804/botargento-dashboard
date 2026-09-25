@@ -21,7 +21,7 @@ describe("stageOfferForActivity", () => {
   });
 
   it("collects one offer per kind", () => {
-    expect(Object.keys(stageOffers(config, "contactado")).sort()).toEqual(["meeting", "visit"]);
+    expect(Object.keys(stageOffers(config, "nuevo")).sort()).toEqual(["meeting", "visit"]);
     expect(stageOffers(config, "visita")).toEqual({});
     expect(stageOffers({ ...config, activityStages: undefined }, "nuevo")).toEqual({});
   });

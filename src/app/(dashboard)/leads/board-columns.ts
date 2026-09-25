@@ -38,7 +38,7 @@ export function buildBoardColumns(
   listHrefFor: (stageKey: string) => string,
 ): BoardColumn[] {
   // Budget totals mean something once the bot has qualified the lead; under
-  // Nuevo/Contactado (and Perdido) they are noise.
+  // Nuevo (and Perdido) they are noise.
   const qualifiedRank = crm.stages.findIndex((s) => s.key === crm.autoStages.qualified);
   const guide = buildStageGuide(crm);
   return crm.stages.map((s, rank) => {

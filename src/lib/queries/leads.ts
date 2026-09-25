@@ -26,7 +26,7 @@ import {
   type LeadSignals,
   type LeadStateRow,
 } from "@/lib/crm/effective-stage";
-import { hasLeadLogSentBy, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
+import { hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
 import { toBudget, type LeadBudget } from "@/lib/crm/budget";
 import { priorityRank } from "@/lib/crm/priority";
 import { attentionKind, attentionRank } from "@/lib/crm/attention";
@@ -84,8 +84,7 @@ async function selectOpportunityRows(
   now: Date,
   scope: Scope = {},
 ): Promise<OpportunityRow[]> {
-  const [sentBy, suppression, snapshot, map] = await Promise.all([
-    hasLeadLogSentBy(),
+  const [suppression, snapshot, map] = await Promise.all([
     hasOutreachSuppression(),
     hasSessionMemory(),
     getIntentMap(now),
@@ -140,10 +139,7 @@ async function selectOpportunityRows(
       -- the data says which one they were about.
       SELECT o.id,
              MIN(l.log_timestamp) AS first_seen,
-             MAX(l.log_timestamp) AS last_message_at,
-             ${sentBy
-               ? sql`MAX(l.log_timestamp) FILTER (WHERE l.sent_by = 'human')`
-               : sql`NULL::timestamptz`} AS last_human_log_at
+             MAX(l.log_timestamp) AS last_message_at
       FROM opps o
       JOIN automation.lead_log l
         ON l.contact_wa_id = o.contact_wa_id
@@ -182,8 +178,7 @@ async function selectOpportunityRows(
       -- Exact per opportunity, plus the person-level ones that happened
       -- while this opportunity was alive.
       SELECT o.id,
-             MAX(ev.occurred_at) FILTER (WHERE ev.kind = ANY(${[...ACTIVITY_EVENT_KINDS]}::text[])) AS last_crm_activity_at,
-             MAX(ev.occurred_at) FILTER (WHERE ev.kind = 'contact') AS last_contact_event_at
+             MAX(ev.occurred_at) FILTER (WHERE ev.kind = ANY(${[...ACTIVITY_EVENT_KINDS]}::text[])) AS last_crm_activity_at
       FROM opps o
       JOIN dashboard.lead_events ev
         ON ev.opportunity_id = o.id
@@ -221,10 +216,10 @@ async function selectOpportunityRows(
       o.budget_amount AS manual_budget_amount, o.budget_currency AS manual_budget_currency,
       (SELECT COUNT(*)::int FROM dashboard.opportunities t WHERE t.contact_wa_id = o.contact_wa_id) AS of_total,
       n.display_name, n.source, n.created_by, n.created_at, n.first_seen_at,
-      m.first_seen, m.last_message_at, m.last_human_log_at,
+      m.first_seen, m.last_message_at,
       h.last_handoff_at, COALESCE(h.handoff_count, 0) AS handoff_count,
       b.budget_amount, b.budget_currency, sn.price_range,
-      e.last_crm_activity_at, e.last_contact_event_at,
+      e.last_crm_activity_at,
       ni.kind AS new_intent,
       ${suppression
         ? sql`(SELECT MIN(s.created_at) FROM outreach.suppression s WHERE s.wa_id = o.contact_wa_id)`
@@ -245,10 +240,6 @@ async function selectOpportunityRows(
       firstSeen: toDate(r.first_seen),
       lastMessageAt: toDate(r.last_message_at),
       lastHandoffAt: toDate(r.last_handoff_at),
-      lastHumanContactAt:
-        [toDate(r.last_human_log_at), toDate(r.last_contact_event_at)]
-          .filter((d): d is Date => d !== null)
-          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null,
       optedOutAt: toDate(r.opted_out_at),
       lastCrmActivityAt: toDate(r.last_crm_activity_at),
     };

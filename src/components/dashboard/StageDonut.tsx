@@ -28,8 +28,8 @@ const TONE_FILL: Record<CrmStageTone, string> = {
 };
 
 export function StageDonut({ slices, total, totalUnit, locale }: Props) {
-  // The second stage with a tone (calificado after contactado, reserva after
-  // visita) gets a lighter mix so neighbouring slices stay distinguishable.
+  // The second stage sharing a tone (reserva after visita) gets a lighter mix
+  // so neighbouring slices stay distinguishable.
   const seen = new Map<CrmStageTone, number>();
   const fills = slices.map((s) => {
     const n = seen.get(s.tone) ?? 0;

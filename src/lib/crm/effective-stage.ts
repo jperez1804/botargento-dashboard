@@ -9,7 +9,9 @@
 //   2. A manual terminal stage (cerrado / perdido) is sticky.
 //   3. A manual non-terminal stage holds its position; a LATER bot signal may
 //      only push the lead FORWARD (higher rank in config.stages), never back.
-//   4. No manual stage → the automatic one (calificado > contactado > nuevo).
+//   4. No manual stage → the automatic one (calificado > nuevo). A reply from
+//      the panel is activity, not a stage: it keeps the opportunity alive but
+//      never moves it (docs/crm-oportunidades.md, regla 11).
 //   5. A non-terminal lead with no activity for autoLostDays → perdido
 //      (automatic, reversible: any manual stage change restarts the clock).
 
@@ -38,7 +40,6 @@ export type LeadSignals = {
   firstSeen: Date | null;
   lastMessageAt: Date | null; // Any WhatsApp message, either direction.
   lastHandoffAt: Date | null; // Latest real handoff (runtime errors excluded).
-  lastHumanContactAt: Date | null; // sent_by='human' or an inbox 'contact' event.
   optedOutAt: Date | null;
   lastCrmActivityAt: Date | null; // MAX(occurred_at) over ACTIVITY_EVENT_KINDS.
 };
@@ -111,9 +112,6 @@ function autoStage(
 ): { stage: string; at: Date | null } {
   if (signals.lastHandoffAt) {
     return { stage: config.autoStages.qualified, at: signals.lastHandoffAt };
-  }
-  if (signals.lastHumanContactAt) {
-    return { stage: config.autoStages.contacted, at: signals.lastHumanContactAt };
   }
   return { stage: config.autoStages.new, at: signals.firstSeen ?? openedAt };
 }

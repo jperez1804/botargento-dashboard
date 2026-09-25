@@ -20,7 +20,6 @@ function signals(overrides: Partial<LeadSignals> = {}): LeadSignals {
     firstSeen: daysAgo(3),
     lastMessageAt: daysAgo(1),
     lastHandoffAt: null,
-    lastHumanContactAt: null,
     optedOutAt: null,
     lastCrmActivityAt: null,
     ...overrides,
@@ -56,14 +55,17 @@ describe("deriveLead — automatic stages", () => {
     expect(lead.stageSince).toEqual(daysAgo(1));
   });
 
-  it("is contactado after a human reply without a handoff", () => {
-    const lead = deriveLead(signals({ lastHumanContactAt: daysAgo(2) }), null, config, NOW);
-    expect(lead.stage).toBe("contactado");
+  // There is no "contactado" any more: a reply from the panel is activity, not
+  // a stage. Only a handoff moves an opportunity off Nuevo by itself.
+  it("stays nuevo without a handoff, however much the team has replied", () => {
+    const lead = deriveLead(signals({ lastMessageAt: daysAgo(2) }), null, config, NOW);
+    expect(lead.stage).toBe("nuevo");
+    expect(lead.source).toBe("auto");
   });
 
-  it("prefers calificado when there is both a handoff and a human reply", () => {
+  it("is calificado as soon as there is a handoff", () => {
     const lead = deriveLead(
-      signals({ lastHandoffAt: daysAgo(2), lastHumanContactAt: daysAgo(1) }),
+      signals({ lastHandoffAt: daysAgo(2), lastMessageAt: daysAgo(1) }),
       null,
       config,
       NOW,
@@ -83,10 +85,10 @@ describe("deriveLead — manual vs automatic precedence", () => {
     expect(lead).toMatchObject({ stage: "visita", source: "manual" });
   });
 
-  it("lets a later handoff push a manual contactado forward to calificado", () => {
+  it("lets a later handoff push a manual nuevo forward to calificado", () => {
     const lead = deriveLead(
       signals({ lastHandoffAt: daysAgo(1) }),
-      state({ stage: "contactado", stageChangedAt: daysAgo(2) }),
+      state({ stage: "nuevo", stageChangedAt: daysAgo(2) }),
       config,
       NOW,
     );
@@ -202,11 +204,21 @@ describe("deriveLead — inactivity clock", () => {
   it("revives an auto-lost lead when a person moves it (stage change is activity)", () => {
     const lead = deriveLead(
       signals({ lastMessageAt: daysAgo(45) }),
+      state({ stage: "visita", stageChangedAt: daysAgo(0) }),
+      config,
+      NOW,
+    );
+    expect(lead).toMatchObject({ stage: "visita", source: "manual", lost: null });
+  });
+
+  it("ignores a stage key the config no longer has, falling back to the derived one", () => {
+    const lead = deriveLead(
+      signals({ lastHandoffAt: daysAgo(1) }),
       state({ stage: "contactado", stageChangedAt: daysAgo(0) }),
       config,
       NOW,
     );
-    expect(lead).toMatchObject({ stage: "contactado", source: "manual", lost: null });
+    expect(lead).toMatchObject({ stage: "calificado", source: "auto" });
   });
 
   it("revives an auto-lost lead when the contact writes again", () => {

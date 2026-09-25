@@ -65,15 +65,24 @@ oportunidad**. La ficha de la persona lista todas las suyas.
 ### Etapas y señales del bot
 
 11. La etapa automática se deriva de las señales dentro de la ventana de la oportunidad
-    (`[opened_at, closed_at)`): derivación de su rubro → Calificado; respuesta humana →
-    Contactado; si no, Nuevo. Un asesor puede mover a cualquier etapa; el bot solo empuja
+    (`[opened_at, closed_at)`): derivación de su rubro → **Calificado**; si no, **Nuevo**. No
+    hay etapa intermedia: **responder desde el panel no mueve la etapa** (sí cuenta como
+    actividad, regla 12 y 14). Un asesor puede mover a cualquier etapa; el bot solo empuja
     hacia adelante y nunca saca de una etapa terminal puesta por una persona. Las
-    oportunidades del bot nacen en Calificado; **Nuevo** queda para las manuales.
+    oportunidades del bot nacen en Calificado; **Nuevo** queda para las manuales y para las
+    que nadie calificó todavía.
+
+    *Había un «Contactado» que la respuesta humana disparaba. Se sacó el 25-09: desde que una
+    oportunidad solo existe por una derivación o porque un asesor la abrió, las del bot ya
+    nacen en Calificado, y en client1 nunca hubo una sola oportunidad en Contactado. Era una
+    sobra del modelo en que cada persona era un lead.*
 12. **Atribución.** Una derivación cuenta solo para la oportunidad de su rubro y nunca empuja
     a las de otro. Un mensaje de la persona, un mensaje del bot y una respuesta humana
     cuentan como actividad para **todas** sus oportunidades abiertas: nada en los datos dice
-    de cuál hablaban, y contar de más nunca pierde un lead. Las actividades que carga un
-    asesor van exactas a la oportunidad donde las cargó.
+    de cuál hablaban, y contar de más nunca pierde un lead. Una respuesta humana queda además
+    como evento «Respuesta desde el panel» en cada una de ellas, o en la persona si no tiene
+    ninguna abierta. Las actividades que carga un asesor van exactas a la oportunidad donde
+    las cargó.
 13. El rubro de una derivación sale de `escalations.intent`, y si falta, de
     `escalation_type`; el de un mensaje, de `lead_log.intent`. El mapeo a rubro es el mismo
     que usan el Panel y el chip de intención (`src/lib/crm/intent.ts`). Tokens sin valor

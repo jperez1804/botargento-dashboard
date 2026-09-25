@@ -410,7 +410,6 @@ export type CrmLabels = {
     moverPerson: string;
     moverBoth: string;
     autoNew: string;
-    autoContacted: string;
     autoQualified: string;
     autoLostTemplate: string; // {days}
     manualOnlyNote: string;
@@ -420,6 +419,8 @@ export type CrmLabels = {
     activityTitle: string;
     activityIntro: string;
     activityMessages: string;
+    // {qualified} = the label of the stage a handoff puts an opportunity in.
+    activityNoStage: string;
     remindersTitle: string;
     remindersBody: string;
     priorityTitle: string;
@@ -470,7 +471,7 @@ export type CrmConfig = {
   // FORWARD in this list, never back.
   stages: ReadonlyArray<CrmStageDef>;
   // Which stage keys the bot's signals map to.
-  autoStages: { new: string; contacted: string; qualified: string; lost: string };
+  autoStages: { new: string; qualified: string; lost: string };
   // Days without activity before a non-terminal lead becomes "perdido" (auto,
   // reversible), and how many days before that it shows up as "por vencer".
   autoLostDays: number;
