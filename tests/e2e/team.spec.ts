@@ -47,7 +47,11 @@ test("Admin adds a person as asesor with name and WhatsApp", async ({ page }) =>
   const add = page.locator('[data-team-member="new"]');
   await add.getByLabel("Email", { exact: true }).fill(NEW_EMAIL);
   await add.getByLabel("Nombre", { exact: true }).fill("Nuevo Asesor");
-  await add.getByLabel("WhatsApp", { exact: true }).fill("5491155550000");
+  // Typed the way people actually write it: trunk 0 and the local "15"
+  // mobile prefix. The number is what the CRM reminder dials, so it is stored
+  // as the id WhatsApp uses, and the form says so before saving.
+  await add.getByLabel("WhatsApp", { exact: true }).fill("011 15 5555-0000");
+  await expect(add.getByTestId("team-wa-preview")).toContainText("+54 9 1155550000");
   await add.getByRole("button", { name: "Agregar" }).click();
 
   await expect(page.locator(`[data-team-member="${NEW_EMAIL}"]`)).toBeVisible();

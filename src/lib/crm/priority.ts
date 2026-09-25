@@ -1,5 +1,5 @@
 // Manual lead priority — a person's mark, never derived by the bot. Keys are
-// persisted in dashboard.lead_state.priority; labels come from the vertical's
+// persisted in dashboard.opportunities.priority; labels come from the vertical's
 // CrmLabels so each vertical words them its own way. Pure module.
 
 import type { CrmLabels, CrmPriorityKey } from "@/config/verticals/_types";

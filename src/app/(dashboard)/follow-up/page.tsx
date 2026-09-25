@@ -59,7 +59,10 @@ export default async function FollowUpPage() {
 
 /**
  * Open reminders that need attention now: overdue, or due inside the warning
- * window. An admin sees the whole team's; anyone else only their own leads.
+ * window. An admin sees the whole team's; an asesor sees their own plus the
+ * ones nobody owns — those are theirs to pick up (regla 16), and they are also
+ * the ones no WhatsApp notice can reach, so hiding them would let a reminder
+ * die in silence.
  */
 async function loadReminders(
   crm: ReturnType<typeof crmConfig>,
@@ -69,16 +72,17 @@ async function loadReminders(
   const session = await getSessionRole();
   if (!session) return [];
   const [result, team] = await Promise.all([
-    listLeads(
-      crm,
-      { owner: session.role === "admin" ? undefined : session.email, includeLost: true },
-      new Date(),
-    ),
+    // No owner filter: it would drop the unassigned ones (listLeads keeps only
+    // exact owner matches), so the scoping happens below.
+    listLeads(crm, { includeLost: true }, new Date()),
     listTeam(),
   ]);
+  const mine = (owner: string | null) =>
+    session.role === "admin" || owner === null || owner === session.email;
   const labelFor = (email: string | null) => memberLabel(team, email);
   return result.rows
     .filter((r) => r.lead.reminder?.status === "overdue" || r.lead.reminder?.status === "upcoming")
+    .filter((r) => mine(r.lead.owner))
     .sort((a, b) => (a.lead.reminder?.at.getTime() ?? 0) - (b.lead.reminder?.at.getTime() ?? 0))
     .map((r) => ({
       id: r.id,

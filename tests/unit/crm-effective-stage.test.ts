@@ -36,6 +36,7 @@ function state(overrides: Partial<LeadStateRow> = {}): LeadStateRow {
     nextActionAt: null,
     nextActionNote: "",
     nextActionDoneAt: null,
+    nextActionNotifiedAt: null,
     priority: "",
     openedAt: daysAgo(3),
     closedAt: null,
@@ -239,5 +240,24 @@ describe("deriveLead — reminders and owner", () => {
     );
     expect(lead.owner).toBe("asesor@cliente.com");
     expect(lead.stage).toBe("perdido");
+  });
+
+  it("carries the WhatsApp notice through without letting it count as activity", () => {
+    const notified = daysAgo(0);
+    const reminder = { nextActionAt: daysAgo(1), nextActionNote: "Llamar" };
+    const withNotice = deriveLead(
+      signals(),
+      state({ ...reminder, nextActionNotifiedAt: notified }),
+      config,
+      NOW,
+    );
+    expect(withNotice.reminder?.notifiedAt).toEqual(notified);
+    expect(withNotice.reminder?.status).toBe("overdue");
+
+    // Sending the notice is not contacting the person, so the inactivity clock
+    // must read exactly the same with and without it (regla 14).
+    const withoutNotice = deriveLead(signals(), state(reminder), config, NOW);
+    expect(withNotice.lastActivityAt).toEqual(withoutNotice.lastActivityAt);
+    expect(withNotice.daysInactive).toBe(withoutNotice.daysInactive);
   });
 });

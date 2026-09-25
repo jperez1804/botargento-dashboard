@@ -192,6 +192,8 @@ export const CRM_LABELS_ES: CrmLabels = {
 
   reminderOverdueRelativeTemplate: "Vencido {relative}",
   reminderDueRelativeTemplate: "Vence {relative}",
+  reminderNotifiedTemplate: "Avisado por WhatsApp · {time}",
+  reminderNoOwner: "Sin responsable · no se avisa",
   reminderChange: "Cambiar",
   reminderPresets: {
     tomorrow: "Mañana",

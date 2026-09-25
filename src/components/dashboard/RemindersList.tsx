@@ -29,7 +29,7 @@ export function RemindersList({ rows, labels, title }: Props) {
           const overdue = rem.status === "overdue";
           return (
             <Link
-              key={waId}
+              key={id}
               role="listitem"
               href={`/conversations/${encodeURIComponent(waId)}?op=${id}`}
               className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-[13.5px] hover:bg-[var(--canvas-2)] transition-colors focus-visible:outline-2 focus-visible:outline-[color-mix(in_oklch,var(--client-primary)_60%,transparent)] focus-visible:outline-offset-[-2px]"
@@ -45,7 +45,23 @@ export function RemindersList({ rows, labels, title }: Props) {
               </span>
               <span className="font-medium text-[var(--ink)]">{displayName}</span>
               {rem.note ? <span className="text-[var(--muted-ink)] truncate min-w-0 flex-1">{rem.note}</span> : null}
-              <span className="text-[12px] text-[var(--soft-ink)]">{view.ownerEmail ? view.ownerLabel : labels.unassigned}</span>
+              {rem.notifiedText ? (
+                <span data-testid="reminder-notified" className="text-[12px] text-[var(--soft-ink)] whitespace-nowrap">
+                  {rem.notifiedText}
+                </span>
+              ) : null}
+              {view.ownerEmail ? (
+                <span className="text-[12px] text-[var(--soft-ink)]">{view.ownerLabel}</span>
+              ) : (
+                // Nobody owns it, so nobody gets the WhatsApp. Say so here
+                // rather than let the reminder die quietly (decision 25-09).
+                <span
+                  data-testid="reminder-no-owner"
+                  className="text-[12px] font-medium text-[color-mix(in_oklch,var(--warning)_80%,var(--ink))] whitespace-nowrap"
+                >
+                  {labels.reminderNoOwner}
+                </span>
+              )}
             </Link>
           );
         })}

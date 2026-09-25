@@ -40,6 +40,11 @@ export function ReminderCallout({ reminder, canEdit, busy, labels, onDone, onCha
         {reminder.note ? (
           <p className="pt-0.5 text-[13px] leading-snug text-[var(--ink)] break-words">{reminder.note}</p>
         ) : null}
+        {reminder.notifiedText ? (
+          <p data-testid="reminder-notified" className="text-[11.5px] opacity-70">
+            {reminder.notifiedText}
+          </p>
+        ) : null}
         {canEdit ? (
           <div className="flex justify-end gap-1 pt-1">
             <Button type="button" size="xs" variant="ghost" disabled={busy} onClick={onDone}>

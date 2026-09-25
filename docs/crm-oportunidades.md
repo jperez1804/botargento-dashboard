@@ -129,6 +129,8 @@ erDiagram
         text budget_currency
         timestamptz next_action_at "recordatorio"
         text next_action_note
+        text next_action_set_by
+        timestamptz next_action_notified_at "la escribe n8n al mandar el aviso"
         timestamptz next_action_done_at
         timestamptz updated_at
     }
@@ -149,6 +151,8 @@ erDiagram
     TEAM_MEMBERS {
         text email PK "FK → allowed_emails (CASCADE)"
         text display_name
+        text whatsapp_number "id de WhatsApp, '' = no recibe avisos"
+        boolean notify_whatsapp "el asesor puede apagar los avisos"
         boolean active
     }
     AUDIT_LOG {
@@ -194,6 +198,25 @@ erDiagram
 
 `automation.*` y `outreach.*` son del bot y el panel **solo los lee**. Por eso no hay clave
 foránea hacia `lead_log`: es un esquema ajeno y no tiene clave única por contacto.
+
+### Quién escribe qué
+
+Al revés también hay una sola puerta. **n8n escribe exactamente una columna de `dashboard.*`:
+`opportunities.next_action_notified_at`**, para registrar que el aviso de un recordatorio
+salió por WhatsApp. Nada más. No inserta eventos, no mueve etapas, no toca contactos.
+
+- El panel **nunca** escribe esa columna: solo la pone en nulo cuando se reprograma el
+  recordatorio, que es lo que re-arma el aviso (`setOpportunityReminder`).
+- El panel **la lee** para mostrar «Avisado por WhatsApp · hh:mm» en Seguimiento y en la ficha.
+- Los permisos están escritos en `migrations/0011_n8n_reminder_grants.sql`: `USAGE` en el
+  esquema, `SELECT` en cuatro tablas y `UPDATE` de esa única columna. En client1 es un no-op
+  porque n8n se conecta como superusuario, pero deja el contrato explícito y hace el workflow
+  portable a un tenant donde no lo sea.
+- Un recordatorio **sin responsable no se avisa**: no hay a qué teléfono mandarlo. Aparece en
+  Seguimiento marcado «Sin responsable · no se avisa», y un asesor lo ve aunque no sea suyo
+  (regla 16), para que no muera en silencio.
+- El aviso **no cuenta como actividad** (regla 14): no reinicia el reloj de inactividad ni
+  genera un evento. Es una notificación, no un contacto con la persona.
 
 ## Sincronización en lectura
 
