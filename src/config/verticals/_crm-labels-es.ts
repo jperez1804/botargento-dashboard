@@ -274,7 +274,6 @@ export const CRM_LABELS_ES: CrmLabels = {
     moverPerson: "La marca un asesor",
     moverBoth: "El bot o un asesor",
     autoNew: "Cuando la persona escribe por primera vez, o cuando se carga a mano.",
-    autoContacted: "Cuando alguien del equipo le responde desde el panel.",
     autoQualified: "Cuando el bot deriva la consulta al equipo.",
     autoLostTemplate:
       "Cuando pide no recibir más mensajes, o tras {days} días sin actividad. Un asesor también puede marcarla, con un motivo.",
@@ -287,6 +286,8 @@ export const CRM_LABELS_ES: CrmLabels = {
     activityTitle: "Qué cuenta como actividad",
     activityIntro: "Cualquiera de estas cosas reinicia el reloj de inactividad:",
     activityMessages: "Un mensaje de WhatsApp, entrante o saliente",
+    activityNoStage:
+      "Responder desde el panel queda registrado y mantiene vivo el seguimiento, pero no cambia la etapa: a {qualified} la mueve el bot cuando la persona termina una consulta, y de ahí en adelante las movés vos.",
     remindersTitle: "Recordatorios",
     remindersBody:
       "Desde la ficha del lead podés dejar un próximo paso con fecha. Los vencidos aparecen en Seguimiento y en el aviso de arriba; asignar un responsable o programar un recordatorio no cuenta como actividad.",

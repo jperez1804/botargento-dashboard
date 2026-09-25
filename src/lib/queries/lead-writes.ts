@@ -240,8 +240,9 @@ export async function completeOpportunityReminder(
 }
 
 /**
- * A person replied to / took over the conversation from the inbox. Feeds the
- * automatic "contactado" stage and restarts the inactivity clock. The reply is
+ * A person replied to / took over the conversation from the inbox. Recorded as
+ * activity, which restarts the inactivity clock; it does NOT move the stage
+ * (there is no "contactado"). The reply is
  * about the person, so it lands on every opportunity they have open (nothing
  * says which one it was about); with none open it stays on the person alone.
  */

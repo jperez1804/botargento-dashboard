@@ -78,8 +78,9 @@ export function makeInboxHandler(action: InboxAction) {
         );
       }
 
-      // CRM: a human replying or taking over marks the lead "contactado" and
-      // restarts its inactivity clock. Best-effort — never fails the send.
+      // CRM: a human replying or taking over is recorded as activity on every
+      // open opportunity of that person and restarts its inactivity clock. It
+      // does NOT move the stage. Best-effort — never fails the send.
       if (crmEnabled() && action !== "release") {
         try {
           await recordHumanContact(

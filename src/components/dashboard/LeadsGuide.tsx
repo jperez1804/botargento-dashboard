@@ -7,6 +7,7 @@ import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
 import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
 import { buildGuideRules, buildStageGuide, type StageMover } from "@/lib/crm/guide";
 import { priorityOptions } from "@/lib/crm/priority";
+import { fillTemplate } from "@/lib/crm/view-model";
 import type { CrmConfig } from "@/config/verticals/_types";
 
 type Props = { config: CrmConfig };
@@ -28,6 +29,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function LeadsGuide({ config }: Props) {
   const g = config.labels.guide;
+  const qualifiedLabel =
+    config.stages.find((s) => s.key === config.autoStages.qualified)?.label ??
+    config.autoStages.qualified;
   const stages = buildStageGuide(config);
   const rules = buildGuideRules(config);
 
@@ -89,6 +93,9 @@ export function LeadsGuide({ config }: Props) {
             <li key={k}>{k}</li>
           ))}
         </ul>
+        <p data-testid="guide-activity-no-stage">
+          {fillTemplate(g.activityNoStage, { qualified: qualifiedLabel })}
+        </p>
       </Section>
 
       <Section title={g.remindersTitle}>

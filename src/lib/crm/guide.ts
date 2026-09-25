@@ -37,9 +37,6 @@ export function buildStageGuide(config: CrmConfig): StageGuideRow[] {
     } else if (s.key === auto.new) {
       mover = "bot";
       trigger = g.autoNew;
-    } else if (s.key === auto.contacted) {
-      mover = "bot";
-      trigger = g.autoContacted;
     } else if (s.key === auto.qualified) {
       mover = "bot";
       trigger = g.autoQualified;
