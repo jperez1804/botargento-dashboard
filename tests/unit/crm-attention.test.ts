@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { realEstate } from "@/config/verticals/real-estate";
 import type { EffectiveLead } from "@/lib/crm/effective-stage";
 import { attentionKind, attentionRank, leadAttention, NO_ATTENTION_RANK } from "@/lib/crm/attention";
-import { compareLeads, isTodayLead, type LeadRow } from "@/lib/queries/leads";
+import { compareLeads, isTodayLead, type OpportunityRow } from "@/lib/queries/leads";
 
 const config = realEstate.crm!;
 const labels = config.labels;
@@ -27,10 +27,16 @@ function lead(over: Partial<EffectiveLead> = {}): EffectiveLead {
     ...over,
   };
 }
-const reminder = (offsetMs: number, status: "overdue" | "upcoming" | "scheduled" | "done", note = "") => ({
+const reminder = (
+  offsetMs: number,
+  status: "overdue" | "upcoming" | "scheduled" | "done",
+  note = "",
+  notifiedAt: Date | null = null,
+) => ({
   at: at(offsetMs),
   note,
   status,
+  notifiedAt,
 });
 
 describe("attention", () => {
@@ -50,8 +56,8 @@ describe("attention", () => {
   it("uses the tenant timezone to decide what is 'today'", () => {
     // 23:30 Buenos Aires = 02:30Z next day: still today locally.
     const lateTonight = new Date("2026-09-22T02:30:00Z");
-    expect(attentionKind(lead({ reminder: { at: lateTonight, note: "", status: "upcoming" } }), NOW, TZ)).toBe("today");
-    expect(attentionKind(lead({ reminder: { at: lateTonight, note: "", status: "upcoming" } }), NOW, "UTC")).toBe("upcoming");
+    expect(attentionKind(lead({ reminder: { at: lateTonight, note: "", status: "upcoming", notifiedAt: null } }), NOW, TZ)).toBe("today");
+    expect(attentionKind(lead({ reminder: { at: lateTonight, note: "", status: "upcoming", notifiedAt: null } }), NOW, "UTC")).toBe("upcoming");
   });
 
   it("ranks for sorting", () => {
@@ -75,7 +81,7 @@ describe("attention", () => {
 });
 
 let n = 0;
-function row(over: Partial<EffectiveLead> = {}): LeadRow {
+function row(over: Partial<EffectiveLead> = {}): OpportunityRow {
   n += 1;
   return {
     contactWaId: `549110000${String(n).padStart(4, "0")}`,

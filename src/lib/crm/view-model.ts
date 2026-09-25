@@ -108,6 +108,10 @@ export type LeadView = {
     text: string;
     // "Vencido hace 2 días" / "Vence mañana" — the callout's headline.
     relativeText: string;
+    // "Avisado 09:15" when n8n already pushed it to the owner's WhatsApp;
+    // null while it has not gone out. Reading it is how the panel shows that
+    // the loop closed without anyone querying the database.
+    notifiedText: string | null;
   } | null;
   lastActivityText: string;
   lastActivityRelative: string;
@@ -165,6 +169,11 @@ export function buildLeadView(
         lead.reminder.status === "overdue"
           ? fillTemplate(labels.reminderOverdueRelativeTemplate, { relative })
           : fillTemplate(labels.reminderDueRelativeTemplate, { relative }),
+      notifiedText: lead.reminder.notifiedAt
+        ? fillTemplate(labels.reminderNotifiedTemplate, {
+            time: formatDayTime(lead.reminder.notifiedAt, locale, timezone),
+          })
+        : null,
     };
   }
 

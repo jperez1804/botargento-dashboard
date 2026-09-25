@@ -13,6 +13,10 @@ export const TEAM_LABELS = {
   emailLabel: "Email",
   nameLabel: "Nombre",
   namePlaceholder: "Ej.: Ana Gómez",
+  // The number is normalized to the id WhatsApp dials, so the form shows
+  // what will actually be saved (same idea as the manual lead form).
+  whatsappPreviewTemplate: "Se guarda como {phone}",
+  whatsappInvalid: "Ese número no parece un WhatsApp válido",
   whatsappPlaceholder: "5491122334455",
   notifyLabel: "Recordatorios por WhatsApp",
   addTitle: "Agregar persona",

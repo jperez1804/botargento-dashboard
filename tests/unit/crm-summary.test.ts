@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { realEstate } from "@/config/verticals/real-estate";
 import type { EffectiveLead } from "@/lib/crm/effective-stage";
 import { buildLeadsSummary, closedStageKeys } from "@/lib/crm/summary";
-import type { LeadRow } from "@/lib/queries/leads";
+import type { OpportunityRow } from "@/lib/queries/leads";
 
 const config = realEstate.crm!;
 const NOW = new Date("2026-09-21T15:00:00Z");
@@ -20,7 +20,7 @@ const team = [
 let n = 0;
 function row(
   over: Partial<EffectiveLead> & { firstSeen?: Date | null; origin?: string; openedAt?: Date } = {},
-): LeadRow {
+): OpportunityRow {
   const { firstSeen = daysAgo(20), origin, openedAt, ...lead } = over;
   n += 1;
   return {
@@ -76,11 +76,11 @@ describe("buildLeadsSummary", () => {
       row({ lastActivityAt: daysAgo(8) }),
       row({ firstSeen: daysAgo(2) }),
       row({ firstSeen: daysAgo(30) }),
-      row({ reminder: { at: daysAhead(3), note: "", status: "upcoming" } }),
-      row({ reminder: { at: daysAhead(6), note: "", status: "upcoming" } }),
-      row({ reminder: { at: daysAhead(12), note: "", status: "scheduled" } }), // beyond 7 days
-      row({ reminder: { at: daysAgo(1), note: "", status: "overdue" } }),
-      row({ reminder: { at: daysAgo(1), note: "", status: "done" } }),
+      row({ reminder: { at: daysAhead(3), note: "", status: "upcoming", notifiedAt: null } }),
+      row({ reminder: { at: daysAhead(6), note: "", status: "upcoming", notifiedAt: null } }),
+      row({ reminder: { at: daysAhead(12), note: "", status: "scheduled", notifiedAt: null } }), // beyond 7 days
+      row({ reminder: { at: daysAgo(1), note: "", status: "overdue", notifiedAt: null } }),
+      row({ reminder: { at: daysAgo(1), note: "", status: "done", notifiedAt: null } }),
     ];
     const s = buildLeadsSummary(rows, config, team, NOW);
     expect(s.windowDays).toBe(7);

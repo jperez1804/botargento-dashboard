@@ -32,7 +32,7 @@ Next.js 15 (App Router) + TypeScript strict + Tailwind CSS v4 + shadcn/ui + Rech
 - `src/db/` — Drizzle schema + client + typed wrappers for `automation.v_*` views
 - `src/lib/queries/` — All SQL lives here; pages call these functions, never inline SQL
 - `src/lib/auth.ts` — Auth.js config with Resend magic link + allowlist check
-- `src/middleware.ts` — Auth guard for `(dashboard)/*` routes
+- `src/proxy.ts` — Auth guard for `(dashboard)/*` routes (Next 16 renamed `middleware` → `proxy`)
 - `migrations/` — Raw SQL migrations for `dashboard.*` schema (applied on container start)
 - `scripts/` — Provisioning, seeding, view-compat verification
 - `.github/workflows/` — CI, release (Docker image), deploy (SSH to VPS)
@@ -177,12 +177,13 @@ changing anything here, and update it in the same PR when a rule moves.**
 ## Reglas No Negociables
 
 1. **The dashboard never writes to `automation.*`.** DB role `dashboard_app` has `SELECT`-only on that schema. Any attempt to `INSERT`/`UPDATE`/`DELETE` there is a bug.
-2. **No hardcoded Spanish strings in JSX.** All UI text comes from `verticalConfig` or `tenantConfig`.
-3. **No `process.env.X` in feature code.** Read through validated config modules.
-4. **Every page query is a Server Component.** Never fetch data from a Client Component.
-5. **Every auth-sensitive action is logged to `dashboard.audit_log`.** Logins, denials, exports, theme updates, role denials.
-6. **Magic link tokens are SHA-256 hashed before storage.** Never plaintext, never logged.
-7. **Migrations are additive only.** No `DROP COLUMN` or destructive changes without a multi-deploy migration plan.
-8. **Max 300 lines per component file.** Extract when larger.
-9. **All env vars validated with Zod at boot.** The container fails fast on misconfiguration, not at request time.
-10. **No secrets in Git, ever.** `.env*` is in `.gitignore`. Secrets live in `/opt/n8n/<clientN>/dashboard.env` on the VPS.
+2. **And n8n writes exactly one column of `dashboard.*`:** `opportunities.next_action_notified_at`, to record that a reminder's WhatsApp notice went out (`migrations/0011_n8n_reminder_grants.sql`, `docs/crm-oportunidades.md`). Anything else in `dashboard.*` written from outside the panel is a bug.
+3. **No hardcoded Spanish strings in JSX.** All UI text comes from `verticalConfig` or `tenantConfig`.
+4. **No `process.env.X` in feature code.** Read through validated config modules.
+5. **Every page query is a Server Component.** Never fetch data from a Client Component.
+6. **Every auth-sensitive action is logged to `dashboard.audit_log`.** Logins, denials, exports, theme updates, role denials.
+7. **Magic link tokens are SHA-256 hashed before storage.** Never plaintext, never logged.
+8. **Migrations are additive only.** No `DROP COLUMN` or destructive changes without a multi-deploy migration plan.
+9. **Max 300 lines per component file.** Extract when larger.
+10. **All env vars validated with Zod at boot.** The container fails fast on misconfiguration, not at request time.
+11. **No secrets in Git, ever.** `.env*` is in `.gitignore`. Secrets live in `/opt/n8n/<clientN>/dashboard.env` on the VPS.

@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRoleApi } from "@/lib/role-guard";
+import { normalizeLeadPhone } from "@/lib/crm/phone";
 import { saveTeamMember } from "@/lib/queries/team-writes";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
@@ -13,8 +14,9 @@ const Body = z.object({
   email: z.email().max(254).transform((e) => e.trim().toLowerCase()),
   role: z.enum(["admin", "asesor", "viewer"]),
   displayName: z.string().trim().max(80),
-  // E.164 digits without '+', or empty for "no WhatsApp reminders".
-  whatsappNumber: z.union([z.literal(""), z.string().regex(/^[0-9]{8,15}$/)]),
+  // Whatever the admin typed; normalized below to the id WhatsApp uses.
+  // '' = no WhatsApp reminders for this person.
+  whatsappNumber: z.string().trim().max(40),
   notifyWhatsapp: z.boolean(),
 });
 
@@ -36,7 +38,19 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const input = parsed.data;
+  // The number is what the CRM reminder workflow dials, so it goes through
+  // the same normalizer as a lead's phone: "011 15 4444-7777" has to become
+  // 5491144447777, not be stored as typed and then never reached.
+  const phone = parsed.data.whatsappNumber ? normalizeLeadPhone(parsed.data.whatsappNumber) : null;
+  if (phone && !phone.ok) {
+    await db.insert(auditLog).values({
+      email: session.email,
+      action: "team_save",
+      metadata: { target: parsed.data.email, role: parsed.data.role, ok: false, error: "invalid_phone" },
+    });
+    return NextResponse.json({ error: "invalid_phone" }, { status: 400 });
+  }
+  const input = { ...parsed.data, whatsappNumber: phone?.ok ? phone.waId : "" };
 
   try {
     const result = await saveTeamMember(input, session.email);

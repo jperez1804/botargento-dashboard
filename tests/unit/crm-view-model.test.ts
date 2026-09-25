@@ -109,7 +109,7 @@ describe("buildLeadView", () => {
 
   it("formats an overdue reminder in the tenant timezone", () => {
     const view = buildLeadView(
-      lead({ reminder: { at: new Date("2026-09-18T13:30:00Z"), note: "Llamar", status: "overdue" } }),
+      lead({ reminder: { at: new Date("2026-09-18T13:30:00Z"), note: "Llamar", status: "overdue", notifiedAt: null } }),
       config,
       label,
       "es-AR",
@@ -206,7 +206,7 @@ describe("budget precedence and events", () => {
   it("gives the reminder a relative headline", () => {
     const now = new Date("2026-09-21T15:00:00Z");
     const view = buildLeadView(
-      lead({ reminder: { at: new Date("2026-09-22T15:00:00Z"), note: "Llamar", status: "upcoming" } }),
+      lead({ reminder: { at: new Date("2026-09-22T15:00:00Z"), note: "Llamar", status: "upcoming", notifiedAt: null } }),
       config,
       label,
       "es-AR",
@@ -215,7 +215,7 @@ describe("budget precedence and events", () => {
     );
     expect(view.reminder?.relativeText).toBe("Vence mañana");
     const overdue = buildLeadView(
-      lead({ reminder: { at: new Date("2026-09-19T15:00:00Z"), note: "", status: "overdue" } }),
+      lead({ reminder: { at: new Date("2026-09-19T15:00:00Z"), note: "", status: "overdue", notifiedAt: null } }),
       config,
       label,
       "es-AR",
@@ -223,5 +223,25 @@ describe("budget precedence and events", () => {
       now,
     );
     expect(overdue.reminder?.relativeText).toBe("Vencido anteayer");
+  });
+
+  it("says when the WhatsApp notice went out, and says nothing until it does", () => {
+    const now = new Date("2026-09-21T15:00:00Z");
+    const reminder = (notifiedAt: Date | null) =>
+      buildLeadView(
+        lead({ reminder: { at: new Date("2026-09-20T15:00:00Z"), note: "", status: "overdue", notifiedAt } }),
+        config,
+        label,
+        "es-AR",
+        TZ,
+        now,
+      ).reminder;
+
+    // The column only ever holds what n8n wrote, so this is a read-only view
+    // of a fact: the owner was pinged at that moment.
+    expect(reminder(new Date("2026-09-21T12:15:00Z"))?.notifiedText).toBe(
+      "Avisado por WhatsApp · 21/09, 09:15",
+    );
+    expect(reminder(null)?.notifiedText).toBeNull();
   });
 });

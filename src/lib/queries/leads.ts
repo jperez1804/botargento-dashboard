@@ -74,9 +74,6 @@ export type OpportunityRow = {
   lead: EffectiveLead;
 };
 
-/** Kept while the UI finishes moving to opportunities. */
-export type LeadRow = OpportunityRow;
-
 const toDate = (v: unknown): Date | null =>
   v === null || v === undefined ? null : new Date(v as string | Date);
 
@@ -219,7 +216,8 @@ async function selectOpportunityRows(
     SELECT
       o.id, o.contact_wa_id, o.seq, o.kind, o.title, o.opened_at, o.opened_by, o.closed_at,
       o.stage, o.stage_changed_at, o.lost_reason, o.owner_email,
-      o.next_action_at, o.next_action_note, o.next_action_done_at, o.priority,
+      o.next_action_at, o.next_action_note, o.next_action_done_at,
+      o.next_action_notified_at, o.priority,
       o.budget_amount AS manual_budget_amount, o.budget_currency AS manual_budget_currency,
       (SELECT COUNT(*)::int FROM dashboard.opportunities t WHERE t.contact_wa_id = o.contact_wa_id) AS of_total,
       n.display_name, n.source, n.created_by, n.created_at, n.first_seen_at,
@@ -262,6 +260,7 @@ async function selectOpportunityRows(
       nextActionAt: toDate(r.next_action_at),
       nextActionNote: String(r.next_action_note ?? ""),
       nextActionDoneAt: toDate(r.next_action_done_at),
+      nextActionNotifiedAt: toDate(r.next_action_notified_at),
       priority: String(r.priority ?? ""),
       openedAt,
       closedAt: toDate(r.closed_at),

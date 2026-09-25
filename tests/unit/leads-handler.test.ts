@@ -5,12 +5,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 import { realEstate } from "@/config/verticals/real-estate";
-import type { LeadRow } from "@/lib/queries/leads";
+import type { OpportunityRow } from "@/lib/queries/leads";
 
 const auditCalls: Array<Record<string, unknown>> = [];
 let authResult: { session?: { email: string; role: string }; response?: NextResponse };
 let crm: typeof realEstate.crm | null;
-let lead: LeadRow | null;
+let lead: OpportunityRow | null;
 
 const writes = {
   setOpportunityStage: vi.fn(async () => undefined),
@@ -50,7 +50,7 @@ const { makeLeadHandler } = await import("@/app/api/leads/_lib");
 const WA = "5491155504001";
 const OPP = 4001;
 
-function makeLead(overrides: Partial<LeadRow["lead"]> = {}): LeadRow {
+function makeLead(overrides: Partial<OpportunityRow["lead"]> = {}): OpportunityRow {
   return {
     contactWaId: WA,
     displayName: "Ramiro",

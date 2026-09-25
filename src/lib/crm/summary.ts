@@ -9,7 +9,7 @@
 import type { CrmConfig, CrmPriorityKey, CrmStageTone } from "@/config/verticals/_types";
 import type { EffectiveLead } from "@/lib/crm/effective-stage";
 import { PRIORITY_KEYS, PRIORITY_TONE, type PriorityTone } from "@/lib/crm/priority";
-import type { LeadRow } from "@/lib/queries/leads";
+import type { OpportunityRow } from "@/lib/queries/leads";
 
 export const SUMMARY_WINDOW_DAYS = 7;
 const DAY_MS = 86_400_000;
@@ -44,7 +44,7 @@ export function isOpenLead(lead: EffectiveLead, config: CrmConfig): boolean {
 const pctOf = (count: number, total: number) => (total > 0 ? count / total : 0);
 
 export function buildLeadsSummary(
-  rows: ReadonlyArray<LeadRow>,
+  rows: ReadonlyArray<OpportunityRow>,
   config: CrmConfig,
   team: ReadonlyArray<SummaryTeamMember>,
   now: Date,

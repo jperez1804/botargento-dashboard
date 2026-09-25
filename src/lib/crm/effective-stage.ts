@@ -4,7 +4,7 @@
 //
 // Automatic stages are DERIVED from what the bot and the inbox already record
 // in automation.* / dashboard.lead_events; only a person's decision is
-// persisted (dashboard.lead_state.stage). Precedence, in order:
+// persisted (dashboard.opportunities.stage). Precedence, in order:
 //   1. Opt-out (outreach.suppression) always wins → perdido, not reversible.
 //   2. A manual terminal stage (cerrado / perdido) is sticky.
 //   3. A manual non-terminal stage holds its position; a LATER bot signal may
@@ -51,6 +51,10 @@ export type LeadStateRow = {
   nextActionAt: Date | null;
   nextActionNote: string;
   nextActionDoneAt: Date | null;
+  // When n8n pushed this reminder to the owner's WhatsApp. The panel only ever
+  // READS this column (docs/crm-oportunidades.md): it is the single field n8n
+  // writes in dashboard.*, and re-scheduling clears it so the notice re-arms.
+  nextActionNotifiedAt: Date | null;
   priority: string; // '' | alta | media | baja (validated by parsePriority)
   // When this opportunity started. An opportunity opened by hand has no
   // WhatsApp message of its own, so this is the floor for its stage date and
@@ -77,7 +81,13 @@ export type EffectiveLead = {
   daysInactive: number | null;
   lost: LostInfo | null;
   atRisk: { lostOn: Date; daysLeft: number } | null;
-  reminder: { at: Date; note: string; status: ReminderStatus } | null;
+  reminder: {
+    at: Date;
+    note: string;
+    status: ReminderStatus;
+    // null = the WhatsApp notice has not gone out (yet, or ever).
+    notifiedAt: Date | null;
+  } | null;
   owner: string | null;
   // Manual priority; setting it is not activity (same rule as assigning).
   priority: CrmPriorityKey | null;
@@ -203,7 +213,12 @@ export function deriveLead(
         : at.getTime() - now.getTime() <= config.warnDays * DAY_MS
           ? "upcoming"
           : "scheduled";
-    reminder = { at, note: state.nextActionNote, status };
+    reminder = {
+      at,
+      note: state.nextActionNote,
+      status,
+      notifiedAt: state.nextActionNotifiedAt,
+    };
   }
 
   return {

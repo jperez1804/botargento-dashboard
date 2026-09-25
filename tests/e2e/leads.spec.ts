@@ -109,14 +109,53 @@ test("Banner surfaces at-risk leads and overdue reminders for the admin", async 
   await expect(leadRows(page).first()).toContainText("Se pierde el");
 });
 
-test("Seguimiento lists open reminders, overdue first", async ({ page }) => {
+test("Seguimiento lists open reminders, overdue first, and says which were notified", async ({ page }) => {
   await loginAsDevViaLog(page, LOG_PATH);
   await page.goto("/follow-up");
   const list = page.getByTestId("reminders-list");
-  await expect(list.getByRole("listitem")).toHaveCount(2);
-  await expect(list.getByRole("listitem").first()).toContainText(F.overdue.name);
-  await expect(list.getByRole("listitem").first()).toContainText("Vencido");
-  await expect(list.getByRole("listitem").nth(1)).toContainText(F.upcoming.name);
+  const rows = list.getByRole("listitem");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText(F.overdue.name);
+  await expect(rows.first()).toContainText("Vencido");
+  await expect(rows.nth(1)).toContainText(F.upcoming.name);
+
+  // E's notice went out; F's has not. The panel reads the column n8n writes,
+  // so the advisor can see the loop closed without querying the database.
+  await expect(rows.first().getByTestId("reminder-notified")).toContainText("Avisado por WhatsApp");
+  await expect(rows.nth(1).getByTestId("reminder-notified")).toHaveCount(0);
+});
+
+const orphanReminder = () =>
+  withSql(
+    (sql) => sql`
+      UPDATE dashboard.opportunities
+      SET owner_email = NULL, owner_assigned_at = NULL, owner_assigned_by = ''
+      WHERE id = ${F.upcoming.opp}
+    `,
+  );
+
+test("A reminder nobody owns says so on Seguimiento", async ({ page }) => {
+  // With no owner there is no phone to notify, so it would die in silence.
+  await orphanReminder();
+  await loginAsDevViaLog(page, LOG_PATH);
+  await page.goto("/follow-up");
+  const orphan = page
+    .getByTestId("reminders-list")
+    .getByRole("listitem")
+    .filter({ hasText: F.upcoming.name });
+  await expect(orphan.getByTestId("reminder-no-owner")).toHaveText("Sin responsable · no se avisa");
+  await expect(orphan.getByTestId("reminder-notified")).toHaveCount(0);
+});
+
+test("An asesor sees the reminders nobody owns, not only their own", async ({ page }) => {
+  await orphanReminder();
+  await loginAsDevViaLog(page, LOG_PATH, ASESOR);
+  await page.goto("/follow-up");
+  const rows = page.getByTestId("reminders-list").getByRole("listitem");
+  // Theirs: none (F was the asesor's and just lost its owner). Unassigned: F,
+  // which is theirs to pick up (regla 16). The admin's overdue one is not.
+  await expect(rows.filter({ hasText: F.upcoming.name })).toHaveCount(1);
+  await expect(rows.filter({ hasText: F.overdue.name })).toHaveCount(0);
 });
 
 test("Leads list derives stages, hides lost leads and filters by owner", async ({ page }) => {

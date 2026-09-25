@@ -136,7 +136,7 @@ export type VerticalFeatures = {
 export type CrmStageTone = "neutral" | "info" | "progress" | "good" | "bad";
 
 export type CrmStageDef = {
-  key: string; // Persisted in dashboard.lead_state.stage — never rename a live key.
+  key: string; // Persisted in dashboard.opportunities.stage — never rename a live key.
   label: string;
   tone: CrmStageTone;
   // Closed stages (won / lost): sticky, no inactivity timer, no "por vencer".
@@ -149,7 +149,7 @@ export type CrmStageDef = {
 };
 
 // Manual priority a person sets on a lead. Persisted in
-// dashboard.lead_state.priority ('' = none) — never rename a live key.
+// dashboard.opportunities.priority ('' = none) — never rename a live key.
 export type CrmPriorityKey = "alta" | "media" | "baja";
 
 // Activities a person logs by hand from the lead card.
@@ -323,6 +323,10 @@ export type CrmLabels = {
   // Reminder callout: {relative} = "hace 2 días" / "mañana"
   reminderOverdueRelativeTemplate: string;
   reminderDueRelativeTemplate: string;
+  // The WhatsApp notice n8n sent for a reminder, and the note on the ones
+  // nobody can be notified about because they have no owner.
+  reminderNotifiedTemplate: string;
+  reminderNoOwner: string;
   reminderChange: string;
   // Reminder editor: preset chips, then note, then date + time (09:00 default).
   reminderPresets: Record<"tomorrow" | "in3days" | "nextWeek" | "custom", string>;

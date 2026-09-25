@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { LEAD_CAPTION_CLASS, LEAD_FIELD_CLASS } from "@/components/dashboard/lead-field-class";
 import { TEAM_LABELS as L } from "@/config/team-labels";
+import { formatLeadPhone, normalizeLeadPhone } from "@/lib/crm/phone";
 
 type Role = "admin" | "asesor" | "viewer";
 
@@ -58,9 +59,12 @@ export function TeamMemberForm({ member, isSelf = false }: Props) {
   const idBase = `team-${(member?.email ?? "new").replace(/[^a-z0-9]/gi, "-")}`;
   const set = <K extends keyof Member>(k: K, v: Member[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
+  // What the server will store. null while the field is empty.
+  const waPreview = draft.whatsappNumber.trim() ? normalizeLeadPhone(draft.whatsappNumber) : null;
+
   async function save() {
     setBusy(true);
-    const res = await post("save", { ...draft, whatsappNumber: draft.whatsappNumber.replace(/\D/g, "") });
+    const res = await post("save", { ...draft, whatsappNumber: draft.whatsappNumber.trim() });
     setBusy(false);
     if (res.ok) {
       toast.success(isNew ? L.added : L.saved);
@@ -146,7 +150,22 @@ export function TeamMemberForm({ member, isSelf = false }: Props) {
           disabled={busy}
           onChange={(e) => set("whatsappNumber", e.target.value)}
           className={cn(LEAD_FIELD_CLASS, "tabular-nums")}
+          aria-describedby={`${idBase}-wa-hint`}
         />
+        <p
+          id={`${idBase}-wa-hint`}
+          data-testid="team-wa-preview"
+          className={cn(
+            "min-h-[1.25em] text-[12px] tabular-nums",
+            waPreview?.ok === false ? "text-[var(--danger)]" : "text-[var(--soft-ink)]",
+          )}
+        >
+          {waPreview?.ok
+            ? L.whatsappPreviewTemplate.replace("{phone}", formatLeadPhone(waPreview.waId))
+            : waPreview
+              ? L.whatsappInvalid
+              : ""}
+        </p>
         <label className="flex items-center gap-1.5 text-[12px] text-[var(--muted-ink)]">
           <input
             type="checkbox"

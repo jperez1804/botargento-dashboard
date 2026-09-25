@@ -4,7 +4,7 @@
 // bodies and SQL assertions without looking ids up:
 //   A visita (manual, dev@) + activity · B reserva (manual, asesor@)
 //   C nuevo, 25 idle days → "por vencer" · D 40 idle days → perdido (auto)
-//   E overdue reminder (dev@) · F upcoming reminder (asesor@)
+//   E overdue reminder (dev@), notice already sent · F upcoming (asesor@)
 //   G human reply from the inbox (sent_by='human') → contactado (auto)
 //   H registered by hand (walk-in, asesor@) — no WhatsApp conversation yet
 //   I wrote with a rubro but never reached a handoff → NO opportunity: the
@@ -119,6 +119,15 @@ export async function seedCrmState(outer: Sql): Promise<void> {
        NULL, NULL, '',
        'asesor@cliente.com', ${ago(1)}, 'asesor@cliente.com', NULL, '', '', '', NULL, '')
   `;
+  // E's WhatsApp notice already went out. That column is written only by the
+  // n8n reminder workflow (docs/crm-oportunidades.md), so the seed is the only
+  // way the panel can render "Avisado por WhatsApp" in a test.
+  await sql`
+    UPDATE dashboard.opportunities
+    SET next_action_notified_at = ${ago(0, 3)}
+    WHERE id = ${f.overdue.opp}
+  `;
+
   // Anything the app opens from here on gets an id well past the fixtures.
   await sql`SELECT setval('dashboard.opportunities_id_seq', 5000, false)`;
 
