@@ -12,6 +12,11 @@ import { sql } from "@/db/client";
 const TTL_MS = 10 * 60_000;
 const cache = new Map<string, { value: boolean; at: number }>();
 
+/** Tests only: forget every cached answer (the schema under test just changed). */
+export function resetProbeCache(): void {
+  cache.clear();
+}
+
 async function probe(key: string, run: () => Promise<boolean>): Promise<boolean> {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
@@ -47,4 +52,9 @@ export function hasSessionMemory(): Promise<boolean> {
 
 export function hasOutreachSuppression(): Promise<boolean> {
   return probe("outreach.suppression", () => relationExists("outreach.suppression"));
+}
+
+/** The campaign side of an outbound tenant: who we wrote to, and as what. */
+export function hasOutreachRecipients(): Promise<boolean> {
+  return probe("outreach.recipients", () => relationExists("outreach.recipients"));
 }

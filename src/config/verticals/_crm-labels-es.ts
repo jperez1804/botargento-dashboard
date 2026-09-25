@@ -117,6 +117,7 @@ export const CRM_LABELS_ES: CrmLabels = {
   columnBudget: "Presupuesto",
   columnSource: "Origen",
   sourceWhatsapp: "WhatsApp",
+  sourceCampaign: "Campaña",
   daysInStageTemplate: "{days} d en la etapa",
   daysInStageToday: "Entró hoy a la etapa",
 

@@ -38,7 +38,11 @@ oportunidad**. La ficha de la persona lista todas las suyas.
 
 ### Qué crea una oportunidad
 
-> Una derivación por rubro es una oportunidad.
+> Una derivación por rubro es una oportunidad. **En un vertical de salida, una respuesta.**
+
+Las reglas 5 a 8, 13 y 14 dependen de **quién habla primero**. Están escritas para inmobiliaria
+(la persona escribe, el bot califica, deriva); la sección **«Reglas por vertical»** más abajo dice
+qué cambia en ventas (nosotros escribimos, la campaña ya calificó, la respuesta es lo escaso).
 
 5. **Derivación del bot** de rubro R para una persona que **no tiene ninguna oportunidad
    abierta de rubro R** → se abre sola, en **Calificado**, con la fecha de la derivación.
@@ -61,6 +65,40 @@ oportunidad**. La ficha de la persona lista todas las suyas.
    abierta».
 10. **Opt-out**: todas las oportunidades de la persona se ven Perdidas, no es reversible y no
     se abre ninguna, ni sola ni a mano.
+
+### Reglas por vertical
+
+Lo que sigue es lo único que cambia entre un vertical de entrada (inmobiliaria) y uno de salida
+(ventas). Todo lo demás —N oportunidades por persona, claves foráneas, sincronización en lectura,
+inactividad reversible, opt-out que gana siempre, el aviso al responsable, n8n que escribe una sola
+columna— es común. Decidido con Jonatan el 25-09.
+
+| | Inmobiliaria (`real-estate`) | Ventas (`outbound-sales`) |
+|---|---|---|
+| **Quién habla primero** | La persona | Nosotros, con una plantilla de campaña |
+| **5. Qué abre una oportunidad** (`crm.opener`) | `"handoff"`: una derivación del bot, de un rubro sin abierta | `"reply"`: **la respuesta a la campaña**. La campaña ya es la calificación; el evento escaso es que contesten. Nace en Nuevo. La derivación (demo, precio, pregunta) la empuja a Calificado |
+| **6–7. Segundo evento** | Derivación del mismo rubro → cuenta para la abierta; un mensaje solo no abre | Una segunda respuesta → cuenta para la abierta. Una respuesta después de cerrada → abre otra |
+| **8. Sin derivar** | Escribió y nunca derivó → sin oportunidad, en Conversaciones | Respondió **antes de `CRM_SINCE`**, o nada pudo abrirse → sin oportunidad, en Conversaciones. La derivación no la excluye: es la historia que el equipo puede levantar a mano |
+| **11. Etapas** | Nuevo → Calificado → Visita → Reserva → Cerrado / Perdido | Nuevo → Calificado → **Demo → Propuesta** → Cerrado / Perdido |
+| **13. De dónde sale el rubro** (`crm.kinds`, `crm.kindFromCampaign`) | De la derivación: `escalations.intent` mapeado a los intents del vertical | **Del prospecto**: `outreach.recipients.vertical` de la última campaña que le escribió, mapeado por `kindFromCampaign`; si no, lo que contestó al wizard (`session_memory…rubro`); si no, vacío y editable. La derivación de ventas es de un solo sabor y no distingue nada |
+| **14. Inactividad** | 30 días, aviso a los 7 | **14 días, aviso a los 3** |
+| **Origen** (`contacts.source`) | `whatsapp` o una fuente manual | `campaign` si el número está en `outreach.recipients`, `whatsapp` si escribió por su cuenta, o manual |
+| **Nombre** | Lo que tipeó un asesor > `lead_name` > perfil de WhatsApp | Lo que tipeó un asesor > **`recipients.business_name`** > `lead_name` > perfil |
+| **«Consulta nueva»** (regla 7) | Sí: un mensaje de otro rubro lo sugiere | No: los mensajes no tienen rubro |
+
+**`CRM_SINCE`** es una variable del tenant, no del vertical: cualquier tenant que active el CRM con
+historia atrás puede fijarla para arrancar con el tablero vacío. client1 no la tiene (todo lo que
+registró cuenta); ventas arranca con ella puesta en el momento del deploy.
+
+**Por qué en ventas abre la respuesta y no la derivación.** Al 25-09 ventas tenía 154 personas que
+respondieron, 22 que derivaron y **132 que respondieron y nunca derivaron**. Con la regla de
+inmobiliaria el tablero mostraría 22 tarjetas y escondería 132 personas que ya contestaron una
+campaña paga. En salida la persona ya fue elegida por nosotros; que responda es el lead.
+
+**Riesgos aceptados en ventas:** un auto-respondedor («gracias por comunicarte, nuestro horario…»)
+abre una oportunidad en Nuevo, y se marca Perdida a mano. «Quizás más adelante» también abre: es un
+sí tibio que conviene seguir. Las 154 respuestas previas a `CRM_SINCE` no están en el tablero, por
+decisión de Jonatan; están en «Sin derivar» a un click.
 
 ### Etapas y señales del bot
 
@@ -86,9 +124,12 @@ oportunidad**. La ficha de la persona lista todas las suyas.
 13. El rubro de una derivación sale de `escalations.intent`, y si falta, de
     `escalation_type`; el de un mensaje, de `lead_log.intent`. El mapeo a rubro es el mismo
     que usan el Panel y el chip de intención (`src/lib/crm/intent.ts`). Tokens sin valor
-    comercial, como `menu`, no mapean a ningún rubro y por eso no pueden abrir nada.
-14. Una oportunidad abierta sin actividad durante `autoLostDays` (30) se ve como **Perdida
-    por inactividad**, reversible; `warnDays` (7) antes aparece «Se pierde el…». Cuenta como
+    comercial, como `menu`, no mapean a ningún rubro y por eso no pueden abrir nada. *En un
+    vertical de salida el rubro es del prospecto, no de la derivación: ver «Reglas por
+    vertical».*
+14. Una oportunidad abierta sin actividad durante `autoLostDays` (30 en inmobiliaria, 14 en
+    ventas) se ve como **Perdida por inactividad**, reversible; `warnDays` (7 / 3) antes
+    aparece «Se pierde el…». Cuenta como
     actividad: mensajes de WhatsApp, notas/llamadas/visitas/reuniones, cambios de etapa,
     contactos desde el panel y la apertura de la oportunidad. Asignar responsable, prioridad,
     presupuesto o recordatorio **no** cuenta.
@@ -207,6 +248,14 @@ erDiagram
 
 `automation.*` y `outreach.*` son del bot y el panel **solo los lee**. Por eso no hay clave
 foránea hacia `lead_log`: es un esquema ajeno y no tiene clave única por contacto.
+
+### Quién lo ve
+
+El CRM se prende con **dos llaves**: el vertical declara la capacidad (`features.crmTab` y un
+bloque `crm`) y el tenant la activa con `CRM_ENABLED=1` en su `dashboard.env`. La imagen es
+una sola para todos los tenants, y hay tres corriendo `outbound-sales` (ventas, tasty, arka) de los
+que solo ventas compró el CRM: con una llave sola por vertical, el tablero aparecería en los tres.
+Es el mismo patrón del inbox (`lib/inbox.ts`) y de las acciones de campaña.
 
 ### Quién escribe qué
 

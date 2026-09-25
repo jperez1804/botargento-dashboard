@@ -13,6 +13,7 @@ import { ExportCsvButton } from "@/components/dashboard/ExportCsvButton";
 import { TopContactsTable } from "@/components/dashboard/TopContactsTable";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { crmKinds } from "@/lib/crm/intent";
 
 const PAGE_SIZE = 25;
 
@@ -48,7 +49,7 @@ export default async function ConversationsPage({ searchParams }: Props) {
     underivedView ? Promise.resolve([]) : listContacts({ search, from, to, limit: PAGE_SIZE, offset }),
     underivedView ? Promise.resolve(0) : countContacts({ search, from, to }),
     crm ? getSessionRole() : Promise.resolve(null),
-    crm ? listUnderivedConversations() : Promise.resolve([]),
+    crm ? listUnderivedConversations(crm) : Promise.resolve([]),
   ]);
   const tenant = tenantConfig();
   const vertical = verticalConfig();
@@ -104,7 +105,7 @@ export default async function ConversationsPage({ searchParams }: Props) {
         <UnderivedTable
           rows={underived}
           config={crm}
-          intents={vertical.intents}
+          intents={crmKinds(crm)}
           locale={tenant.locale}
           timezone={tenant.timezone}
           canEdit={canEdit}

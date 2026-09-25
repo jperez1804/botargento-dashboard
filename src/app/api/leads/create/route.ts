@@ -6,13 +6,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRoleApi } from "@/lib/role-guard";
-import { verticalConfig } from "@/config/verticals";
 import { crmConfig } from "@/lib/crm/enabled";
 import { normalizeLeadPhone } from "@/lib/crm/phone";
 import { createManualLead } from "@/lib/queries/lead-writes";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
 import { logger } from "@/lib/logger";
+import { crmKinds } from "@/lib/crm/intent";
 
 const Body = z.object({
   phone: z.string().trim().min(1).max(40),
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   }
   const { name, source, note = "" } = parsed.data;
   const intentDef = parsed.data.intent
-    ? verticalConfig().intents.find((i) => i.key.toLowerCase() === parsed.data.intent!.toLowerCase())
+    ? crmKinds(config).find((i) => i.key.toLowerCase() === parsed.data.intent!.toLowerCase())
     : null;
   const intent = intentDef?.key ?? "";
 

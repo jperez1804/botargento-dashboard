@@ -6,10 +6,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ExternalLink, MessageCircle, X } from "lucide-react";
 import { tenantConfig } from "@/config/tenant";
-import { verticalConfig } from "@/config/verticals";
 import { crmConfig } from "@/lib/crm/enabled";
 import { buildLeadView, fillTemplate } from "@/lib/crm/view-model";
-import { leadIntent } from "@/lib/crm/intent";
+import { crmKinds, leadIntent } from "@/lib/crm/intent";
 import { getSessionRole, hasRole } from "@/lib/role-guard";
 import { getOpportunity } from "@/lib/queries/leads";
 import { getLeadQualification, listOpportunityEvents } from "@/lib/queries/lead-detail";
@@ -22,6 +21,7 @@ import { LeadQualificationCard } from "@/components/dashboard/LeadQualificationC
 import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
 import { LeadPriorityChip } from "@/components/dashboard/LeadPriorityChip";
 import { RefreshOnce } from "@/components/dashboard/RefreshOnce";
+import { contactSourceLabel } from "@/lib/crm/source";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -56,12 +56,8 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
     .filter((m) => m.role !== "viewer" && m.active)
     .map((m) => ({ email: m.email, label: m.displayName || m.email }));
   const view = buildLeadView(lead.lead, crm, labelFor, tenant.locale, tenant.timezone, now, lead.budget);
-  const intent = leadIntent(lead.kind, verticalConfig().intents);
-  const sourceLabel =
-    lead.contact.source === "whatsapp"
-      ? labels.sourceWhatsapp
-      : (crm.manualLeadSources.find((s) => s.key === lead.contact.source)?.label ??
-        lead.contact.source);
+  const intent = leadIntent(lead.kind, crmKinds(crm));
+  const sourceLabel = contactSourceLabel(crm, lead.contact.source);
   const conversationHref = `/conversations/${encodeURIComponent(waId)}?op=${lead.id}`;
 
   return (
@@ -147,7 +143,7 @@ export default async function LeadModalPage({ params, searchParams }: Props) {
           <LeadCrmCard
             waId={waId}
             kind={lead.kind}
-            intents={verticalConfig().intents}
+            intents={crmKinds(crm)}
             opportunityId={lead.id}
             view={view}
             config={crm}

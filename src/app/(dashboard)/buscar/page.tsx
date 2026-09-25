@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type DataTableColumn } from "@/components/dashboard/DataTable";
 import { LeadStageChip } from "@/components/dashboard/LeadStageChip";
 import type { CrmStageTone } from "@/config/verticals/_types";
+import { contactSourceLabel } from "@/lib/crm/source";
 
 const MAX_RESULTS = 50;
 
@@ -54,11 +55,7 @@ export default async function SearchPage({ searchParams }: Props) {
         return {
           waId: group.contactWaId,
           name: group.displayName,
-          sourceLabel:
-            first.contact.source === "whatsapp"
-              ? crm.labels.sourceWhatsapp
-              : (crm.manualLeadSources.find((s) => s.key === first.contact.source)?.label ??
-                first.contact.source),
+          sourceLabel: contactSourceLabel(crm, first.contact.source),
           stages: views.map((v) => ({ label: v.stageLabel, tone: v.tone, auto: v.auto })),
           lastActivity: views[0]!.lastActivityText,
         };

@@ -4,7 +4,7 @@
 
 import { sql } from "@/db/client";
 import type { CrmConfig } from "@/config/verticals/_types";
-import { hasSessionMemory } from "@/lib/crm/probes";
+import { hasOutreachRecipients, hasSessionMemory } from "@/lib/crm/probes";
 import { priceRangeText } from "@/lib/crm/price-range";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
 
@@ -156,8 +156,8 @@ export async function getLeadQualification(
   window: QualificationWindow,
 ): Promise<QualificationItem[]> {
   const waId = window.contactWaId;
-  const withSnapshot = await hasSessionMemory();
-  const [escalationRows, snapshotRows] = await Promise.all([
+  const [withSnapshot, withCampaign] = await Promise.all([hasSessionMemory(), hasOutreachRecipients()]);
+  const [escalationRows, snapshotRows, campaignRows] = await Promise.all([
     sql<{ data: Record<string, unknown> }[]>`
       SELECT to_jsonb(e) AS data
       FROM automation.escalations e
@@ -178,11 +178,29 @@ export async function getLeadQualification(
           LIMIT 1
         `
       : Promise.resolve([]),
+    // Outbound: which campaign wrote to this person, and how many times. The
+    // latest send wins (one number can sit in two campaigns).
+    withCampaign
+      ? sql<{ data: Record<string, unknown> }[]>`
+          SELECT jsonb_build_object(
+                   'campaign_name', c.name,
+                   'campaign_vertical', c.vertical,
+                   'campaign_sent_at', r.last_send_at,
+                   'touch_count', r.touch_count
+                 ) AS data
+          FROM outreach.recipients r
+          JOIN outreach.campaigns c ON c.id = r.campaign_id
+          WHERE r.wa_id = ${waId}
+          ORDER BY r.last_send_at DESC NULLS LAST, r.id DESC
+          LIMIT 1
+        `
+      : Promise.resolve([]),
   ]);
 
   const sources = {
     escalation: asObject(escalationRows[0]?.data),
     snapshot: asObject(snapshotRows[0]?.data),
+    campaign: asObject(campaignRows[0]?.data),
   };
 
   const items: QualificationItem[] = [];

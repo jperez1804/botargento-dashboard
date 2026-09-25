@@ -4,7 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { getContact, getConversation } from "@/lib/queries/contacts";
 import { tenantConfig } from "@/config/tenant";
 import { verticalConfig } from "@/config/verticals";
-import { intentOptions } from "@/lib/crm/intent";
+import { crmKinds, intentOptions } from "@/lib/crm/intent";
 import { ConversationTimeline } from "@/components/dashboard/ConversationTimeline";
 import { ContactSidebar } from "@/components/dashboard/ContactSidebar";
 import { formatAutomationLabel } from "@/lib/automation-labels";
@@ -21,6 +21,7 @@ import { LeadQualificationCard } from "@/components/dashboard/LeadQualificationC
 import { NoConversationYet } from "@/components/dashboard/NoConversationYet";
 import { OpportunityList } from "@/components/dashboard/OpportunityList";
 import { UnderivedNotice } from "@/components/dashboard/UnderivedNotice";
+import { isManualSource } from "@/lib/crm/source";
 
 type Props = {
   params: Promise<{ waId: string }>;
@@ -126,7 +127,7 @@ export default async function ConversationDetailPage({ params, searchParams }: P
               locale={tenant.locale}
               timezone={tenant.timezone}
             />
-          ) : crm && person && person.contact.source !== "whatsapp" ? (
+          ) : crm && person && isManualSource(person.contact.source) ? (
             <NoConversationYet
               waId={waId}
               manual={person.contact}
@@ -144,11 +145,11 @@ export default async function ConversationDetailPage({ params, searchParams }: P
             <OpportunityList
               waId={waId}
               canEdit={canEdit}
-              intentOptions={intentOptions(vertical.intents)}
+              intentOptions={intentOptions(crmKinds(crm))}
               opportunities={person.opportunities}
               selectedId={lead?.id ?? null}
               config={crm}
-              intents={vertical.intents}
+              intents={crmKinds(crm)}
               locale={tenant.locale}
               timezone={tenant.timezone}
             />
@@ -159,7 +160,7 @@ export default async function ConversationDetailPage({ params, searchParams }: P
               waId={waId}
               kind={person.newIntent}
               config={crm}
-              intents={vertical.intents}
+              intents={crmKinds(crm)}
               canEdit={canEdit}
             />
           ) : null}
@@ -168,7 +169,7 @@ export default async function ConversationDetailPage({ params, searchParams }: P
               <LeadCrmCard
                 waId={waId}
                 kind={lead.kind}
-                intents={vertical.intents}
+                intents={crmKinds(crm)}
                 opportunityId={lead.id}
                 view={buildLeadView(lead.lead, crm, labelFor, tenant.locale, tenant.timezone, now, lead.budget)}
                 config={crm}

@@ -21,11 +21,11 @@ import {
   setOpportunityStage,
 } from "@/lib/queries/lead-writes";
 import type { CrmConfig, CrmPriorityKey } from "@/config/verticals/_types";
-import { verticalConfig } from "@/config/verticals";
 import { crmCurrencies } from "@/lib/crm/budget";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
 import { logger } from "@/lib/logger";
+import { crmKinds } from "@/lib/crm/intent";
 
 export type LeadAction =
   | "set-stage"
@@ -124,7 +124,7 @@ async function apply(
 
   if (action === "set-kind") {
     const kind = String(data.kind ?? "");
-    if (kind && !verticalConfig().intents.some((i) => i.key === kind)) {
+    if (kind && !crmKinds(config).some((i) => i.key === kind)) {
       return fail(400, "invalid_kind", { kind });
     }
     const title = String(data.title ?? lead.title).trim();

@@ -34,6 +34,7 @@ jobs:
       CLIENT_NAME: CI Tenant
       CLIENT_PRIMARY_COLOR: "#3b82f6"
       VERTICAL: real-estate
+      CRM_ENABLED: "1"
       NODE_ENV: test
 
     steps:
