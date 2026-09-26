@@ -12,8 +12,8 @@ const verticals: VerticalConfig[] = [realEstate, architecture, outboundSales];
 const withCrm = verticals.filter((v): v is VerticalConfig & { crm: CrmConfig } => Boolean(v.crm));
 
 describe("CRM config invariants", () => {
-  it("is declared on real-estate and outbound-sales, and on nothing else yet", () => {
-    expect(withCrm.map((v) => v.key).sort()).toEqual(["outbound-sales", "real-estate"]);
+  it("is declared on real-estate, architecture and outbound-sales", () => {
+    expect(withCrm.map((v) => v.key).sort()).toEqual(["architecture", "outbound-sales", "real-estate"]);
     for (const v of withCrm) expect(v.features?.crmTab).toBe(true);
   });
 

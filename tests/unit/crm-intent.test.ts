@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { realEstate } from "@/config/verticals/real-estate";
 import { outboundSales } from "@/config/verticals/outbound-sales";
-import { crmKinds, intentOptions, leadIntent } from "@/lib/crm/intent";
+import { architecture } from "@/config/verticals/architecture";
+import { crmKindOf, crmKinds, intentOptions, leadIntent } from "@/lib/crm/intent";
 
 const intents = realEstate.intents;
 
@@ -20,6 +21,28 @@ describe("leadIntent", () => {
 
   it("lists one option per vertical intent", () => {
     expect(intentOptions(intents).map((i) => i.key)).toEqual(intents.map((i) => i.key));
+  });
+});
+
+describe("crmKindOf", () => {
+  const arch = architecture.crm!;
+
+  it("maps an architecture handoff token straight to its rubro", () => {
+    expect(crmKindOf("proyecto_lead", arch)).toEqual({ key: "proyecto_lead", label: "Proyecto" });
+    expect(crmKindOf("gestiones_lead", arch)?.key).toBe("gestiones_lead");
+    expect(crmKindOf("construccion_lead", arch)?.key).toBe("construccion_lead");
+  });
+
+  it("is strict when the vertical declares its rubros: intakes and bot noise are not rubros", () => {
+    for (const raw of ["proveedor_intake", "mano_obra_intake", "unsupported_content", "freetext_ack", "guided_proyecto_handoff", "business"]) {
+      expect(crmKindOf(raw, arch)).toBeNull();
+    }
+    expect(crmKindOf("menu", arch)).toBeNull();
+  });
+
+  it("keeps the old behaviour without declared rubros — an unknown token is still a rubro", () => {
+    expect(crmKindOf("Ventas", realEstate.crm!, intents)?.key).toBe("Ventas");
+    expect(crmKindOf("algo_raro", realEstate.crm!, intents)).not.toBeNull();
   });
 });
 
