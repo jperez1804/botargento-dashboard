@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { countContacts, listContacts } from "@/lib/queries/contacts";
-import { listUnderivedConversations } from "@/lib/queries/underived";
+import { countUnderived, listUnderivedConversations } from "@/lib/queries/underived";
 import { crmConfig } from "@/lib/crm/enabled";
 import { getSessionRole, hasRole } from "@/lib/role-guard";
 import { UnderivedTable } from "@/components/dashboard/UnderivedTable";
@@ -45,11 +45,14 @@ export default async function ConversationsPage({ searchParams }: Props) {
   const crm = crmConfig();
   const underivedView = Boolean(crm) && sp.filter === "no_handoff";
 
-  const [rows, total, session, underived] = await Promise.all([
+  const [rows, total, session, underived, underivedTotal] = await Promise.all([
     underivedView ? Promise.resolve([]) : listContacts({ search, from, to, limit: PAGE_SIZE, offset }),
     underivedView ? Promise.resolve(0) : countContacts({ search, from, to }),
     crm ? getSessionRole() : Promise.resolve(null),
-    crm ? listUnderivedConversations(crm) : Promise.resolve([]),
+    underivedView && crm
+      ? listUnderivedConversations(crm, { limit: PAGE_SIZE, offset })
+      : Promise.resolve([]),
+    crm ? countUnderived(crm) : Promise.resolve(0),
   ]);
   const tenant = tenantConfig();
   const vertical = verticalConfig();
@@ -64,6 +67,8 @@ export default async function ConversationsPage({ searchParams }: Props) {
     const qs = params.toString();
     return `/conversations${qs ? `?${qs}` : ""}`;
   };
+  const buildUnderivedPageHref = (page: number) =>
+    `/conversations?filter=no_handoff${page > 1 ? `&page=${page}` : ""}`;
 
   return (
     <div className="space-y-6">
@@ -82,7 +87,7 @@ export default async function ConversationsPage({ searchParams }: Props) {
 
       {/* Not every conversation becomes an opportunity: only a handoff opens
           one. These are the ones that stopped short. */}
-      {crm && underived.length > 0 ? (
+      {crm && underivedTotal > 0 ? (
         <div className="flex flex-wrap gap-2">
           <Link
             href="/conversations"
@@ -96,7 +101,7 @@ export default async function ConversationsPage({ searchParams }: Props) {
             data-testid="conversations-no-handoff"
             className={cn(CHIP, underivedView ? CHIP_ON : CHIP_OFF)}
           >
-            {underivedCount(crm.labels, underived.length)}
+            {underivedCount(crm.labels, underivedTotal)}
           </Link>
         </div>
       ) : null}
@@ -109,6 +114,10 @@ export default async function ConversationsPage({ searchParams }: Props) {
           locale={tenant.locale}
           timezone={tenant.timezone}
           canEdit={canEdit}
+          page={pageNum}
+          pageSize={PAGE_SIZE}
+          total={underivedTotal}
+          buildPageHref={buildUnderivedPageHref}
         />
       ) : (
         <>
