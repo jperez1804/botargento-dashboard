@@ -827,7 +827,10 @@ test("Board: attention strip first, Hoy filter, rails, column subtitles", async 
   await expect(page.locator(`[data-lead-card="${F.replied.opp}"]`).getByTestId("lead-attention")).toHaveCount(0);
 
   // Who moves the stage: subtitle, lock on manual-only columns, bot glyph on auto chips.
-  await expect(nuevo.locator("[data-column-mover]")).toHaveText("La mueve el bot");
+  // Inbound: the bot opens every opportunity already in Calificado; only a
+  // person puts one in Nuevo (PR #41).
+  await expect(nuevo.locator("[data-column-mover]")).toHaveText("La marca un asesor");
+  await expect(page.locator('[data-board-column="calificado"] [data-column-mover]')).toHaveText("La mueve el bot");
   await expect(page.locator('[data-board-column="visita"] [data-column-lock]')).toHaveCount(1);
   await expect(page.locator('[data-board-column="nuevo"] [data-column-lock]')).toHaveCount(0);
 
