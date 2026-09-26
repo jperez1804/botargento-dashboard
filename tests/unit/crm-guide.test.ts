@@ -28,7 +28,10 @@ describe("buildStageGuide", () => {
 
   it("says who moves each stage", () => {
     const by = (key: string) => rows.find((r) => r.key === key)!;
-    expect(by("nuevo").mover).toBe("bot");
+    // Inbound: the bot opens every opportunity already qualified; only a
+    // person puts one in Nuevo.
+    expect(by("nuevo").mover).toBe("person");
+    expect(by("nuevo").trigger).toMatch(/Nuevo lead/);
     expect(by("calificado").mover).toBe("bot");
     expect(by("visita").mover).toBe("person");
     expect(by("visita").moverLabel).toBe("La marca un asesor");

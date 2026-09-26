@@ -274,7 +274,8 @@ export const CRM_LABELS_ES: CrmLabels = {
     moverBot: "La mueve el bot",
     moverPerson: "La marca un asesor",
     moverBoth: "El bot o un asesor",
-    autoNew: "Cuando la persona escribe por primera vez, o cuando se carga a mano.",
+    autoNew:
+      "Cuando la abrís a mano: «Nuevo lead», o «Abrir oportunidad» desde Sin derivar. Si después el bot deriva la consulta, pasa sola a Calificado. Quien escribe al bot y no termina no llega acá: queda en Conversaciones, «Sin derivar».",
     autoQualified: "Cuando el bot deriva la consulta al equipo.",
     autoLostTemplate:
       "Cuando pide no recibir más mensajes, o tras {days} días sin actividad. Un asesor también puede marcarla, con un motivo.",

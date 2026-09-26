@@ -147,7 +147,7 @@ export const realEstate: VerticalConfig = {
         key: "nuevo",
         label: "Nuevo",
         tone: "neutral",
-        help: "Escribió o fue cargado a mano y todavía nadie del equipo habló con la persona.",
+        help: "La abrió alguien del equipo («Nuevo lead» o desde Sin derivar) y el bot todavía no derivó la consulta.",
       },
       {
         key: "calificado",
