@@ -163,7 +163,7 @@ export const architecture: VerticalConfig = {
         key: "nuevo",
         label: "Nuevo",
         tone: "neutral",
-        help: "Llegó la consulta y todavía nadie del estudio habló con la persona.",
+        help: "La abrió alguien del estudio («Nuevo lead» o desde Sin derivar) y el bot todavía no derivó la consulta.",
       },
       {
         key: "calificado",

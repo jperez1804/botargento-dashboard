@@ -35,7 +35,11 @@ export function buildStageGuide(config: CrmConfig): StageGuideRow[] {
       mover = "both";
       trigger = fillTemplate(g.autoLostTemplate, { days: config.autoLostDays });
     } else if (s.key === auto.new) {
-      mover = "bot";
+      // Outbound: a reply to the campaign opens it here, so the bot does.
+      // Inbound: every opportunity the bot opens is a handoff and is born in
+      // qualified — only a person (Nuevo lead, "Abrir oportunidad") puts one
+      // in new; a later handoff moves it on.
+      mover = config.opener === "reply" ? "bot" : "person";
       trigger = g.autoNew;
     } else if (s.key === auto.qualified) {
       mover = "bot";
