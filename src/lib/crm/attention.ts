@@ -71,7 +71,7 @@ export function leadAttention(
   switch (kind) {
     case "overdue":
       text = withNote(
-        fillTemplate(labels.attentionOverdueTemplate, { relative: formatRelative(rem!.at, now, locale) }),
+        fillTemplate(labels.attentionOverdueTemplate, { relative: formatRelative(rem!.at, now, locale, timezone) }),
       );
       break;
     case "today":
@@ -82,7 +82,7 @@ export function leadAttention(
       break;
     case "upcoming":
       text = withNote(
-        fillTemplate(labels.attentionUpcomingTemplate, { relative: formatRelative(rem!.at, now, locale) }),
+        fillTemplate(labels.attentionUpcomingTemplate, { relative: formatRelative(rem!.at, now, locale, timezone) }),
       );
       break;
     case "lost": {

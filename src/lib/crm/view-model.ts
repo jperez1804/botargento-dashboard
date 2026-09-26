@@ -45,11 +45,32 @@ export function formatDayTime(date: Date, locale: string, timezone: string): str
 }
 
 /**
+ * Whole calendar days from `now` to `date` in the tenant's timezone. A
+ * reminder for tomorrow 09:00 looked at tonight is "mañana" even though it is
+ * nine hours away — rounding elapsed hours said "hoy", which is wrong on the
+ * card and made the e2e suite flaky late in the UTC day.
+ */
+export function calendarDaysBetween(date: Date, now: Date, timezone: string): number {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const utcMidnight = (d: Date) => {
+    const parts = fmt.formatToParts(d);
+    const num = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+    return Date.UTC(num("year"), num("month") - 1, num("day"));
+  };
+  return Math.round((utcMidnight(date) - utcMidnight(now)) / 86_400_000);
+}
+
+/**
  * "hoy" / "ayer" / "hace 3 días" / "hace 2 meses". Used on the board cards,
  * where an exact timestamp is noise; the list keeps the precise date.
  */
-export function formatRelative(date: Date, now: Date, locale: string): string {
-  const days = Math.round((date.getTime() - now.getTime()) / 86_400_000);
+export function formatRelative(date: Date, now: Date, locale: string, timezone: string): string {
+  const days = calendarDaysBetween(date, now, timezone);
   // Days read better as words ("hoy", "ayer"); months and years don't — "el
   // mes pasado" is vaguer than "hace 1 mes" on a card you scan.
   if (Math.abs(days) < 30) {
@@ -156,7 +177,7 @@ export function buildLeadView(
   let reminder: LeadView["reminder"] = null;
   if (lead.reminder) {
     const when = formatDayTime(lead.reminder.at, locale, timezone);
-    const relative = formatRelative(lead.reminder.at, now, locale);
+    const relative = formatRelative(lead.reminder.at, now, locale, timezone);
     reminder = {
       atIso: lead.reminder.at.toISOString(),
       note: lead.reminder.note,
@@ -191,7 +212,7 @@ export function buildLeadView(
       ? formatDayTime(lead.lastActivityAt, locale, timezone)
       : "—",
     lastActivityRelative: lead.lastActivityAt
-      ? formatRelative(lead.lastActivityAt, now, locale)
+      ? formatRelative(lead.lastActivityAt, now, locale, timezone)
       : "—",
     budgetText: formatBudget(budget, locale),
     daysInStageText: daysInStage(lead.stageSince, now, labels),

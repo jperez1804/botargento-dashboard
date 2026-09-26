@@ -4,6 +4,7 @@ import {
   buildLeadView,
   fillTemplate,
   formatBudget,
+  calendarDaysBetween,
   formatRelative,
   sumBudgets,
 } from "@/lib/crm/view-model";
@@ -38,20 +39,37 @@ describe("fillTemplate", () => {
 });
 
 describe("formatRelative", () => {
+  const TZ = "America/Argentina/Buenos_Aires";
   const now = new Date("2026-09-19T15:00:00Z");
   const ago = (days: number) => new Date(now.getTime() - days * 86_400_000);
 
   it("says hoy / ayer / hace N días for the recent past", () => {
-    expect(formatRelative(ago(0), now, "es-AR")).toBe("hoy");
-    expect(formatRelative(ago(1), now, "es-AR")).toBe("ayer");
-    expect(formatRelative(ago(3), now, "es-AR")).toBe("hace 3 días");
-    expect(formatRelative(ago(29), now, "es-AR")).toBe("hace 29 días");
+    expect(formatRelative(ago(0), now, "es-AR", TZ)).toBe("hoy");
+    expect(formatRelative(ago(1), now, "es-AR", TZ)).toBe("ayer");
+    expect(formatRelative(ago(3), now, "es-AR", TZ)).toBe("hace 3 días");
+    expect(formatRelative(ago(29), now, "es-AR", TZ)).toBe("hace 29 días");
   });
 
   it("switches to months past 30 days", () => {
-    expect(formatRelative(ago(45), now, "es-AR")).toBe("hace 1 mes");
-    expect(formatRelative(ago(75), now, "es-AR")).toBe("hace 2 meses");
-    expect(formatRelative(ago(400), now, "es-AR")).toBe("hace 1 año");
+    expect(formatRelative(ago(45), now, "es-AR", TZ)).toBe("hace 1 mes");
+    expect(formatRelative(ago(75), now, "es-AR", TZ)).toBe("hace 2 meses");
+    expect(formatRelative(ago(400), now, "es-AR", TZ)).toBe("hace 1 año");
+  });
+
+  it("counts calendar days in the tenant timezone, not elapsed hours", () => {
+    // 20:44 in Buenos Aires; the reminder is tomorrow 06:00 local — nine hours away.
+    const tonight = new Date("2026-09-25T23:44:00Z");
+    const tomorrowMorning = new Date("2026-09-26T09:00:00Z");
+    expect(formatRelative(tomorrowMorning, tonight, "es-AR", TZ)).toBe("mañana");
+    // Two hours later, same local day.
+    expect(formatRelative(new Date("2026-09-26T01:00:00Z"), tonight, "es-AR", TZ)).toBe("hoy");
+    // 02:30Z is still the 25th in Buenos Aires but already the 26th in UTC:
+    // the timezone decides which day it is.
+    const lateEvening = new Date("2026-09-26T02:30:00Z");
+    expect(calendarDaysBetween(lateEvening, tonight, TZ)).toBe(0);
+    expect(calendarDaysBetween(lateEvening, tonight, "UTC")).toBe(1);
+    // 40 hours ahead crossing two midnights is "pasado mañana", not "mañana".
+    expect(calendarDaysBetween(new Date("2026-09-27T15:44:00Z"), tonight, TZ)).toBe(2);
   });
 });
 
