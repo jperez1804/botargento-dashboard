@@ -17,9 +17,24 @@ type Props = {
   locale: string;
   timezone: string;
   canEdit: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
+  buildPageHref: (page: number) => string;
 };
 
-export function UnderivedTable({ rows, config, intents, locale, timezone, canEdit }: Props) {
+export function UnderivedTable({
+  rows,
+  config,
+  intents,
+  locale,
+  timezone,
+  canEdit,
+  page,
+  pageSize,
+  total,
+  buildPageHref,
+}: Props) {
   const labels = config.labels;
   const columns: ReadonlyArray<DataTableColumn<UnderivedConversation>> = [
     {
@@ -39,14 +54,16 @@ export function UnderivedTable({ rows, config, intents, locale, timezone, canEdi
       id: "kind",
       header: labels.opportunity.kindLabel,
       width: "minmax(0, 0.8fr)",
-      cell: (r) => (
-        <span
-          data-testid="underived-kind"
-          className="inline-flex h-[22px] items-center rounded-full bg-[var(--info-soft)] px-2 text-[11.5px] font-medium text-[color-mix(in_oklch,var(--info)_75%,var(--ink))]"
-        >
-          {leadIntent(r.kind, intents)?.label ?? r.kind}
-        </span>
-      ),
+      // Reply mode has no rubro for a conversation; an empty pill reads as a glitch.
+      cell: (r) =>
+        r.kind === "" ? null : (
+          <span
+            data-testid="underived-kind"
+            className="inline-flex h-[22px] items-center rounded-full bg-[var(--info-soft)] px-2 text-[11.5px] font-medium text-[color-mix(in_oklch,var(--info)_75%,var(--ink))]"
+          >
+            {leadIntent(r.kind, intents)?.label ?? r.kind}
+          </span>
+        ),
     },
     {
       id: "last",
@@ -86,6 +103,14 @@ export function UnderivedTable({ rows, config, intents, locale, timezone, canEdi
         title: labels.opportunity.underivedEmpty,
       }}
       minWidth={760}
+      pagination={{
+        page,
+        pageSize,
+        total,
+        buildPageHref,
+        locale,
+        rowsLabel: { singular: "conversación", plural: "conversaciones" },
+      }}
     />
   );
 }

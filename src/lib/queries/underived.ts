@@ -47,6 +47,7 @@ async function selectHandoffMode(
   config: CrmConfig,
   days: number | null,
   limit: number | null,
+  offset: number,
 ): Promise<Record<string, unknown>[]> {
   const map = await getIntentMap(new Date(), config);
   if (map.raws.length === 0) return [];
@@ -73,8 +74,9 @@ async function selectHandoffMode(
         AND e.escalation_type <> ALL(${[...NON_BUSINESS_ESCALATION_TYPES]}::text[])
         ${days ? sql`AND e.escalation_timestamp >= NOW() - ${`${days} days`}::interval` : sql``}
     )
-    ORDER BY r.log_timestamp DESC
+    ORDER BY r.log_timestamp DESC, r.contact_wa_id
     ${limit ? sql`LIMIT ${limit}` : sql``}
+    ${offset ? sql`OFFSET ${offset}` : sql``}
   `;
 }
 
@@ -84,6 +86,7 @@ async function selectHandoffMode(
 async function selectReplyMode(
   days: number | null,
   limit: number | null,
+  offset: number,
 ): Promise<Record<string, unknown>[]> {
   return sql<Record<string, unknown>[]>`
     WITH recent AS (${recent(days)})
@@ -96,8 +99,9 @@ async function selectReplyMode(
     WHERE NOT EXISTS (
       SELECT 1 FROM dashboard.opportunities o WHERE o.contact_wa_id = r.contact_wa_id
     )
-    ORDER BY r.log_timestamp DESC
+    ORDER BY r.log_timestamp DESC, r.contact_wa_id
     ${limit ? sql`LIMIT ${limit}` : sql``}
+    ${offset ? sql`OFFSET ${offset}` : sql``}
   `;
 }
 
@@ -105,10 +109,11 @@ async function select(
   config: CrmConfig,
   days: number | null,
   limit: number | null,
+  offset = 0,
 ): Promise<UnderivedConversation[]> {
   const rows = isReplyOpener(config)
-    ? await selectReplyMode(days, limit)
-    : await selectHandoffMode(config, days, limit);
+    ? await selectReplyMode(days, limit, offset)
+    : await selectHandoffMode(config, days, limit, offset);
   return rows.map((r) => ({
     contactWaId: String(r.contact_wa_id),
     displayName: String(r.display_name),
@@ -117,14 +122,17 @@ async function select(
   }));
 }
 
+// One page of the list. The total is countUnderived(): a chip that counted
+// the rows of a capped list said "50 sin derivar" on ventas while the board,
+// counting everything, said 154.
 export function listUnderivedConversations(
   config: CrmConfig,
-  opts: { days?: number; limit?: number } = {},
+  opts: { days?: number; limit?: number; offset?: number } = {},
 ): Promise<UnderivedConversation[]> {
-  return select(config, opts.days ?? null, opts.limit ?? 50);
+  return select(config, opts.days ?? null, opts.limit ?? 50, opts.offset ?? 0);
 }
 
-/** How many are waiting — the pill above the board. Cached for a minute. */
+/** How many are waiting — the pill above the board and the Conversaciones chip. Cached for a minute. */
 export async function countUnderived(config: CrmConfig, now: Date = new Date()): Promise<number> {
   if (countCache && now.getTime() - countCache.at < TTL_MS) return countCache.value;
   const rows = await select(config, null, null);
