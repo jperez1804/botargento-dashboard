@@ -180,6 +180,7 @@ changing anything here, and update it in the same PR when a rule moves.**
 
 1. **The dashboard never writes to `automation.*`.** DB role `dashboard_app` has `SELECT`-only on that schema. Any attempt to `INSERT`/`UPDATE`/`DELETE` there is a bug.
 2. **Features that a tenant buys are gated by the tenant, not only by the vertical.** The inbox, the campaign actions and the CRM each need a vertical capability AND a tenant env (`N8N_INBOX_*`, `N8N_CAMPAIGN_*`, `CRM_ENABLED`). One image serves five tenants; a vertical-only gate would light a paid feature up on the ones that did not buy it.
+   - **A vertical that declares `crm.kinds` has strict rubros.** Only those rubros open opportunities or count as "Sin derivar" (`crmKindOf`, `src/lib/crm/intent.ts`); anything else — supplier intakes, bot noise — is not a rubro. Without `kinds` an unknown token still falls into "Otras" (real-estate).
 3. **And n8n writes exactly one column of `dashboard.*`:** `opportunities.next_action_notified_at`, to record that a reminder's WhatsApp notice went out (`migrations/0011_n8n_reminder_grants.sql`, `docs/crm-oportunidades.md`). Anything else in `dashboard.*` written from outside the panel is a bug.
 4. **No hardcoded Spanish strings in JSX.** All UI text comes from `verticalConfig` or `tenantConfig`.
 5. **No `process.env.X` in feature code.** Read through validated config modules.

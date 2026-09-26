@@ -32,7 +32,7 @@
 import { sql } from "@/db/client";
 import type { CrmConfig } from "@/config/verticals/_types";
 import { crmSince } from "@/lib/crm/enabled";
-import { crmKinds, leadIntentForTenant } from "@/lib/crm/intent";
+import { crmKindOf, crmKinds } from "@/lib/crm/intent";
 import { hasOutreachRecipients, hasOutreachSuppression, hasSessionMemory } from "@/lib/crm/probes";
 import { NON_BUSINESS_ESCALATION_TYPES } from "@/lib/queries/handoffs";
 import { logger } from "@/lib/logger";
@@ -79,7 +79,8 @@ export async function getIntentMap(now: Date = new Date(), config?: CrmConfig | 
   const raws: string[] = [];
   const kinds: string[] = [];
   for (const { raw } of rows) {
-    const kind = leadIntentForTenant(raw)?.key;
+    // Strict when the vertical declares its rubros: see crmKindOf.
+    const kind = crmKindOf(raw, config)?.key;
     if (!kind) continue; // "menu" and friends: not a rubro
     raws.push(raw);
     kinds.push(kind);

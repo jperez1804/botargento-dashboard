@@ -28,12 +28,36 @@ export function crmKinds(
 
 /** Pure: `intents` is the vertical's list. null when there is no usable intent. */
 export function leadIntent(raw: string | null | undefined, intents: ReadonlyArray<IntentDef>): LeadIntent | null {
+  // A raw token that IS one of the rubro keys ("proyecto_lead") needs no label
+  // round-trip — which also keeps this independent of the running tenant.
+  const exact = raw ? intents.find((i) => i.key.toLowerCase() === raw.toLowerCase()) : undefined;
+  if (exact) return { key: exact.key, label: exact.label };
   const label = formatBusinessIntentLabel(raw);
   if (!label) return null;
   const def =
     intents.find((i) => i.label.toLowerCase() === label.toLowerCase()) ??
     intents.find((i) => i.key.toLowerCase() === label.toLowerCase());
   return def ? { key: def.key, label: def.label } : { key: label, label };
+}
+
+/**
+ * The CRM rubro of a raw bot token, or null when it has none. A vertical that
+ * declares its own `crm.kinds` is STRICT: a token that does not resolve to one
+ * of them is not a rubro at all, so it opens nothing and does not count as
+ * "Sin derivar". That is what keeps an architecture studio's supplier and
+ * job-seeker intakes, and the bot's "unsupported_content" noise, off the board.
+ * Without `kinds` (real-estate) the old behaviour stays: an unknown token is
+ * "Otras".
+ */
+export function crmKindOf(
+  raw: string | null | undefined,
+  config?: CrmConfig | null,
+  intents?: ReadonlyArray<IntentDef>,
+): LeadIntent | null {
+  const kind = leadIntent(raw, crmKinds(config, intents));
+  if (!kind) return null;
+  if (config?.kinds && !config.kinds.some((k) => k.key === kind.key)) return null;
+  return kind;
 }
 
 /** Same, against the running tenant's CRM rubros. */

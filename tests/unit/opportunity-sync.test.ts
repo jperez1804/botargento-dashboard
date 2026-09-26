@@ -267,6 +267,47 @@ maybe("opportunity sync", () => {
     });
   });
 
+  describe("strict rubros (architecture)", () => {
+    let arch: NonNullable<typeof import("@/config/verticals/architecture").architecture.crm>;
+    const runArch = () => sync.syncOpportunities(arch, [WA]);
+
+    beforeAll(async () => {
+      arch = (await import("@/config/verticals/architecture")).architecture.crm!;
+    });
+    beforeEach(async () => {
+      await clean();
+      sync.invalidateIntentMap();
+    });
+    afterAll(() => sync.invalidateIntentMap());
+
+    it("opens one for a commercial handoff, with its rubro", async () => {
+      await message("proyecto_lead", 40);
+      await handoff("proyecto_lead", 30);
+      await runArch();
+      expect((await opportunities()).map((r) => r.kind)).toEqual(["proyecto_lead"]);
+    });
+
+    it("opens nothing for a supplier or job-seeker intake, nor for bot noise", async () => {
+      await message("proveedor_intake", 50);
+      await handoff("proveedor_intake", 40);
+      await handoff("mano_obra_intake", 30);
+      await message("unsupported_content", 20);
+      await runArch();
+      expect(await opportunities()).toHaveLength(0);
+      const { listUnderivedConversations } = await import("@/lib/queries/underived");
+      const underived = await listUnderivedConversations(arch, { limit: 1000 });
+      expect(underived.some((u) => u.contactWaId === WA)).toBe(false);
+    });
+
+    it("still lists a stalled commercial conversation under Sin derivar", async () => {
+      await message("gestiones_lead", 20);
+      await runArch();
+      const { listUnderivedConversations } = await import("@/lib/queries/underived");
+      const underived = await listUnderivedConversations(arch, { limit: 1000 });
+      expect(underived.find((u) => u.contactWaId === WA)?.kind).toBe("gestiones_lead");
+    });
+  });
+
   it("ignores runtime errors, which are not handoffs", async () => {
     await sql`
       INSERT INTO automation.escalations

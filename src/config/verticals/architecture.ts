@@ -1,4 +1,5 @@
 import type { VerticalConfig } from "./_types";
+import { CRM_LABELS_ES } from "./_crm-labels-es";
 
 export const architecture: VerticalConfig = {
   key: "architecture",
@@ -139,5 +140,185 @@ export const architecture: VerticalConfig = {
   features: {
     providersTab: true,
     laborPoolTab: true,
+    // Capability only — the tenant turns it on with CRM_ENABLED in dashboard.env.
+    crmTab: true,
+  },
+
+  // CRM-lite for an architecture studio (docs/crm-oportunidades.md, "Reglas
+  // por vertical"). Inbound, like real-estate: a handoff opens the opportunity.
+  // Two differences: the rubros are STRICT — only the four commercial ones, so
+  // supplier and job-seeker intakes (which have their own tabs) never land on
+  // the board — and a project cycle is long, so a lead goes stale in 45 days,
+  // not 30. Keys are persisted — don't rename.
+  crm: {
+    opener: "handoff",
+    kinds: [
+      { key: "proyecto_lead", label: "Proyecto" },
+      { key: "construccion_lead", label: "Construcción" },
+      { key: "gestiones_lead", label: "Gestiones" },
+      { key: "desarrollo_lead", label: "Desarrollos" },
+    ],
+    stages: [
+      {
+        key: "nuevo",
+        label: "Nuevo",
+        tone: "neutral",
+        help: "Llegó la consulta y todavía nadie del estudio habló con la persona.",
+      },
+      {
+        key: "calificado",
+        label: "Calificado",
+        tone: "info",
+        help: "El bot terminó la consulta y la derivó al equipo, con lo que contó la persona.",
+      },
+      {
+        key: "reunion",
+        label: "Reunión",
+        tone: "progress",
+        manualOnly: true,
+        help: "Primera reunión o visita al terreno u obra, agendada o hecha.",
+      },
+      {
+        key: "presupuesto",
+        label: "Presupuesto",
+        tone: "progress",
+        manualOnly: true,
+        help: "Se mandó la propuesta de honorarios o el presupuesto de obra.",
+      },
+      {
+        key: "cerrado",
+        label: "Cerrado",
+        tone: "good",
+        manualOnly: true,
+        terminal: true,
+        help: "Aceptó la propuesta: es cliente. Etapa final, no vence por inactividad.",
+      },
+      {
+        key: "perdido",
+        label: "Perdido",
+        tone: "bad",
+        terminal: true,
+        help: "No sigue: por inactividad o decisión del equipo. Cualquier actividad nueva lo reabre.",
+      },
+    ],
+    autoStages: { new: "nuevo", qualified: "calificado", lost: "perdido" },
+    // A project is decided over weeks: a month of silence is not yet a no.
+    autoLostDays: 45,
+    warnDays: 10,
+    currencies: ["USD", "ARS"],
+    activityStages: { meeting: "reunion", visit: "reunion" },
+    qualificationFields: [
+      {
+        source: "escalation",
+        key: "handoff_target",
+        label: "Equipo",
+        valueLabels: {
+          architect: "Arquitectura",
+          municipal: "Gestión municipal",
+          sales: "Comercial",
+          technical: "Técnico",
+          development: "Desarrollos",
+        },
+        display: "chip",
+      },
+      {
+        source: "snapshot",
+        key: "selected_flow",
+        label: "Consulta",
+        valueLabels: {
+          proyecto: "Proyecto",
+          construccion: "Construcción",
+          gestiones: "Gestiones",
+          desarrollo: "Desarrollos",
+        },
+      },
+      { source: "snapshot", key: "terreno", label: "Tiene terreno", valueLabels: { si: "Sí", no: "No", no_se: "No sabe" } },
+      { source: "snapshot", key: "zona", label: "Zona" },
+      { source: "snapshot", key: "zone", label: "Zona" },
+      {
+        source: "snapshot",
+        key: "m2",
+        label: "Superficie",
+        valueLabels: { menos_100: "Menos de 100 m²", "100_400": "100 - 400 m²", mas_400: "Más de 400 m²" },
+        display: "chip",
+      },
+      { source: "snapshot", key: "planos", label: "Tiene planos", valueLabels: { si: "Sí", no: "No", no_se: "No sabe" } },
+      {
+        source: "snapshot",
+        key: "modalidad",
+        label: "Qué necesita",
+        valueLabels: { construir: "Construir", direccion: "Dirección de obra", cotizar: "Reforma" },
+      },
+      {
+        source: "snapshot",
+        key: "tramite",
+        label: "Trámite",
+        valueLabels: {
+          permiso_obra: "Permiso de obra",
+          regularizacion: "Regularización",
+          consulta_general: "Consulta general",
+        },
+        display: "chip",
+      },
+      { source: "snapshot", key: "municipio", label: "Municipio" },
+      {
+        source: "snapshot",
+        key: "subintencion",
+        label: "Desarrollo",
+        valueLabels: {
+          invertir: "Invertir en pozo",
+          desarrollar: "Desarrollar un terreno",
+          asociarse: "Asociarse para un desarrollo",
+        },
+      },
+      {
+        source: "snapshot",
+        key: "tipo_aporte",
+        label: "Aporta",
+        valueLabels: { terreno: "Terreno", capital: "Capital", ambos: "Terreno + capital" },
+      },
+      { source: "snapshot", key: "superficie", label: "Superficie del terreno" },
+      { source: "snapshot", key: "estado_dominial", label: "Estado dominial" },
+      { source: "snapshot", key: "descripcion", label: "Descripción" },
+      { source: "escalation", key: "transcript_summary", label: "Resumen del bot", display: "summary" },
+    ],
+    manualLeadSources: [
+      { key: "telefono", label: "Teléfono" },
+      { key: "email", label: "Email" },
+      { key: "instagram", label: "Instagram" },
+      { key: "referido", label: "Referido" },
+      { key: "otro", label: "Otro" },
+    ],
+    // The shared copy, with the parts written for a real-estate agency
+    // (visits to a PH, balconies, reservations, "un alquiler y una venta")
+    // rewritten for a studio.
+    labels: {
+      ...CRM_LABELS_ES,
+      reminderNotePlaceholder: "Ej.: llamar para coordinar la visita al terreno",
+      activityPlaceholders: {
+        note: "¿Qué pasó? Ej.: mandó fotos del terreno y la medianera",
+        call: "¿Qué hablaron? Ej.: quiere arrancar el anteproyecto en octubre",
+        visit: "¿Cómo fue la visita? Ej.: terreno de 10×30, hay que regularizar lo existente",
+        meeting: "¿Qué se acordó? Ej.: le mandamos la propuesta de honorarios el lunes",
+      },
+      lostReasons: ["Eligió otro estudio", "Fuera de presupuesto", "Postergó el proyecto", "No responde", "Otro"],
+      newLeadHint:
+        "Para consultas que no llegaron por WhatsApp: alguien que llamó, escribió por mail o Instagram, o vino referido.",
+      opportunity: {
+        ...CRM_LABELS_ES.opportunity,
+        dialogHint:
+          "Para cuando la misma persona consulta por otra cosa: un proyecto y una gestión municipal se siguen por separado.",
+        titlePlaceholder: "Ej.: vivienda en Pilar, 180 m²",
+      },
+      guide: {
+        ...CRM_LABELS_ES.guide,
+        sourcesBody:
+          "Las consultas que escriben al bot llegan por WhatsApp. Las que llaman, escriben por mail o Instagram, o vienen referidas se cargan a mano con «Nuevo lead»; si después escriben, la conversación se suma al mismo lead.",
+        opportunitiesIntro:
+          "Cada tarjeta del tablero es una oportunidad: una consulta concreta, con su rubro, su etapa y su responsable. La misma persona puede tener varias — un proyecto hoy y la gestión municipal de la obra más adelante — y cada una se sigue por separado. En la ficha del contacto están todas, numeradas por orden de apertura.",
+        opportunitiesKind:
+          "El rubro lo pone el bot según la consulta que derivó: Proyecto, Construcción, Gestiones o Desarrollos. Los proveedores y la mano de obra no abren oportunidades: tienen sus propias pestañas. Si el rubro está mal, lo corregís desde la ficha.",
+      },
+    },
   },
 };
