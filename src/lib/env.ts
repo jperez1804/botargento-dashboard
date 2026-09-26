@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// "" is what docker-compose passes for an interpolated variable nobody set.
+const blankToUndefined = (v: unknown) => (v === "" ? undefined : v);
+
 const schema = z.object({
   // Database
   TENANT_DB_URL: z.string().min(1, "TENANT_DB_URL is required"),
@@ -28,11 +31,17 @@ const schema = z.object({
   // flag; absence keeps the shared image from surfacing Leads on tenants that
   // did not buy it). CRM_SINCE: replies/handoffs before this instant do not
   // open opportunities on their own — "solo de acá en adelante".
-  CRM_ENABLED: z.enum(["1", "true", "0", "false"]).optional(),
-  CRM_SINCE: z
-    .string()
-    .refine((v) => !Number.isNaN(Date.parse(v)), "CRM_SINCE must be an ISO date")
-    .optional(),
+  // A compose file that names the variable (CRM_ENABLED: "${CRM_ENABLED}")
+  // while the tenant .env does not set it interpolates to "" — which must read
+  // as "absent", or that tenant fails at boot. Hence the preprocess.
+  CRM_ENABLED: z.preprocess(blankToUndefined, z.enum(["1", "true", "0", "false"]).optional()),
+  CRM_SINCE: z.preprocess(
+    blankToUndefined,
+    z
+      .string()
+      .refine((v) => !Number.isNaN(Date.parse(v)), "CRM_SINCE must be an ISO date")
+      .optional(),
+  ),
 
   // Two-way inbox (optional — only tenants whose n8n has the inbox webhook set
   // these; absence disables the /inbox tab even when the vertical allows it).
