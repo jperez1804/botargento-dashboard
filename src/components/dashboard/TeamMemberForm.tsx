@@ -88,111 +88,119 @@ export function TeamMemberForm({ member, isSelf = false }: Props) {
     }
   }
 
+  // One grid for every row, so the columns line up across people: the action
+  // column has a fixed width (the self row has no "quitar" button) and every
+  // column starts with its caption, so the inputs sit on one line even when
+  // WhatsApp grows a preview and a checkbox underneath.
   return (
-    <div
-      data-team-member={member?.email ?? "new"}
-      className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end"
-    >
-      <div className="space-y-1.5 min-w-0">
-        {isNew ? (
-          <>
-            <label htmlFor={`${idBase}-email`} className={LEAD_CAPTION_CLASS}>{L.emailLabel}</label>
-            <input
-              id={`${idBase}-email`}
-              type="email"
-              value={draft.email}
-              disabled={busy}
-              onChange={(e) => set("email", e.target.value)}
-              className={LEAD_FIELD_CLASS}
-            />
-          </>
-        ) : (
-          <p className="text-[13.5px] font-medium text-[var(--ink)] truncate">
-            {draft.email}
-            {isSelf ? <span className="ml-1.5 text-[12px] font-normal text-[var(--soft-ink)]">({L.you})</span> : null}
-          </p>
-        )}
-        <label htmlFor={`${idBase}-name`} className="sr-only">{L.nameLabel}</label>
-        <input
-          id={`${idBase}-name`}
-          value={draft.displayName}
-          placeholder={L.namePlaceholder}
-          maxLength={80}
-          disabled={busy}
-          onChange={(e) => set("displayName", e.target.value)}
-          className={LEAD_FIELD_CLASS}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor={`${idBase}-role`} className={LEAD_CAPTION_CLASS}>{L.columnRole}</label>
-        <select
-          id={`${idBase}-role`}
-          value={draft.role}
-          disabled={busy || isSelf}
-          onChange={(e) => set("role", e.target.value as Role)}
-          className={LEAD_FIELD_CLASS}
-        >
-          {(["admin", "asesor", "viewer"] as const).map((r) => (
-            <option key={r} value={r}>{L.roles[r]}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor={`${idBase}-wa`} className={LEAD_CAPTION_CLASS}>{L.columnWhatsapp}</label>
-        <input
-          id={`${idBase}-wa`}
-          inputMode="numeric"
-          value={draft.whatsappNumber}
-          placeholder={L.whatsappPlaceholder}
-          maxLength={20}
-          disabled={busy}
-          onChange={(e) => set("whatsappNumber", e.target.value)}
-          className={cn(LEAD_FIELD_CLASS, "tabular-nums")}
-          aria-describedby={`${idBase}-wa-hint`}
-        />
-        <p
-          id={`${idBase}-wa-hint`}
-          data-testid="team-wa-preview"
-          className={cn(
-            "min-h-[1.25em] text-[12px] tabular-nums",
-            waPreview?.ok === false ? "text-[var(--danger)]" : "text-[var(--soft-ink)]",
-          )}
-        >
-          {waPreview?.ok
-            ? L.whatsappPreviewTemplate.replace("{phone}", formatLeadPhone(waPreview.waId))
-            : waPreview
-              ? L.whatsappInvalid
-              : ""}
-        </p>
-        <label className="flex items-center gap-1.5 text-[12px] text-[var(--muted-ink)]">
+    <div data-team-member={member?.email ?? "new"} className="space-y-3 px-5 py-4">
+      {isNew ? (
+        <div className="space-y-1.5 md:max-w-[360px]">
+          <label htmlFor={`${idBase}-email`} className={LEAD_CAPTION_CLASS}>{L.emailLabel}</label>
           <input
-            type="checkbox"
-            checked={draft.notifyWhatsapp}
+            id={`${idBase}-email`}
+            type="email"
+            value={draft.email}
             disabled={busy}
-            onChange={(e) => set("notifyWhatsapp", e.target.checked)}
+            onChange={(e) => set("email", e.target.value)}
+            className={LEAD_FIELD_CLASS}
           />
-          {L.notifyLabel}
-        </label>
-      </div>
+        </div>
+      ) : (
+        <p className="truncate text-[13.5px] font-medium text-[var(--ink)]">
+          {draft.email}
+          {isSelf ? <span className="ml-1.5 text-[12px] font-normal text-[var(--soft-ink)]">({L.you})</span> : null}
+        </p>
+      )}
 
-      <div className="flex items-center justify-end gap-1.5">
-        {busy ? <Loader2 className="size-4 animate-spin text-[var(--soft-ink)]" aria-hidden /> : null}
-        {!isNew && !isSelf ? (
-          confirming ? (
-            <Button type="button" size="xs" variant="destructive" autoFocus onBlur={() => setConfirming(false)} onClick={() => void remove()}>
-              {L.removeConfirm}
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_7.5rem] md:items-start">
+        <div className="min-w-0 space-y-1.5">
+          <label htmlFor={`${idBase}-name`} className={LEAD_CAPTION_CLASS}>{L.nameLabel}</label>
+          <input
+            id={`${idBase}-name`}
+            value={draft.displayName}
+            placeholder={L.namePlaceholder}
+            maxLength={80}
+            disabled={busy}
+            onChange={(e) => set("displayName", e.target.value)}
+            className={LEAD_FIELD_CLASS}
+          />
+        </div>
+
+        <div className="min-w-0 space-y-1.5">
+          <label htmlFor={`${idBase}-role`} className={LEAD_CAPTION_CLASS}>{L.columnRole}</label>
+          <select
+            id={`${idBase}-role`}
+            value={draft.role}
+            disabled={busy || isSelf}
+            onChange={(e) => set("role", e.target.value as Role)}
+            className={LEAD_FIELD_CLASS}
+          >
+            {(["admin", "asesor", "viewer"] as const).map((r) => (
+              <option key={r} value={r}>{L.roles[r]}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="min-w-0 space-y-1.5">
+          <label htmlFor={`${idBase}-wa`} className={LEAD_CAPTION_CLASS}>{L.columnWhatsapp}</label>
+          <input
+            id={`${idBase}-wa`}
+            inputMode="numeric"
+            value={draft.whatsappNumber}
+            placeholder={L.whatsappPlaceholder}
+            maxLength={20}
+            disabled={busy}
+            onChange={(e) => set("whatsappNumber", e.target.value)}
+            className={cn(LEAD_FIELD_CLASS, "tabular-nums")}
+            aria-describedby={`${idBase}-wa-hint`}
+          />
+          <p
+            id={`${idBase}-wa-hint`}
+            data-testid="team-wa-preview"
+            className={cn(
+              "min-h-[1.25em] text-[12px] tabular-nums",
+              waPreview?.ok === false ? "text-[var(--danger)]" : "text-[var(--soft-ink)]",
+            )}
+          >
+            {waPreview?.ok
+              ? L.whatsappPreviewTemplate.replace("{phone}", formatLeadPhone(waPreview.waId))
+              : waPreview
+                ? L.whatsappInvalid
+                : ""}
+          </p>
+          <label className="flex items-center gap-1.5 text-[12px] text-[var(--muted-ink)]">
+            <input
+              type="checkbox"
+              checked={draft.notifyWhatsapp}
+              disabled={busy}
+              onChange={(e) => set("notifyWhatsapp", e.target.checked)}
+            />
+            {L.notifyLabel}
+          </label>
+        </div>
+
+        <div className="space-y-1.5">
+          {/* An empty caption, so the buttons sit on the inputs' line. */}
+          <span aria-hidden className={cn(LEAD_CAPTION_CLASS, "invisible hidden md:block")}>·</span>
+          <div className="flex items-center justify-end gap-1.5">
+            {busy ? <Loader2 className="size-4 animate-spin text-[var(--soft-ink)]" aria-hidden /> : null}
+            {!isNew && !isSelf ? (
+              confirming ? (
+                <Button type="button" size="xs" variant="destructive" autoFocus onBlur={() => setConfirming(false)} onClick={() => void remove()}>
+                  {L.removeConfirm}
+                </Button>
+              ) : (
+                <Button type="button" size="xs" variant="ghost" disabled={busy} aria-label={L.remove} title={L.remove} onClick={() => setConfirming(true)}>
+                  <UserMinus className="size-3.5" aria-hidden />
+                </Button>
+              )
+            ) : null}
+            <Button type="button" size="sm" disabled={busy || !dirty || (isNew && !draft.email.trim())} onClick={() => void save()}>
+              {isNew ? L.add : L.save}
             </Button>
-          ) : (
-            <Button type="button" size="xs" variant="ghost" disabled={busy} aria-label={L.remove} title={L.remove} onClick={() => setConfirming(true)}>
-              <UserMinus className="size-3.5" aria-hidden />
-            </Button>
-          )
-        ) : null}
-        <Button type="button" size="sm" disabled={busy || !dirty || (isNew && !draft.email.trim())} onClick={() => void save()}>
-          {isNew ? L.add : L.save}
-        </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
