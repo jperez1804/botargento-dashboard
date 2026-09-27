@@ -5,15 +5,21 @@
 import { describe, expect, it } from "vitest";
 import { architecture } from "@/config/verticals/architecture";
 import { outboundSales } from "@/config/verticals/outbound-sales";
+import { outboundWholesale } from "@/config/verticals/outbound-wholesale";
 import { realEstate } from "@/config/verticals/real-estate";
 import type { CrmConfig, VerticalConfig } from "@/config/verticals/_types";
 
-const verticals: VerticalConfig[] = [realEstate, architecture, outboundSales];
+const verticals: VerticalConfig[] = [realEstate, architecture, outboundSales, outboundWholesale];
 const withCrm = verticals.filter((v): v is VerticalConfig & { crm: CrmConfig } => Boolean(v.crm));
 
 describe("CRM config invariants", () => {
-  it("is declared on real-estate, architecture and outbound-sales", () => {
-    expect(withCrm.map((v) => v.key).sort()).toEqual(["architecture", "outbound-sales", "real-estate"]);
+  it("is declared on every vertical that sells", () => {
+    expect(withCrm.map((v) => v.key).sort()).toEqual([
+      "architecture",
+      "outbound-sales",
+      "outbound-wholesale",
+      "real-estate",
+    ]);
     for (const v of withCrm) expect(v.features?.crmTab).toBe(true);
   });
 
@@ -57,6 +63,13 @@ describe("CRM config invariants", () => {
       const kindKeys = crm.kinds.map((k) => k.key);
       expect(new Set(kindKeys).size).toBe(kindKeys.length);
       for (const kind of Object.values(crm.kindFromCampaign ?? {})) expect(kindKeys).toContain(kind);
+      if (crm.kindAfterWon) expect(kindKeys).toContain(crm.kindAfterWon);
+    });
+
+    it("only re-kinds a returning customer on a reply opener that can win", () => {
+      if (!crm.kindAfterWon) return;
+      expect(crm.opener).toBe("reply");
+      expect(crm.stages.some((s) => s.terminal && s.key !== crm.autoStages.lost)).toBe(true);
     });
 
     it("only asks for a campaign rubro when a reply is what opens", () => {

@@ -106,7 +106,9 @@ const idFilter = (waIds?: ReadonlyArray<string>) =>
  * they are (outreach.recipients.vertical through crm.kindFromCampaign; the
  * latest send wins, because one number can sit in two campaigns); failing
  * that, what they answered the wizard (session snapshot `rubro`, only if it is
- * one of our kinds); failing that, '' — blank, to be filled by hand.
+ * one of our kinds); failing that, '' — blank, to be filled by hand. Ahead of
+ * all of those, with crm.kindAfterWon: somebody who already has an opportunity
+ * closed as won is a returning customer, and gets that rubro.
  *
  * Both sources are probed by the caller: an outbound tenant without
  * session_memory, or a fresh one without the outreach schema yet, degrades to
@@ -119,6 +121,17 @@ function personKindCtes(config: CrmConfig, recipients: boolean, snapshot: boolea
   const fromKeys = Object.keys(map);
   const toKinds = fromKeys.map((k) => map[k]!);
   const kindKeys = crmKinds(config).map((k) => k.key);
+  // Terminal stages other than the lost one: the ones a deal is won in.
+  const wonStages = config.stages
+    .filter((s) => s.terminal && s.key !== config.autoStages.lost)
+    .map((s) => s.key);
+  const afterWon =
+    config.kindAfterWon && wonStages.length > 0
+      ? sql`
+          SELECT DISTINCT o.contact_wa_id, ${config.kindAfterWon}::text AS kind
+          FROM dashboard.opportunities o
+          WHERE o.closed_at IS NOT NULL AND o.stage = ANY(${wonStages}::text[])`
+      : sql`SELECT NULL::text AS contact_wa_id, NULL::text AS kind WHERE false`;
 
   const campaign = recipients
     ? sql`
@@ -139,11 +152,13 @@ function personKindCtes(config: CrmConfig, recipients: boolean, snapshot: boolea
     : sql`SELECT NULL::text AS contact_wa_id, NULL::text AS kind WHERE false`;
 
   return sql`
+    won_kind AS (${afterWon}),
     campaign_kind AS (${campaign}),
     snapshot_kind AS (${snap}),
     person_kind AS (
       SELECT p.contact_wa_id,
              COALESCE(
+               (SELECT wk.kind FROM won_kind wk WHERE wk.contact_wa_id = p.contact_wa_id LIMIT 1),
                (SELECT ck.kind FROM campaign_kind ck WHERE ck.contact_wa_id = p.contact_wa_id LIMIT 1),
                (SELECT sk.kind FROM snapshot_kind sk WHERE sk.contact_wa_id = p.contact_wa_id LIMIT 1),
                ''

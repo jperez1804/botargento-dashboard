@@ -504,6 +504,11 @@ export type CrmConfig = {
   // With opener "reply": outreach.recipients.vertical → a key of `kinds`.
   // Unmapped values leave the rubro blank, to be filled by hand.
   kindFromCampaign?: Readonly<Record<string, string>>;
+  // With opener "reply": the rubro of an opportunity opened for somebody who
+  // already has one closed as WON (a terminal stage that is not autoStages.lost).
+  // A wholesale customer who bought and writes again is re-ordering, not a new
+  // prospect. A key of `kinds`. Default: the person's usual rubro.
+  kindAfterWon?: string;
   labels: CrmLabels;
 };
 
