@@ -92,9 +92,8 @@ export const outboundSales: VerticalConfig = {
     inboxTab: true,
     // Capability only — the tenant turns it on with CRM_ENABLED in dashboard.env.
     // Two tenants run this vertical (ventas, arka; tasty moved to
-    // outbound-wholesale, which spreads this one) and only ventas
-    // bought the CRM; without the tenant key the shared image would light it
-    // up on all three.
+    // outbound-wholesale, which spreads this one) and only ventas bought the
+    // CRM; without the tenant key the shared image would light it up on arka.
     crmTab: true,
   },
 
