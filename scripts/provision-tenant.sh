@@ -134,7 +134,7 @@ fi
 read -rp "→ VERTICAL [real-estate]: " VERTICAL
 VERTICAL="${VERTICAL:-real-estate}"
 if ! [[ "$VERTICAL" =~ ^[a-z0-9-]+$ ]]; then
-  echo "✗ VERTICAL must be lowercase-kebab (e.g. real-estate, architecture)"; exit 1
+  echo "✗ VERTICAL must be lowercase-kebab (real-estate, architecture, outbound-sales, outbound-wholesale)"; exit 1
 fi
 
 read -rp "→ AUTH_EMAIL_FROM [no-reply@botargento.com.ar]: " AUTH_EMAIL_FROM

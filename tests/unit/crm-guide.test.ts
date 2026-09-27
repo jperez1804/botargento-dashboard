@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { realEstate } from "@/config/verticals/real-estate";
 import { outboundSales } from "@/config/verticals/outbound-sales";
+import { outboundWholesale } from "@/config/verticals/outbound-wholesale";
 import { buildGuideRules, buildStageGuide } from "@/lib/crm/guide";
 
 const config = realEstate.crm!;
@@ -14,6 +15,17 @@ describe("buildStageGuide — outbound sales", () => {
   });
 
   it("explains Nuevo as a reply to a campaign, not as somebody writing first", () => {
+    expect(rows.find((r) => r.key === "nuevo")?.trigger).toMatch(/campaña/i);
+  });
+});
+
+describe("buildStageGuide — wholesale", () => {
+  const rows = buildStageGuide(outboundWholesale.crm!);
+
+  it("walks an order from the reply to the delivery", () => {
+    expect(rows.map((r) => r.key)).toEqual(["nuevo", "calificado", "cotizado", "pedido", "cerrado", "perdido"]);
+    // A reply opens it, so the bot puts it in Nuevo; the rest is the seller's.
+    expect(rows.map((r) => r.mover)).toEqual(["bot", "bot", "person", "person", "person", "both"]);
     expect(rows.find((r) => r.key === "nuevo")?.trigger).toMatch(/campaña/i);
   });
 });

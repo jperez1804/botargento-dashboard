@@ -69,23 +69,23 @@ qué cambia en ventas (nosotros escribimos, la campaña ya calificó, la respues
 ### Reglas por vertical
 
 Lo que sigue es lo único que cambia entre los verticales: dos de entrada (inmobiliaria, estudio de
-arquitectura) y uno de salida (ventas). Todo lo demás —N oportunidades por persona, claves foráneas,
+arquitectura) y dos de salida (ventas, y el mayorista que le vende a comercios). Todo lo demás —N oportunidades por persona, claves foráneas,
 sincronización en lectura, inactividad reversible, opt-out que gana siempre, el aviso al
-responsable, n8n que escribe una sola columna— es común. Decidido con Jonatan el 25-09 (ventas) y
-el 26-09 (estudio).
+responsable, n8n que escribe una sola columna— es común. Decidido con Jonatan el 25-09 (ventas),
+el 26-09 (estudio) y el 27-09 (mayorista).
 
-| | Inmobiliaria (`real-estate`) | Ventas (`outbound-sales`) | Estudio (`architecture`) |
-|---|---|---|---|
-| **Quién habla primero** | La persona | Nosotros, con una plantilla de campaña | La persona |
-| **5. Qué abre una oportunidad** (`crm.opener`) | `"handoff"`: una derivación del bot, de un rubro sin abierta | `"reply"`: **la respuesta a la campaña**. La campaña ya es la calificación; el evento escaso es que contesten. Nace en Nuevo. La derivación (demo, precio, pregunta) la empuja a Calificado | `"handoff"`, como inmobiliaria |
-| **6–7. Segundo evento** | Derivación del mismo rubro → cuenta para la abierta; un mensaje solo no abre | Una segunda respuesta → cuenta para la abierta. Una respuesta después de cerrada → abre otra | Como inmobiliaria |
-| **8. Sin derivar** | Escribió y nunca derivó → sin oportunidad, en Conversaciones | Respondió **antes de `CRM_SINCE`**, o nada pudo abrirse → sin oportunidad, en Conversaciones. La derivación no la excluye: es la historia que el equipo puede levantar a mano | Como inmobiliaria, pero solo cuentan los mensajes de los cuatro rubros comerciales |
-| **11. Etapas** | Nuevo → Calificado → Visita → Reserva → Cerrado / Perdido | Nuevo → Calificado → **Demo → Propuesta** → Cerrado / Perdido | Nuevo → Calificado → **Reunión → Presupuesto** → Cerrado / Perdido |
-| **13. De dónde sale el rubro** (`crm.kinds`, `crm.kindFromCampaign`) | De la derivación: `escalations.intent` mapeado a los intents del vertical | **Del prospecto**: `outreach.recipients.vertical` de la última campaña que le escribió, mapeado por `kindFromCampaign`; si no, lo que contestó al wizard (`session_memory…rubro`); si no, vacío y editable. La derivación de ventas es de un solo sabor y no distingue nada | De la derivación, como inmobiliaria, pero **estricto**: `crm.kinds` declara Proyecto, Construcción, Gestiones y Desarrollos, y un token que no resuelve a uno de ellos no es rubro (proveedores, mano de obra, `unsupported_content`) |
-| **14. Inactividad** | 30 días, aviso a los 7 | **14 días, aviso a los 3** | **45 días, aviso a los 10** |
-| **Origen** (`contacts.source`) | `whatsapp` o una fuente manual | `campaign` si el número está en `outreach.recipients`, `whatsapp` si escribió por su cuenta, o manual | `whatsapp` o manual (teléfono, email, Instagram, referido) |
-| **Nombre** | Lo que tipeó un asesor > `lead_name` > perfil de WhatsApp | Lo que tipeó un asesor > **`recipients.business_name`** > `lead_name` > perfil | Como inmobiliaria |
-| **«Consulta nueva»** (regla 7) | Sí: un mensaje de otro rubro lo sugiere | No: los mensajes no tienen rubro | Sí, solo para los cuatro rubros |
+| | Inmobiliaria (`real-estate`) | Ventas (`outbound-sales`) | Estudio (`architecture`) | Mayorista (`outbound-wholesale`) |
+|---|---|---|---|---|
+| **Quién habla primero** | La persona | Nosotros, con una plantilla de campaña | La persona | Nosotros, con una plantilla de campaña a comercios |
+| **5. Qué abre una oportunidad** (`crm.opener`) | `"handoff"`: una derivación del bot, de un rubro sin abierta | `"reply"`: **la respuesta a la campaña**. La campaña ya es la calificación; el evento escaso es que contesten. Nace en Nuevo. La derivación (demo, precio, pregunta) la empuja a Calificado | `"handoff"`, como inmobiliaria | `"reply"`, como ventas: la respuesta abre en Nuevo; la derivación al vendedor la pasa a Calificado |
+| **6–7. Segundo evento** | Derivación del mismo rubro → cuenta para la abierta; un mensaje solo no abre | Una segunda respuesta → cuenta para la abierta. Una respuesta después de cerrada → abre otra | Como inmobiliaria | Como ventas |
+| **8. Sin derivar** | Escribió y nunca derivó → sin oportunidad, en Conversaciones | Respondió **antes de `CRM_SINCE`**, o nada pudo abrirse → sin oportunidad, en Conversaciones. La derivación no la excluye: es la historia que el equipo puede levantar a mano | Como inmobiliaria, pero solo cuentan los mensajes de los cuatro rubros comerciales | Como ventas |
+| **11. Etapas** | Nuevo → Calificado → Visita → Reserva → Cerrado / Perdido | Nuevo → Calificado → **Demo → Propuesta** → Cerrado / Perdido | Nuevo → Calificado → **Reunión → Presupuesto** → Cerrado / Perdido | Nuevo → Calificado → **Cotizado → Pedido** → Cerrado (entregado) / Perdido |
+| **13. De dónde sale el rubro** (`crm.kinds`, `crm.kindFromCampaign`) | De la derivación: `escalations.intent` mapeado a los intents del vertical | **Del prospecto**: `outreach.recipients.vertical` de la última campaña que le escribió, mapeado por `kindFromCampaign`; si no, lo que contestó al wizard (`session_memory…rubro`); si no, vacío y editable. La derivación de ventas es de un solo sabor y no distingue nada | De la derivación, como inmobiliaria, pero **estricto**: `crm.kinds` declara Proyecto, Construcción, Gestiones y Desarrollos, y un token que no resuelve a uno de ellos no es rubro (proveedores, mano de obra, `unsupported_content`) | **Del momento del cliente**: todas las campañas van a growshops, así que `kindFromCampaign` da «Pack de apertura»; si la persona ya tiene una oportunidad **cerrada ganada**, la nueva es «Reposición» (`crm.kindAfterWon`) |
+| **14. Inactividad** | 30 días, aviso a los 7 | **14 días, aviso a los 3** | **45 días, aviso a los 10** | **21 días, aviso a los 5** |
+| **Origen** (`contacts.source`) | `whatsapp` o una fuente manual | `campaign` si el número está en `outreach.recipients`, `whatsapp` si escribió por su cuenta, o manual | `whatsapp` o manual (teléfono, email, Instagram, referido) | Como ventas, más manuales: Instagram, tienda online, referido, feria |
+| **Nombre** | Lo que tipeó un asesor > `lead_name` > perfil de WhatsApp | Lo que tipeó un asesor > **`recipients.business_name`** > `lead_name` > perfil | Como inmobiliaria | Como ventas |
+| **«Consulta nueva»** (regla 7) | Sí: un mensaje de otro rubro lo sugiere | No: los mensajes no tienen rubro | Sí, solo para los cuatro rubros | No |
 
 **`CRM_SINCE`** es una variable del tenant, no del vertical: cualquier tenant que active el CRM con
 historia atrás puede fijarla para arrancar con el tablero vacío. client1 no la tiene (todo lo que
@@ -106,6 +106,11 @@ esos rubros abren oportunidades y cuentan en «Sin derivar» (`crmKindOf` en `sr
 Sin `kinds` (inmobiliaria) sigue la regla vieja: un token desconocido cae en «Otras». Se decidió así
 porque Plec tiene pestañas propias para proveedores y mano de obra, y su `lead_log` trae cientos de
 `unsupported_content` que llenarían «Sin derivar» de ruido.
+
+**Reposición (mayorista).** En salida la respuesta abre la oportunidad; sin más, un comercio que ya
+compró y vuelve a escribir abriría otro «Pack de apertura». `crm.kindAfterWon` lo evita: si la
+persona tiene una oportunidad cerrada en una etapa terminal que no es la de perdido, la nueva nace con
+ese rubro. Después de una perdida vuelve a ser un primer pedido, porque nunca compró.
 
 **Por qué 45 días en el estudio.** Un proyecto se decide en semanas y con idas y vueltas (terreno,
 socio, financiación): un mes sin novedades todavía no es un no.
@@ -263,7 +268,7 @@ foránea hacia `lead_log`: es un esquema ajeno y no tiene clave única por conta
 
 El CRM se prende con **dos llaves**: el vertical declara la capacidad (`features.crmTab` y un
 bloque `crm`) y el tenant la activa con `CRM_ENABLED=1` en su `dashboard.env`. La imagen es
-una sola para todos los tenants, y hay tres corriendo `outbound-sales` (ventas, tasty, arka) de los
+una sola para todos los tenants, y hay tres tenants de salida (ventas y arka en `outbound-sales`, tasty en `outbound-wholesale`) de los
 que solo ventas compró el CRM: con una llave sola por vertical, el tablero aparecería en los tres.
 Es el mismo patrón del inbox (`lib/inbox.ts`) y de las acciones de campaña.
 

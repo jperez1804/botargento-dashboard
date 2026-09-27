@@ -250,6 +250,42 @@ maybe("opportunity sync", () => {
       expect(await opps2()).toHaveLength(1);
     });
 
+    describe("wholesale: a returning customer is a Reposición", () => {
+      let wholesale: typeof config;
+      const runWholesale = () =>
+        sync.ensureContacts([WA2]).then(() => sync.ensureOpportunities(wholesale, [WA2], { since: null }));
+      beforeAll(async () => {
+        wholesale = (await import("@/config/verticals/outbound-wholesale")).outboundWholesale.crm!;
+      });
+
+      it("opens the first order as Pack de apertura", async () => {
+        await wroteTo("growshop", 2);
+        await replied(30);
+        await runWholesale();
+        expect((await opps2()).map((r) => r.kind)).toEqual(["pack_apertura"]);
+      });
+
+      it("opens a Reposición when the shop writes again after a won order", async () => {
+        await wroteTo("growshop", 10);
+        await replied(300);
+        await runWholesale();
+        await sql`UPDATE dashboard.opportunities SET stage = 'cerrado', closed_at = NOW() - '200 minutes'::interval WHERE contact_wa_id = ${WA2}`;
+        await replied(5);
+        await runWholesale();
+        expect((await opps2()).map((r) => r.kind)).toEqual(["pack_apertura", "reposicion"]);
+      });
+
+      it("opens another Pack de apertura after a lost one — they never bought", async () => {
+        await wroteTo("growshop", 10);
+        await replied(300);
+        await runWholesale();
+        await sql`UPDATE dashboard.opportunities SET stage = 'perdido', closed_at = NOW() - '200 minutes'::interval WHERE contact_wa_id = ${WA2}`;
+        await replied(5);
+        await runWholesale();
+        expect((await opps2()).map((r) => r.kind)).toEqual(["pack_apertura", "pack_apertura"]);
+      });
+    });
+
     it("leaves the rubro blank when no campaign wrote to them, to be filled by hand", async () => {
       await replied(15);
       await runReply();
