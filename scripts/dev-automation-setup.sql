@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS automation.lead_log (
   profile_name    TEXT NOT NULL DEFAULT '',
   lead_name       TEXT NOT NULL DEFAULT '',
   message_type    TEXT NOT NULL DEFAULT '',
+  -- WhatsApp's wamid. What a stored media asset joins on.
+  message_id      TEXT NOT NULL DEFAULT '',
   text_body       TEXT NOT NULL DEFAULT '',
   intent          TEXT NOT NULL DEFAULT '',
   handoff         BOOLEAN NOT NULL DEFAULT FALSE,
@@ -28,6 +30,8 @@ CREATE TABLE IF NOT EXISTS automation.lead_log (
   sent_by         TEXT NOT NULL DEFAULT '',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Dev DBs created before message_id existed here.
+ALTER TABLE automation.lead_log ADD COLUMN IF NOT EXISTS message_id TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS ix_lead_log_contact_timestamp
   ON automation.lead_log (contact_wa_id, log_timestamp DESC);
@@ -76,6 +80,25 @@ CREATE INDEX IF NOT EXISTS ix_escalations_timestamp
   ON automation.escalations (escalation_timestamp DESC);
 CREATE INDEX IF NOT EXISTS ix_escalations_handoff_target
   ON automation.escalations (handoff_target);
+
+-- Media a lead sent, captured by the tenant's router (mirror of
+-- Plec Automation/n8n/compose/media-assets.sql; canonical since 2026-09-28).
+-- `content` holds the bytes; the view below deliberately omits it.
+CREATE TABLE IF NOT EXISTS automation.media_assets (
+  id                   BIGSERIAL PRIMARY KEY,
+  message_id           TEXT NOT NULL UNIQUE,
+  contact_wa_id        TEXT NOT NULL DEFAULT '',
+  media_kind           TEXT NOT NULL DEFAULT '',
+  media_id             TEXT NOT NULL DEFAULT '',
+  mime_type            TEXT NOT NULL DEFAULT '',
+  byte_size            INTEGER NOT NULL DEFAULT 0,
+  content              BYTEA,
+  fetch_status         TEXT NOT NULL DEFAULT '',
+  transcription_status TEXT NOT NULL DEFAULT '',
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_media_assets_contact
+  ON automation.media_assets (contact_wa_id, created_at DESC);
 
 -- ── Views (must match production column contract) ───────────────────────────
 
@@ -182,3 +205,13 @@ SELECT
 FROM contact_activity ca
 LEFT JOIN latest_handoff lh ON lh.contact_wa_id = ca.contact_wa_id
 ORDER BY ca.last_seen DESC;
+
+-- Metadata only: no `content`, so the thread can never drag binaries across
+-- the wire. The bytes are read by /api/media/[id] from the base table.
+CREATE OR REPLACE VIEW automation.v_media_assets AS
+SELECT
+  id, message_id, contact_wa_id, media_kind, mime_type, byte_size,
+  fetch_status, transcription_status,
+  (content IS NOT NULL) AS has_content,
+  created_at
+FROM automation.media_assets;
