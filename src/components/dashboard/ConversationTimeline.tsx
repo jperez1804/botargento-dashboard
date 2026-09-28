@@ -6,6 +6,7 @@
 
 import { cn } from "@/lib/utils";
 import { formatAutomationLabel } from "@/lib/automation-labels";
+import { MediaBubble } from "@/components/dashboard/MediaBubble";
 import type { LeadLogEntry } from "@/lib/queries/contacts";
 import type { IntentDef } from "@/config/verticals/_types";
 
@@ -128,10 +129,12 @@ export function ConversationTimeline({ entries, intents, locale, timezone }: Pro
                         {flowTag}
                       </div>
                     ) : null}
+                    {/* Media the lead sent (photo / voice note / PDF), then the
+                     * text: a caption, a transcript, or "(sin texto)". A media
+                     * message has text_body '' -- not null -- which is why the
+                     * old `messageText ?? …` rendered an empty bubble for it. */}
                     <div className="whitespace-pre-wrap break-words">
-                      {e.messageText ?? (
-                        <span className="text-[var(--soft-ink)] italic">(sin texto)</span>
-                      )}
+                      <MediaBubble entry={e} />
                     </div>
                     <div className="text-[11px] text-[var(--soft-ink)] tabular-nums mt-1 text-right">
                       {timeFmt.format(new Date(e.createdAt))}

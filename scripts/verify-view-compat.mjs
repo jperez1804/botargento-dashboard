@@ -24,6 +24,11 @@ const REQUIRED_VIEWS = [
   "v_follow_up_queue",
   "v_providers",
   "v_labor_pool",
+  // Media the lead sent (photo / voice note / PDF), metadata only. Present on
+  // all six tenants since 2026-09-28 (Plec Automation/n8n/compose/media-assets.sql);
+  // the conversation thread LEFT JOINs it, so a tenant without it would 42P01
+  // on every conversation -- better to fail here, at boot, with the name.
+  "v_media_assets",
 ];
 
 const url = process.env.TENANT_DB_URL;

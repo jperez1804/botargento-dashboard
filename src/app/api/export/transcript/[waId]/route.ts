@@ -8,6 +8,8 @@
 
 import { NextResponse } from "next/server";
 import { getContact, getConversation } from "@/lib/queries/contacts";
+import { MEDIA_LABELS_ES } from "@/config/media-labels";
+import { transcriptText } from "@/lib/media/bubble";
 
 type Params = { waId: string };
 
@@ -50,7 +52,9 @@ export async function GET(
     direction: e.direction,
     intent: e.intent ?? "",
     route: e.route ?? "",
-    text: e.messageText ?? "",
+    // A photo has no text: the CSV says "[foto]"; a voice note keeps its
+    // transcript, prefixed "[audio]". lead_log.text_body itself is untouched.
+    text: transcriptText(e, MEDIA_LABELS_ES),
   }));
   const csv = toCsv(rows);
 

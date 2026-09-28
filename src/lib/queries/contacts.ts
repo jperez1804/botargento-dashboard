@@ -20,6 +20,18 @@ export type ListContactsParams = {
   offset?: number;
 };
 
+// A stored media asset attached to an inbound message, from
+// automation.v_media_assets (metadata only -- never the bytes; those are
+// fetched by /api/media/[id] when the bubble renders).
+export type MediaRef = {
+  id: number;
+  kind: string;
+  mimeType: string;
+  fetchStatus: string;
+  hasContent: boolean;
+  byteSize: number;
+};
+
 export type LeadLogEntry = {
   id: number;
   direction: "inbound" | "outbound";
@@ -30,6 +42,12 @@ export type LeadLogEntry = {
   // '' = bot/legacy, 'human' = agent-sent via the two-way inbox. Renders as a
   // third bubble style in ConversationTimeline.
   sentBy: string;
+  // lead_log.message_type: 'text', 'image', 'audio_transcribed', 'document',
+  // 'video'... Lets the thread say "Foto — ya no disponible" for a media
+  // message whose asset was never captured or has been swept.
+  messageType: string;
+  // The captured asset, when the tenant's router stored one for this message.
+  media: MediaRef | null;
 };
 
 function mapContact(r: Record<string, unknown>): ContactSummary {
@@ -91,15 +109,37 @@ export async function getConversation(waId: string): Promise<LeadLogEntry[]> {
   // The to_jsonb(ll) ->> 'sent_by' indirection guards tenants whose schema
   // predates the two-way inbox ALTER (lead_log.sent_by) — a direct column
   // reference would 42703 on them; this query runs for every tenant.
+  // message_id and message_type exist on every tenant (checked on all six,
+  // 2026-09-28), so they are referenced directly. The LEFT JOIN goes to the
+  // VIEW, which has no `content` column: the thread never pulls bytes, only
+  // enough to decide what to render. automation.media_assets exists on every
+  // tenant too (applied 2026-09-28, empty where the router does not capture),
+  // so this cannot 42P01 anywhere.
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT id, direction, intent, route, text_body AS message_text, log_timestamp AS created_at,
-           COALESCE(to_jsonb(ll) ->> 'sent_by', '') AS sent_by
+    SELECT ll.id, ll.direction, ll.intent, ll.route, ll.text_body AS message_text,
+           ll.log_timestamp AS created_at,
+           COALESCE(to_jsonb(ll) ->> 'sent_by', '') AS sent_by,
+           ll.message_type,
+           m.id AS media_id, m.media_kind, m.mime_type, m.fetch_status, m.has_content, m.byte_size
     FROM automation.lead_log AS ll
-    WHERE contact_wa_id = ${waId}
-    ORDER BY log_timestamp ASC, id ASC
+    LEFT JOIN automation.v_media_assets AS m
+      ON ll.direction = 'inbound' AND m.message_id = ll.message_id
+    WHERE ll.contact_wa_id = ${waId}
+    ORDER BY ll.log_timestamp ASC, ll.id ASC
   `;
   return rows.map((r) => {
     const direction = String(r.direction);
+    const media: MediaRef | null =
+      r.media_id === null || r.media_id === undefined
+        ? null
+        : {
+            id: Number(r.media_id),
+            kind: String(r.media_kind ?? ""),
+            mimeType: String(r.mime_type ?? ""),
+            fetchStatus: String(r.fetch_status ?? ""),
+            hasContent: r.has_content === true,
+            byteSize: Number(r.byte_size ?? 0),
+          };
     return {
       id: Number(r.id),
       direction: direction === "outbound" ? "outbound" : "inbound",
@@ -108,6 +148,8 @@ export async function getConversation(waId: string): Promise<LeadLogEntry[]> {
       messageText: r.message_text === null ? null : String(r.message_text),
       createdAt: new Date(r.created_at as string | Date).toISOString(),
       sentBy: String(r.sent_by ?? ""),
+      messageType: String(r.message_type ?? ""),
+      media,
     };
   });
 }

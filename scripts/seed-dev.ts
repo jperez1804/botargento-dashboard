@@ -66,7 +66,23 @@ type LeadLogRow = {
   text_body: string;
   handoff: boolean;
   log_timestamp: string;
+  // Media messages set these; everything else is normalised to 'text' / ''
+  // right before the insert.
+  message_type?: string;
+  message_id?: string;
 };
+
+// The contact the e2e suite opens ("Lucía"). Gets three media messages so the
+// thread renders every state: a stored photo, a photo whose asset is gone, and
+// a file that was too large to keep.
+const MEDIA_WAID = "5491155501004";
+const MEDIA_NAME = "Lucía Fernández";
+// A real 1x1 PNG, so /api/media/[id] answers image/png with bytes a browser
+// decodes -- the e2e fetches it through the logged-in page context.
+const PNG_1x1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 type EscalationRow = {
   contact_wa_id: string;
@@ -123,6 +139,7 @@ async function seedAllowlist() {
 async function seedActivity() {
   await sql`TRUNCATE automation.lead_log RESTART IDENTITY`;
   await sql`TRUNCATE automation.escalations RESTART IDENTITY`;
+  await sql`TRUNCATE automation.media_assets RESTART IDENTITY`;
 
   const now = new Date();
   const messageRows: LeadLogRow[] = [];
@@ -264,6 +281,31 @@ async function seedActivity() {
     });
   }
 
+  // Media messages for the e2e contact, 2h / 3h / 4h ago. text_body is '' for
+  // a photo, exactly as the router logs it; the voice-note case carries its
+  // transcript there.
+  const mediaMessage = (hoursAgo: number, type: string, messageId: string, text = "") => ({
+    contact_wa_id: MEDIA_WAID,
+    lead_name: MEDIA_NAME,
+    direction: "inbound" as const,
+    intent: "Ventas",
+    route: "media_ack",
+    text_body: text,
+    handoff: false,
+    log_timestamp: new Date(now.getTime() - hoursAgo * 3600_000).toISOString(),
+    message_type: type,
+    message_id: messageId,
+  });
+  messageRows.push(
+    mediaMessage(2, "image", "wamid.SEED-MEDIA-STORED"),
+    mediaMessage(3, "image", "wamid.SEED-MEDIA-GONE"),
+    mediaMessage(4, "document", "wamid.SEED-MEDIA-TOO-LARGE"),
+  );
+  for (const r of messageRows) {
+    r.message_type ??= "text";
+    r.message_id ??= "";
+  }
+
   // Insert in batches to keep the parameter count reasonable.
   const BATCH = 200;
   for (let i = 0; i < messageRows.length; i += BATCH) {
@@ -279,10 +321,23 @@ async function seedActivity() {
         "text_body",
         "handoff",
         "log_timestamp",
+        "message_type",
+        "message_id",
       )}
     `;
   }
   console.log(`  ✓ ${messageRows.length} lead_log rows inserted`);
+
+  // The captured assets: one with bytes, one that was too large (row kept so
+  // the thread can say why), and none at all for SEED-MEDIA-GONE.
+  await sql`
+    INSERT INTO automation.media_assets
+      (message_id, contact_wa_id, media_kind, media_id, mime_type, byte_size, content, fetch_status)
+    VALUES
+      ('wamid.SEED-MEDIA-STORED', ${MEDIA_WAID}, 'image', 'seed-1', 'image/png', ${PNG_1x1.length}, ${PNG_1x1}, 'stored'),
+      ('wamid.SEED-MEDIA-TOO-LARGE', ${MEDIA_WAID}, 'document', 'seed-2', 'application/pdf', 9000000, NULL, 'too_large')
+  `;
+  console.log("  ✓ 2 media_assets rows inserted (1 stored PNG, 1 too_large)");
 
   await sql`
     INSERT INTO automation.escalations ${sql(
