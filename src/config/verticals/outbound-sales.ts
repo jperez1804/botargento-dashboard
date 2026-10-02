@@ -157,6 +157,13 @@ export const outboundSales: VerticalConfig = {
       },
     ],
     autoStages: { new: "nuevo", qualified: "calificado", lost: "perdido" },
+    // The wizard's entry step ("¿hoy cómo atendés?") is where auto-responders
+    // and "ya tengo, gracias" land: free text there opens nothing. A tap on a
+    // template or wizard button does.
+    passiveReplyRoutes: ["guided_ventas_hoy", "guided_ventas_dormant", "unsupported_content"],
+    // "Veámoslo" (the showcase) is interest enough for Calificado; the handoff
+    // only fires later, on "Quiero un mes gratis".
+    qualifyingRoutes: ["guided_ventas_oferta"],
     // A cold prospect who answered once and went quiet for two weeks is gone.
     autoLostDays: 14,
     warnDays: 3,
@@ -219,8 +226,9 @@ export const outboundSales: VerticalConfig = {
       },
       guide: {
         ...CRM_LABELS_ES.guide,
-        autoNew: "Cuando la persona responde a una campaña, o cuando se carga a mano.",
-        autoQualified: "Cuando pide la demo, pregunta el precio o hace una pregunta concreta y el bot deriva.",
+        autoNew:
+          "Cuando la persona responde a una campaña tocando un botón o escribiendo más allá del primer mensaje, o cuando se carga a mano. Un contestador automático o un «gracias, ya tengo» no abre nada: queda en «Sin derivar».",
+        autoQualified: "Cuando toca «Veámoslo», pide la demo, pregunta el precio o hace una pregunta concreta y el bot deriva.",
         sourcesBody:
           "Los prospectos que responden a una campaña llegan como Campaña. Los que escriben por su cuenta, como WhatsApp. Los que conociste en otro lado se cargan a mano.",
         opportunitiesIntro:
