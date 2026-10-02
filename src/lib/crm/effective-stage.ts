@@ -42,6 +42,9 @@ export type LeadSignals = {
   lastHandoffAt: Date | null; // Latest real handoff (runtime errors excluded).
   optedOutAt: Date | null;
   lastCrmActivityAt: Date | null; // MAX(occurred_at) over ACTIVITY_EVENT_KINDS.
+  // When the person's LATEST message in the window was a polite "no"
+  // (crm.declinedRoutes). Null when there is none, or they wrote again after.
+  declinedAt?: Date | null;
 };
 
 export type LeadStateRow = {
@@ -67,7 +70,7 @@ export type LeadStateRow = {
 
 export type LostInfo = {
   at: Date;
-  reason: "opt_out" | "inactivity" | "manual";
+  reason: "opt_out" | "inactivity" | "manual" | "declined";
   detail: string; // Free-text motive for manual losses; '' otherwise.
   reversible: boolean;
 };
@@ -181,6 +184,17 @@ export function deriveLead(
     source = "auto";
     stageSince = signals.optedOutAt;
     lost = { at: signals.optedOutAt, reason: "opt_out", detail: "", reversible: false };
+  } else if (
+    signals.declinedAt &&
+    !(source === "manual" && isTerminal(stage)) &&
+    !(state?.stageChangedAt && state.stageChangedAt.getTime() > signals.declinedAt.getTime())
+  ) {
+    // A polite "no" closes the conversation for now; an advisor moving the
+    // opportunity afterwards, or the person writing again, takes it back.
+    stage = config.autoStages.lost;
+    source = "auto";
+    stageSince = signals.declinedAt;
+    lost = { at: signals.declinedAt, reason: "declined", detail: "", reversible: true };
   } else if (stage === config.autoStages.lost && source === "manual") {
     lost = {
       at: stageSince ?? now,

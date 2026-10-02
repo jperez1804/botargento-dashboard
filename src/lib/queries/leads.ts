@@ -186,6 +186,18 @@ async function selectOpportunityRows(
        AND (o.closed_at IS NULL OR l.log_timestamp < o.closed_at)
       GROUP BY o.id
     ),
+    last_in AS (
+      -- The person's latest message inside the window: a polite "no" there
+      -- (crm.declinedRoutes) reads the opportunity as lost, until they write again.
+      SELECT DISTINCT ON (o.id) o.id, l.route, l.log_timestamp
+      FROM opps o
+      JOIN automation.lead_log l
+        ON l.contact_wa_id = o.contact_wa_id
+       AND l.direction = 'inbound'
+       AND l.log_timestamp >= o.opened_at
+       AND (o.closed_at IS NULL OR l.log_timestamp < o.closed_at)
+      ORDER BY o.id, l.log_timestamp DESC, l.id DESC
+    ),
     budgets AS (
       -- Latest handoff of this opportunity that carried an amount. Read
       -- through to_jsonb: not every tenant has the budget columns.
@@ -252,6 +264,7 @@ async function selectOpportunityRows(
       m.first_seen, m.last_message_at,
       GREATEST(h.last_handoff_at, q.last_qualified_at) AS last_handoff_at,
       COALESCE(h.handoff_count, 0) AS handoff_count,
+      CASE WHEN li.route = ANY(${[...(config.declinedRoutes ?? [])]}::text[]) THEN li.log_timestamp END AS declined_at,
       b.budget_amount, b.budget_currency, sn.price_range,
       e.last_crm_activity_at,
       ni.kind AS new_intent,
@@ -263,6 +276,7 @@ async function selectOpportunityRows(
     LEFT JOIN msgs m ON m.id = o.id
     LEFT JOIN handoffs h ON h.id = o.id
     LEFT JOIN qualifies q ON q.id = o.id
+    LEFT JOIN last_in li ON li.id = o.id
     LEFT JOIN budgets b ON b.id = o.id
     LEFT JOIN snaps sn ON sn.contact_wa_id = o.contact_wa_id
     LEFT JOIN events e ON e.id = o.id
@@ -277,6 +291,7 @@ async function selectOpportunityRows(
       lastHandoffAt: toDate(r.last_handoff_at),
       optedOutAt: toDate(r.opted_out_at),
       lastCrmActivityAt: toDate(r.last_crm_activity_at),
+      declinedAt: toDate(r.declined_at),
     };
     const state: LeadStateRow = {
       stage: r.stage === null ? null : String(r.stage),

@@ -77,6 +77,7 @@ export const CRM_LABELS_ES: CrmLabels = {
   lostReasonAuto: {
     opt_out: "pidió no recibir más mensajes",
     inactivity: "sin actividad",
+    declined: "dijo que por ahora no",
   },
   eventKinds: {
     note: "Nota",
