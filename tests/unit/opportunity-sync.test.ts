@@ -188,12 +188,17 @@ maybe("opportunity sync", () => {
       INSERT INTO outreach.recipients (campaign_id, wa_id, business_name, vertical, status, last_send_at)
       VALUES (1, ${WA2}, 'Estudio Prueba', ${vertical}, 'sent', NOW() - ${`${daysAgo} days`}::interval)
     `;
-    const replied = (minutesAgo: number) => sql`
+    const inbound = (minutesAgo: number, route: string, messageType: string, text: string) => sql`
       INSERT INTO automation.lead_log
-        (contact_wa_id, lead_name, direction, intent, route, text_body, sent_by, log_timestamp)
-      VALUES (${WA2}, 'Prueba', 'inbound', 'ventas_lead', 'guided_ventas_hoy', 'hola',
+        (contact_wa_id, lead_name, direction, intent, route, message_type, text_body, sent_by, log_timestamp)
+      VALUES (${WA2}, 'Prueba', 'inbound', 'ventas_lead', ${route}, ${messageType}, ${text},
               '', NOW() - ${`${minutesAgo} minutes`}::interval)
     `;
+    /** A real reply: the prospect taps the campaign template's button. */
+    const replied = (minutesAgo: number) => inbound(minutesAgo, "guided_ventas_hoy", "template_button_reply", "Ver ejemplo");
+    /** What an auto-responder (or "ya tengo, gracias") looks like: free text on the entry step. */
+    const autoReplied = (minutesAgo: number) =>
+      inbound(minutesAgo, "guided_ventas_hoy", "text", "Gracias por comunicarte, a la brevedad te respondemos");
     const askedForDemo = (minutesAgo: number) => sql`
       INSERT INTO automation.escalations
         (contact_wa_id, escalation_type, intent, escalation_timestamp, reason)
@@ -284,6 +289,28 @@ maybe("opportunity sync", () => {
         await runWholesale();
         expect((await opps2()).map((r) => r.kind)).toEqual(["pack_apertura", "pack_apertura"]);
       });
+    });
+
+    it("does not open on an auto-responder, and opens when the person taps a button", async () => {
+      await wroteTo("inmobiliaria", 2);
+      await autoReplied(60);
+      await runReply();
+      expect(await opps2()).toHaveLength(0);
+      // Later the person answers the wizard's question with a button.
+      await inbound(10, "guided_ventas_interes", "interactive_button_reply", "a_mano");
+      await runReply();
+      expect(await opps2()).toHaveLength(1);
+    });
+
+    it("tapping «Veámoslo» counts as Calificado, without a handoff", async () => {
+      await wroteTo("inmobiliaria", 2);
+      await replied(60);
+      await runReply();
+      const [opp] = await sql<{ id: number }[]>`SELECT id FROM dashboard.opportunities WHERE contact_wa_id = ${WA2}`;
+      const { getOpportunity } = await import("@/lib/queries/leads");
+      expect((await getOpportunity(outbound, Number(opp!.id), new Date()))?.lead.stage).toBe("nuevo");
+      await inbound(5, "guided_ventas_oferta", "interactive_button_reply", "veamoslo");
+      expect((await getOpportunity(outbound, Number(opp!.id), new Date()))?.lead.stage).toBe("calificado");
     });
 
     it("leaves the rubro blank when no campaign wrote to them, to be filled by hand", async () => {

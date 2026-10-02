@@ -509,6 +509,16 @@ export type CrmConfig = {
   // A wholesale customer who bought and writes again is re-ordering, not a new
   // prospect. A key of `kinds`. Default: the person's usual rubro.
   kindAfterWon?: string;
+  // With opener "reply": a reply that is NOT a button tap and lands on one of
+  // these bot routes does not open an opportunity. The entry step is where an
+  // auto-responder ("gracias por comunicarte…") or a "ya tengo, gracias"
+  // lands; a person who taps a button, or writes past that step, opens one.
+  // Those who never do stay in Conversaciones › "Sin derivar".
+  passiveReplyRoutes?: ReadonlyArray<string>;
+  // Inbound bot routes that count as a qualified signal, like a handoff: an
+  // opportunity whose person reached one moves to autoStages.qualified.
+  // Outbound sales: tapping "Veámoslo" (the showcase) is interest enough.
+  qualifyingRoutes?: ReadonlyArray<string>;
   labels: CrmLabels;
 };
 

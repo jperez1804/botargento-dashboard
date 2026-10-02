@@ -97,6 +97,14 @@ export function kindOf(map: IntentMap, raw: string | null | undefined): string |
   return i === -1 ? null : (map.kinds[i] ?? null);
 }
 
+/** lead_log.message_type values that mean the person tapped a button we sent. */
+export const BUTTON_MESSAGE_TYPES = [
+  "template_button_reply",
+  "interactive_button_reply",
+  "button",
+  "interactive",
+] as const;
+
 const idFilter = (waIds?: ReadonlyArray<string>) =>
   waIds && waIds.length > 0 ? [...waIds] : null;
 
@@ -292,6 +300,7 @@ async function openFromReplies(
     hasSessionMemory(),
   ]);
   const kinds = personKindCtes(config, recipients, snapshot);
+  const passive = [...(config.passiveReplyRoutes ?? [])];
 
   const replies = sql`
     SELECT l.contact_wa_id, pk.kind, l.log_timestamp AS at
@@ -303,6 +312,12 @@ async function openFromReplies(
       ${only ? sql`AND l.contact_wa_id IN ${sql(only)}` : sql``}
       ${suppression
         ? sql`AND NOT EXISTS (SELECT 1 FROM outreach.suppression s WHERE s.wa_id = l.contact_wa_id)`
+        : sql``}
+      ${passive.length > 0
+        ? sql`AND NOT (
+            l.route = ANY(${passive}::text[])
+            AND COALESCE(l.message_type, '') <> ALL(${[...BUTTON_MESSAGE_TYPES]}::text[])
+          )`
         : sql``}
   `;
 
