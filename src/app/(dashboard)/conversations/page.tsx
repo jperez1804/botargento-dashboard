@@ -71,7 +71,7 @@ export default async function ConversationsPage({ searchParams }: Props) {
     `/conversations?filter=no_handoff${page > 1 ? `&page=${page}` : ""}`;
 
   return (
-    <div className="space-y-6">
+    <div data-board-bleed className="space-y-6">
       <PageHeader
         kicker="Operación"
         title="Conversaciones"

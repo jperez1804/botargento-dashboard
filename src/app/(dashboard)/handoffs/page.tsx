@@ -20,7 +20,7 @@ export default async function HandoffsPage() {
   const vertical = verticalConfig();
 
   return (
-    <div className="space-y-6">
+    <div data-board-bleed className="space-y-6">
       <PageHeader
         kicker="Operación"
         title="Derivaciones"
