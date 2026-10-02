@@ -160,7 +160,10 @@ export const outboundSales: VerticalConfig = {
     // The wizard's entry step ("¿hoy cómo atendés?") is where auto-responders
     // and "ya tengo, gracias" land: free text there opens nothing. A tap on a
     // template or wizard button does.
-    passiveReplyRoutes: ["guided_ventas_hoy", "guided_ventas_dormant", "unsupported_content"],
+    passiveReplyRoutes: ["guided_ventas_hoy", "guided_ventas_dormant", "unsupported_content", "guided_ventas_declined"],
+    // A polite "no" («por el momento te agradezco», «ya tengo contratado»): the
+    // wizard closes the script there, and the board shows it as lost.
+    declinedRoutes: ["guided_ventas_declined"],
     // "Veámoslo" (the showcase) is interest enough for Calificado; the handoff
     // only fires later, on "Quiero un mes gratis".
     qualifyingRoutes: ["guided_ventas_oferta"],
@@ -181,7 +184,7 @@ export const outboundSales: VerticalConfig = {
         source: "snapshot",
         key: "hoy",
         label: "Cómo atiende hoy",
-        valueLabels: { a_mano: "A mano", algo: "Tiene algo", no: "No las atiende" },
+        valueLabels: { a_mano: "A mano", algo: "Tiene algo", no: "No llega a todas" },
         display: "chip",
       },
       {

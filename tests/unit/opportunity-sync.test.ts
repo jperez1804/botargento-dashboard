@@ -302,6 +302,22 @@ maybe("opportunity sync", () => {
       expect(await opps2()).toHaveLength(1);
     });
 
+    it("a polite «no» as the first reply opens nothing; after a tap it shows as lost", async () => {
+      await wroteTo("inmobiliaria", 2);
+      await inbound(60, "guided_ventas_declined", "text", "Por el momento te agradezco");
+      await runReply();
+      expect(await opps2()).toHaveLength(0);
+      await sql`DELETE FROM automation.lead_log WHERE contact_wa_id = ${WA2}`;
+      await replied(50);
+      await runReply();
+      await inbound(5, "guided_ventas_declined", "text", "No estoy trabajando por el momento");
+      const [opp] = await sql<{ id: number }[]>`SELECT id FROM dashboard.opportunities WHERE contact_wa_id = ${WA2}`;
+      const { getOpportunity } = await import("@/lib/queries/leads");
+      const row = await getOpportunity(outbound, Number(opp!.id), new Date());
+      expect(row?.lead.stage).toBe("perdido");
+      expect(row?.lead.lost?.reason).toBe("declined");
+    });
+
     it("tapping «Veámoslo» counts as Calificado, without a handoff", async () => {
       await wroteTo("inmobiliaria", 2);
       await replied(60);

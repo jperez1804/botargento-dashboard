@@ -235,7 +235,7 @@ export type CrmLabels = {
   reminderUpcomingTemplate: string;
   lostReasonLabel: string;
   lostReasons: ReadonlyArray<string>;
-  lostReasonAuto: { opt_out: string; inactivity: string };
+  lostReasonAuto: { opt_out: string; inactivity: string; declined: string };
   eventKinds: Record<CrmEventKind, string>;
   errors: Record<string, string>;
 
@@ -519,6 +519,11 @@ export type CrmConfig = {
   // opportunity whose person reached one moves to autoStages.qualified.
   // Outbound sales: tapping "Veámoslo" (the showcase) is interest enough.
   qualifyingRoutes?: ReadonlyArray<string>;
+  // Inbound bot routes where the person said a polite "no" (not an opt-out).
+  // When the person's latest message inside the opportunity's window landed
+  // on one, the opportunity reads as lost, reason "declined" — reversible:
+  // a later message or an advisor moving it brings it back.
+  declinedRoutes?: ReadonlyArray<string>;
   labels: CrmLabels;
 };
 

@@ -44,6 +44,34 @@ function state(overrides: Partial<LeadStateRow> = {}): LeadStateRow {
   };
 }
 
+describe("deriveLead — a polite no", () => {
+  const sales = outboundSales.crm!;
+  it("reads as lost, reversible, with its own reason", () => {
+    const lead = deriveLead(signals({ declinedAt: daysAgo(1) }), state(), sales, NOW);
+    expect(lead.stage).toBe(sales.autoStages.lost);
+    expect(lead.lost).toMatchObject({ reason: "declined", reversible: true });
+  });
+  it("an advisor moving it afterwards wins", () => {
+    const lead = deriveLead(
+      signals({ declinedAt: daysAgo(2) }),
+      state({ stage: "demo", stageChangedAt: daysAgo(1) }),
+      sales,
+      NOW,
+    );
+    expect(lead.stage).toBe("demo");
+    expect(lead.lost).toBeNull();
+  });
+  it("does not reopen a closed deal", () => {
+    const lead = deriveLead(
+      signals({ declinedAt: daysAgo(1) }),
+      state({ stage: "cerrado", stageChangedAt: daysAgo(3) }),
+      sales,
+      NOW,
+    );
+    expect(lead.stage).toBe("cerrado");
+  });
+});
+
 describe("deriveLead — automatic stages", () => {
   it("is nuevo with no signals and no manual stage", () => {
     const lead = deriveLead(signals(), null, config, NOW);
