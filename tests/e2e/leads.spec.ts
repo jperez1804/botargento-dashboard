@@ -34,10 +34,12 @@ async function withSql<T>(fn: (sql: ReturnType<typeof postgres>) => Promise<T>):
 
 const leadRows = (page: Page) => page.locator('a[aria-label^="Leads: "]');
 
-// What <input type="date"> holds for a Date, in the browser's local calendar
-// (the runner and the browser share the machine, so local here = local there).
+// What <input type="date"> holds for a Date, in the browser's calendar. The
+// browser is pinned to the tenants' timezone (playwright.config.ts); the test
+// process is not (CI is UTC), so compute it there explicitly.
+const BROWSER_TZ = "America/Argentina/Buenos_Aires";
 const localDateInput = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  new Intl.DateTimeFormat("en-CA", { timeZone: BROWSER_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 
 // The audit row is written after the handler's transaction commits, so a test
 // that just saw the state change must poll for it rather than read once.
