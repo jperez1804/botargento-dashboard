@@ -17,6 +17,11 @@ export default defineConfig({
   use: {
     baseURL: BASE,
     trace: "retain-on-failure",
+    // The browser runs where the tenants are. CI is UTC: between 21:00 and
+    // midnight in Buenos Aires its "tomorrow" was already the day after the
+    // tenant's, and "Vence mañana" read "pasado mañana" (main, 2026-10-02).
+    timezoneId: "America/Argentina/Buenos_Aires",
+    locale: "es-AR",
   },
   // Dev server is started by scripts/run-e2e.sh outside of Playwright so we
   // can capture stdout into a known file (.playwright-dev-server.log) that
