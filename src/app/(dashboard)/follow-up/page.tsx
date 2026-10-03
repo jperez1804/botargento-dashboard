@@ -21,7 +21,7 @@ export default async function FollowUpPage() {
   const low = rows.filter((r) => r.priority === "low").length;
 
   return (
-    <div className="space-y-6">
+    <div data-board-bleed className="space-y-6">
       <PageHeader
         kicker="Operación"
         title="Seguimiento"

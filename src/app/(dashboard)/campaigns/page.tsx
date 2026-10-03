@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { verticalConfig } from "@/config/verticals";
 import { tenantConfig } from "@/config/tenant";
@@ -14,16 +15,30 @@ import { CampaignsPoller } from "@/components/dashboard/CampaignRowActions";
 import { campaignActionsEnabled } from "@/lib/campaigns";
 import { formatNumber, formatPercent } from "@/lib/format";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 const DAILY_WINDOW = 28;
 
-export default async function CampaignsPage() {
+// Same chips as Conversaciones › "Sin derivar": URL state, so the filter
+// survives the poller's refresh and a shared link.
+const CHIP =
+  "inline-flex h-[30px] items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-150";
+const CHIP_ON =
+  "border-[color-mix(in_oklch,var(--client-primary)_55%,var(--rule))] bg-[color-mix(in_oklch,var(--client-primary)_12%,var(--surface))] text-[var(--ink)]";
+const CHIP_OFF =
+  "border-[var(--rule)] bg-[var(--canvas-2)] text-[var(--muted-ink)] hover:border-[var(--rule-strong)] hover:text-[var(--ink)]";
+
+type SearchParams = Promise<{ status?: string }>;
+
+export default async function CampaignsPage({ searchParams }: { searchParams: SearchParams }) {
   if (!verticalConfig().features?.campaignsTab) {
     notFound();
   }
 
+  const sp = await searchParams;
+  const activeOnly = sp.status === "active";
   const tenant = tenantConfig();
   const [overview, campaigns, daily, quality] = await Promise.all([
     getOutreachOverview(),
@@ -31,6 +46,9 @@ export default async function CampaignsPage() {
     selectCampaignDaily(DAILY_WINDOW),
     getQualityCurrent(),
   ]);
+
+  const activeCount = campaigns.filter((c) => c.status === "active").length;
+  const shown = activeOnly ? campaigns.filter((c) => c.status === "active") : campaigns;
 
   // Sum the per-campaign daily rows into one series for the chart.
   const byDay = new Map<string, number>();
@@ -49,7 +67,7 @@ export default async function CampaignsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div data-board-bleed className="space-y-6">
       <CampaignsPoller />
       <PageHeader
         kicker="Outbound"
@@ -80,8 +98,21 @@ export default async function CampaignsPage() {
         ))}
       </section>
 
+      <div className="flex flex-wrap gap-2" data-testid="campaigns-filter">
+        <Link href="/campaigns" data-testid="campaigns-all" className={cn(CHIP, activeOnly ? CHIP_OFF : CHIP_ON)}>
+          Todas · {formatNumber(campaigns.length, tenant.locale)}
+        </Link>
+        <Link
+          href="/campaigns?status=active"
+          data-testid="campaigns-active"
+          className={cn(CHIP, activeOnly ? CHIP_ON : CHIP_OFF)}
+        >
+          Activas · {formatNumber(activeCount, tenant.locale)}
+        </Link>
+      </div>
+
       <CampaignsTable
-        rows={campaigns}
+        rows={shown}
         locale={tenant.locale}
         actionsEnabled={campaignActionsEnabled()}
       />
